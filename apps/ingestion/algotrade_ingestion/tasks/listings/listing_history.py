@@ -23,6 +23,10 @@ rows stay without an id; no answer at all fails the run. The meta of a Massive-o
 request per record that has candidates (``meta_record_requests``, ``meta_record_failed``). Without
 a ``meta`` source no row gets a ``perma_ticker``.
 
+Massive's ticker details (``instruments/delisted_details``, the ``delisted-details`` task) fill the
+start of a record that still lacks one (``listing_merge`` step 6); no stored details is no details.
+Each row's ``start_source`` says where its start came from.
+
 Rows are stamped with their own ``source`` (``tiingo`` or ``massive``).
 """
 
@@ -32,7 +36,7 @@ from datetime import date
 import pandas as pd
 
 from algotrade.core.model.errors import MissingDataError
-from algotrade.data.listings.delisted import read_delisted_tickers
+from algotrade.data.listings.delisted import read_delisted_details, read_delisted_tickers
 from algotrade.data.listings.universe import TABLE
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.framework.run import IngestRun, NoResponseError, TaskContext
@@ -150,7 +154,9 @@ def ingest_listing_history(
             run.failed(f"no Massive delisted tickers to merge: {error}")
             return run.record
         asker = _RecordMeta(run, meta, session)
-        rows, merge_stats = merge_listings(listings, delisted, asker)
+        rows, merge_stats = merge_listings(
+            listings, delisted, asker, read_delisted_details(run.reader)
+        )
         extra: dict[str, int] = {}
         if meta is not None:
             matched = _with_perma(run, meta, rows, history, session)
