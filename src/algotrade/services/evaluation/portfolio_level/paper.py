@@ -2,15 +2,21 @@
 trades as ``OpenTrade`` rows, read only for its record owner, as known at ``as_of`` (a settlement
 written later is not leaked into an earlier night). Never another edge's rows, another owner's or
 any other store. A paper row stores no collateral, so ``capital`` is None and ``open_collateral``
-reads UNKNOWN on this path until the table stores it."""
+reads UNKNOWN on this path until the table stores it. ``paper_row`` is the level's row over that
+book, the one both tonight's picks and the paper record's own gate read (E9)."""
 
+from collections.abc import Callable, Mapping
 from datetime import date, datetime, timedelta
 
 import pandas as pd
 
 from algotrade.data import StoreReader
 from algotrade.data.paper.reading import LOOKBACK_DAYS, read_paper
-from algotrade.services.evaluation.portfolio_level.book import OpenTrade
+from algotrade.services.evaluation.portfolio_level.book import (
+    OpenTrade,
+    PortfolioRow,
+    portfolio_row,
+)
 
 SKIPPED = "skipped"  # a paper row's status (forward/settle.py owns the others)
 
@@ -49,3 +55,21 @@ def paper_book(
             )
         )
     return trades
+
+
+def paper_row(
+    reader: StoreReader,
+    edge_id: str,
+    owner: str,
+    session: date,
+    as_of: datetime | None,
+    sectors: Callable[[frozenset[str], date], Mapping[str, str | None]],
+    *,
+    option: bool = False,
+) -> PortfolioRow:
+    """The portfolio level's row at ``session`` over ``edge_id``'s paper book as known at ``as_of``
+    (``paper_book``); ``sectors`` reads the held names' sectors at ``session`` (only when one is
+    held). An empty book is a known state: a record holds nothing until it buys."""
+    trades = paper_book(reader, edge_id, owner, session, as_of)
+    held = frozenset(t.instrument_id for t in trades)
+    return portfolio_row(trades, session, sectors(held, session) if held else {}, option=option)

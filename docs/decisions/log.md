@@ -393,3 +393,11 @@ follow-up PR).
 - decided by: Fable on the owner's behalf
 - status: pending owner confirmation
 - Reasoning: keeps "site by PR" intact, no git-tracked file dirtied on the host, one new document kind instead of a store.
+
+## 2026-11-03 | Options design build row E9 | `[portfolio] book = "picks"`: build now or keep refused
+- Question: with the paper record now applying setup gates, a `portfolio.*` gate at tonight's picks reads the paper record's book (`book = "paper"`). Build the declared alternative `book = "picks"` (the book rebuilt from stored `results/edge_picks` rows held for the horizon) now?
+- Options: (1) build `picks` now; (2) keep it declared and refused, `paper` the only built book; (3) remove `picks` from `BOOKS`.
+- Decision: (2). Revisit only when a site setup needs a book the paper record cannot give.
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: the paper record is the harness's book (same spaced decision sessions, the trades the evidence counts, point in time at the previous cut-off) and now works end to end; a `picks` book would hold overlapping daily cohorts for every-session setups, a third book neither the harness nor the record evidences; no site setup reads `portfolio.*`. (3) rejected: ADR 0088 G15 declares it and a refusal with a reason keeps the vocabulary stable.
