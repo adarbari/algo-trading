@@ -414,6 +414,7 @@ TASKS: dict[str, Task] = {
                 ),
                 Param("symbols", ("--symbols",), str, "only these tickers (default: the universe)"),
                 Param("limit", ("--limit",), int, "per-CIK reads: fetch at most N CIKs this run"),
+                Param("delisted", ("--delisted",), None, "the delisted filers per CIK, from 2009"),
             ),
         ),
         Task(

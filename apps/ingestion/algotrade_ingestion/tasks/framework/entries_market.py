@@ -114,6 +114,7 @@ def run_filings(ctx: TaskContext, p: Params) -> RunRecord:
         p.get("since"),
         p.get("limit"),
         ctx.sources["sec_daily_index"],
+        bool(p.get("delisted")),
     )
 
 

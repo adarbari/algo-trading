@@ -68,6 +68,24 @@ Two ways to read SEC, one row shape (``_one_cik`` is the only writer of rows):
   session's partition like the calendar's; the one report per quarter is chosen by the rollup,
   not here.
 
+**Delisted mode** (``--delisted``, ADR 0087 PR4; the Form 25 follow-up of D1 / D10): the names
+of the universe are the live ones, so a company that delisted has no filings stored, and the
+survivorship-free history has none of its 8-Ks or Form 25. With ``--delisted`` the names are the
+listings of ``instruments/listing_history`` (in scope: ``scope_reason`` null) that ended on or
+before the session and on or after ``DELISTED_FROM`` (2010-01-01: ``delistings`` starts there),
+that have an ``instrument_id`` and a ``cik``, minus the funds (``delisted_names``: one ``Listed``
+per id, the last ticker; a CIK groups its ids like ``ciks_of``). Per CIK only, never the daily
+index walk, from ``--since`` (default ``DELISTED_SINCE`` 2009-01-01: the window of the first
+2010 delisting starts 120 days before it), ``--limit`` and the coverage skip as above, so the run
+is resumable and repeatable. Rows are written exactly as above (``_one_cik``; an Item 2.02
+release of a delisted id is an ``events/earnings`` row too). The run records no ``walked_to``,
+so it never moves the nightly's walk start (``filing_coverage``). ``stats``: ``delisted_listings``,
+``delisted_without_id``, ``delisted_without_cik``, ``delisted_funds``. Owner run (about 6,000
+CIKs at SEC's pacing, 30-60 min: detached, README "Long runs"), after ``listing-history`` and
+before ``delistings``::
+
+    algotrade-ingest run filings --delisted --since 2009-01-01
+
 Items: per CIK ``OK: <n> filings, <m> results`` (none is still ``OK``), ``NO_DATA`` (SEC has no
 filings for the CIK) or ``FETCH_ERROR``; per index day ``idx:<date>``. A name the universe does
 not hold is ``UNKNOWN`` (``sym:<SYMBOL>``). ``stats``: ``ciks`` / ``ciks_failed`` (submissions
@@ -90,6 +108,7 @@ from algotrade.data.events import (
     acceptance_sessions,
     filing_coverage,
 )
+from algotrade.data.listings.universe import listing_frame
 from algotrade.data.reference import companies, load_universe
 from algotrade.storage.runs import RunRecord
 from algotrade.storage.tables.schemas import EARNINGS_8K_SOURCE
@@ -123,6 +142,8 @@ FUND_TYPES = (
     "ETF",
     "ETN",
 )  # security types that file no 8-K (a CEF is kept on purpose: EB hand-off decision)
+DELISTED_FROM = date(2010, 1, 1)  # the first delisting the survivorship-free history carries
+DELISTED_SINCE = date(2009, 1, 1)  # delisted mode's default ``since``: 120 days before it, rounded
 STALE_DAYS = 7  # business days after which a missing daily index is an error, not "not yet"
 RESULTS_ITEM = "2.02"
 RESULTS_FORM = "8-K"  # an 8-K/A amends a release, it is no new report
@@ -186,6 +207,41 @@ def universe_names(run: IngestRun, requested: Sequence[str]) -> Names:
         for i, s in zip(frame.loc[~fund, "instrument_id"], frame.loc[~fund, "symbol"], strict=True)
     ]
     return Names(names, int(fund.sum()), unknown)
+
+
+@dataclass(frozen=True)
+class DelistedNames:
+    """The delisted names of a run by CIK (10 digits) and what was left out (module doc)."""
+
+    by_cik: dict[str, list[Listed]]
+    listings: int
+    without_id: int
+    without_cik: int
+    funds: int
+
+
+def delisted_names(run: IngestRun) -> DelistedNames:
+    """The listings that ended in ``DELISTED_FROM`` .. the session, grouped by CIK (module doc).
+    ``end_date`` is read to say which names left, never as a feature (identity)."""
+    frame, _ = listing_frame(run.reader)
+    end = pd.to_datetime(frame["end_date"])
+    gone = frame[(end >= pd.Timestamp(DELISTED_FROM)) & (end <= pd.Timestamp(run.session))]
+    gone = gone.assign(_end=end[gone.index]).sort_values(["_end", "start_date"], kind="stable")
+    has_id = gone["instrument_id"].notna() & (gone["instrument_id"].astype(str) != "")
+    with_id = gone[has_id]
+    fund = with_id["security_type"].isin(FUND_TYPES)
+    stocks = with_id[~fund]
+    cik = pd.Series(
+        [pad_cik(c) if pd.notna(c) else None for c in stocks["cik"]], index=stocks.index
+    )
+    named = stocks[cik.notna() & (cik != "")]
+    last = named.assign(_cik=cik[named.index]).drop_duplicates("instrument_id", keep="last")
+    by_cik: dict[str, list[Listed]] = {}
+    for iid, ticker, key in zip(last["instrument_id"], last["ticker"], last["_cik"], strict=True):
+        by_cik.setdefault(str(key), []).append(Listed(str(iid), str(ticker)))
+    return DelistedNames(
+        by_cik, len(gone), int((~has_id).sum()), len(stocks) - len(named), int(fund.sum())
+    )
 
 
 def ciks_of(run: IngestRun, names: Sequence[Listed]) -> dict[str, list[Listed]]:
@@ -477,25 +533,32 @@ def ingest_filings(
     since: date | None = None,
     limit: int | None = None,
     index: Source | None = None,
+    delisted: bool = False,
 ) -> RunRecord:
     """Store the event filings of the universe's operating companies (module doc): per CIK from
     ``since`` (at most ``limit`` CIKs), or, without ``since`` and with filings stored, the CIKs
-    the daily ``index`` shows filing since the latest stored day."""
+    the daily ``index`` shows filing since the latest stored day. ``delisted``: the delisted
+    names per CIK from ``since`` (default ``DELISTED_SINCE``), never the walk."""
     with IngestRun(ctx, TASK, session) as run:
-        covered = universe_names(run, requested)
-        names = covered.listed
+        gone = delisted_names(run) if delisted else None
+        covered = Names([], 0, []) if gone else universe_names(run, requested)
+        names = [n for group in gone.by_cik.values() for n in group] if gone else covered.listed
         for symbol in covered.unknown:
             run.record_item(f"sym:{symbol}", "UNKNOWN: not in the universe")
-        ciks = ciks_of(run, names)
+        ciks = gone.by_cik if gone else ciks_of(run, names)
         have = {n.instrument_id for group in ciks.values() for n in group}
         without = [n.symbol for n in names if n.instrument_id not in have]
+        if gone:
+            since = since or DELISTED_SINCE
         stored = stored_filings(run)
         walked = last_walked(run)
         # Where the walk starts: the last clean day an earlier nightly read; only without such a
         # run (the first nightly after a backfill) the latest stored filing day. A narrowed run
         # (--symbols) is no walk: it would record days it did not read for every other CIK.
         start = walked or (max(stored["filing_date"]) if len(stored) else None)
-        daily = index is not None and since is None and not requested and start is not None
+        daily = (
+            index is not None and not gone and since is None and not requested and start is not None
+        )
         skipped, days_asked, first_day, last_day, clean = 0, 0, None, None, False
         asked = filing_coverage(run.reader, FORMS_TAG, exclude=run.run_id).asked_since()
         backfilled: list[str] = []
@@ -521,7 +584,17 @@ def ingest_filings(
         written = run.publish(TABLE)
         results = run.publish(EARNINGS, sort_by="ts")
         run.stats.update(
-            mode="daily_index" if daily else "per_cik",
+            mode="daily_index" if daily else "delisted" if gone else "per_cik",
+            **(
+                {
+                    "delisted_listings": gone.listings,
+                    "delisted_without_id": gone.without_id,
+                    "delisted_without_cik": gone.without_cik,
+                    "delisted_funds": gone.funds,
+                }
+                if gone
+                else {}
+            ),
             names=len(names),
             with_cik=len(have),
             funds_excluded=covered.funds,
