@@ -43,7 +43,7 @@ from datetime import date
 import numpy as np
 import pandas as pd
 
-from algotrade.storage.tables.schemas import DELISTING_BASES, NO_EVENT, UNMEASURED
+from algotrade.storage.tables.schemas import NO_EVENT, UNMEASURED
 
 TRADING_DAYS = 252  # annualises the realised volatility
 BAD_BAR = "BAD_BAR"  # the outcome_reason of an UNMEASURED row (ADR 0061)
@@ -175,17 +175,21 @@ def _delisting_step(
 
 
 def unapplied_delistings(rows: pd.DataFrame, window: Window, events: Events) -> int:
-    """The names with a measured row and a delisting event in (S, T] that the row did not apply (a
-    bar at T, or a last bar that is not the event's last session): counted in the run's stats."""
-    ids = set(rows.loc[rows["outcome_status"] != UNMEASURED, "instrument_id"].astype(str))
-    applied = set(
-        rows.loc[rows["delisting_basis"].isin(DELISTING_BASES[:-1]), "instrument_id"].astype(str)
-    )
-    return sum(
-        1
-        for i in ids - applied
-        if any(window.start < day <= window.end for day, _, _ in events.get(i, ()))
-    )
+    """The names whose delisting event disagrees with their bars, counted in the run's stats: a bar
+    at T while the event's last session is before T (a name that came back, or a wrong date), and
+    a DELISTED row whose last bar is not the event's last session in (S, T] (``NO_EVENT``). A
+    window ending on the event's own last session is COMPLETE and right: not counted."""
+    count = 0
+    for iid, status, basis in zip(
+        rows["instrument_id"].astype(str), rows["outcome_status"], rows["delisting_basis"],
+        strict=True,
+    ):  # fmt: skip
+        days = [d for d, _, _ in events.get(iid, ()) if window.start < d <= window.end]
+        if status == "COMPLETE":
+            count += any(d < window.end for d in days)
+        elif status == "DELISTED" and basis == NO_EVENT:
+            count += bool(days)
+    return count
 
 
 def v2_view(rows: pd.DataFrame) -> pd.DataFrame:

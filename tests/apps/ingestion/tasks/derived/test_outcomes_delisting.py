@@ -29,6 +29,8 @@ from algotrade_ingestion.tasks.derived.outcomes import (
     compute_outcomes,
 )
 from tests.apps.ingestion.tasks.derived.test_outcomes import _outcomes, _store
+from tests.apps.ingestion.tasks.derived.test_outcomes_listings import Z
+from tests.apps.ingestion.tasks.derived.test_outcomes_listings import _store as _listing_store
 from tests.helpers.ingest_fakes import task_ctx
 from tests.helpers.rollup_store import END, write_rows
 
@@ -112,11 +114,22 @@ def test_without_events_the_rows_have_no_delisting_columns() -> None:
     assert "delisting_basis" not in rows.columns
 
 
-def _events(writer, days: list[date], last: date, known: date, value: float = -0.55) -> None:  # type: ignore[no-untyped-def]
-    row = {"instrument_id": "EQ:D", "ts": pd.Timestamp(last, tz="UTC"), "known_from": known,
-           "last_session": last, "last_close": 1.0, "reason": "BANKRUPTCY",
-           "terminal_basis": "REPLACEMENT", "delisting_return": value}  # fmt: skip
-    write_rows(writer, "events/delisting", days[-1], [row])
+def _events(  # type: ignore[no-untyped-def]
+    writer,
+    days: list[date],
+    last: date,
+    known: date,
+    iid: str = "EQ:D",
+    also: dict[str, date] | None = None,
+) -> None:
+    """One full snapshot: ``iid`` ended on ``last``; ``also``: more id -> last session."""
+    rows = [
+        {"instrument_id": i, "ts": pd.Timestamp(d, tz="UTC"), "known_from": known,
+         "last_session": d, "last_close": 1.0, "reason": "BANKRUPTCY",
+         "terminal_basis": "REPLACEMENT", "delisting_return": -0.55}
+        for i, d in {iid: last, **(also or {})}.items()
+    ]  # fmt: skip
+    write_rows(writer, "events/delisting", days[-1], rows)
 
 
 def _d_rows(reader: StoreReader, table: str) -> pd.DataFrame:
@@ -129,14 +142,20 @@ def _d_rows(reader: StoreReader, table: str) -> pd.DataFrame:
 
 
 def test_v2_is_unchanged_by_the_delisting_return_and_v3_carries_it() -> None:
-    plain_writer, plain_reader, days = _store()
-    event_writer, event_reader, _ = _store()
+    plain_writer, plain_reader, days = _store(event_only=True)
+    event_writer, event_reader, _ = _store(event_only=True)
     # known_from long after every window end: the label still reads it
-    _events(event_writer, days, days[-4], days[-1] + timedelta(days=60))
+    _events(event_writer, days, days[-4], days[-1] + timedelta(days=60),
+            also={"EQ:E": days[-6]})  # only an event marks E gone  # fmt: skip
     for writer in (plain_writer, event_writer):
         record = compute_outcomes(task_ctx(writer), days[-1])
         assert record.status == RunStatus.COMPLETE, record.stats
     pd.testing.assert_frame_equal(_outcomes(plain_reader, TABLE), _outcomes(event_reader, TABLE))
+    e3 = _outcomes(event_reader, TABLE_V3)
+    e3 = e3[e3["instrument_id"] == "EQ:E"]
+    assert "DELISTED" in set(e3["outcome_status"])  # v3 counts the event-only departure ...
+    e2 = _outcomes(event_reader, TABLE)
+    assert "DELISTED" not in set(e2[e2["instrument_id"] == "EQ:E"]["outcome_status"])  # v2 not
     v3 = _d_rows(event_reader, TABLE_V3)
     assert len(v3) and set(v3["delisting_basis"]) == {"REPLACEMENT"}
     v2 = _d_rows(event_reader, TABLE).set_index("horizon_sessions")["fwd_return"]
@@ -152,9 +171,8 @@ def test_a_backfill_reads_todays_snapshot_and_writes_v3_only() -> None:
     compute_outcomes(task_ctx(writer), days[-1], days[-6], days[-1])
     assert not reader.dates(TABLE) and reader.dates(TABLE_V3)
     assert set(_d_rows(reader, TABLE_V3)["delisting_basis"]) == {"REPLACEMENT"}
-    by_end = {r.session_date: r.stats["delisting_mismatch"] for r in reader.runs("outcomes")}
-    # only the window ending on D's last bar has the event inside (S, T] with a bar at T
-    assert {d: n > 0 for d, n in by_end.items()} == {d: d == _LAST for d in by_end}
+    # a window ending on D's own last session is COMPLETE and right: no run counts a mismatch
+    assert [r.stats["delisting_mismatch"] for r in reader.runs("outcomes")] == [0] * 6
 
 
 def test_a_late_event_rewrites_only_the_v3_row_on_the_recheck() -> None:
@@ -169,12 +187,27 @@ def test_a_late_event_rewrites_only_the_v3_row_on_the_recheck() -> None:
     assert set(_d_rows(reader, TABLE_V3)["delisting_basis"]) == {"REPLACEMENT"}
 
 
-def test_an_event_that_disagrees_with_the_reference_date_is_a_conflict() -> None:
-    writer, _reader, days = _store()
-    _events(writer, days, days[-5], days[-1])  # the reference says D left on days[-2]
-    record = compute_outcomes(task_ctx(writer), days[-1])
-    assert record.stats["delisting_conflicts"] == 1
-    assert record.stats["delisting_mismatch"] > 0  # D's last bar (days[-4]) is not the event's
+def test_an_event_is_a_conflict_only_against_the_listing_historys_last_day() -> None:
+    writer, _reader, days = _listing_store()  # Z's listing ends on days[-4]
+    _events(writer, days, days[-4], days[-1], iid=Z)
+    assert compute_outcomes(task_ctx(writer), days[-1]).stats["delisting_conflicts"] == 0
+    other, _reader, days = _listing_store()
+    _events(other, days, days[-5], days[-1], iid=Z)
+    assert compute_outcomes(task_ctx(other), days[-1]).stats["delisting_conflicts"] == 1
+
+
+def test_a_reference_date_after_the_last_bar_is_not_a_conflict() -> None:
+    writer, _reader, days = _store()  # the reference says D left on days[-2], its last bar days[-4]
+    _events(writer, days, days[-4], days[-1])
+    assert compute_outcomes(task_ctx(writer), days[-1]).stats["delisting_conflicts"] == 0
+
+
+def test_a_bar_after_the_event_or_a_wrong_last_bar_is_a_mismatch() -> None:
+    bars = _bars({"EQ:D": [50, 45, 40, 41, 42], "EQ:F": [50, 45, None, None, None]})
+    events = {"EQ:D": [(W.sessions[2], -0.5, "REPLACEMENT")],
+              "EQ:F": [(W.sessions[3], -0.5, "REPLACEMENT")]}  # fmt: skip
+    rows, _ = window_rows(bars, W, {"EQ:D", "EQ:F"}, None, {"EQ:F": W.sessions[2]}, events=events)
+    assert unapplied_delistings(rows, W, events) == 2
 
 
 def test_acceptance_checks_both_tables() -> None:

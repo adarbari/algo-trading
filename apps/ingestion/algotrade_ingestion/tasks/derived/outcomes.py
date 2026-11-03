@@ -52,6 +52,7 @@ bound with no suspect bar (a real squeeze) is a WARN naming the names.
 
 from collections.abc import Iterator, Sequence
 from datetime import date
+from typing import Any
 
 import pandas as pd
 
@@ -185,20 +186,29 @@ def delisting_events(reader: StoreReader) -> tuple[Events, date | None]:
     return events, day
 
 
-def with_events(left: dict[str, date], events: Events, end: date) -> tuple[dict[str, date], int]:
-    """``left`` plus the names an event says left on or before ``end`` (the latest such last
-    session; a name another source already dates keeps that date) and the number of names whose
-    event and other source disagree on the date."""
-    out, conflicts = dict(left), 0
+def with_events(left: dict[str, date], events: Events, end: date) -> dict[str, date]:
+    """``left`` plus the names an event says left on or before ``end`` (its latest such last
+    session; a name another source already dates keeps that date): the departures of v3 only, v2
+    never counts a name only an event marks."""
+    out = dict(left)
     for i, rows in events.items():
         days = [d for d, _, _ in rows if d <= end]
-        if not days:
-            continue
-        if i not in out:
+        if days and i not in out:
             out[i] = max(days)
-        elif out[i] not in days:
-            conflicts += 1
-    return out, conflicts
+    return out
+
+
+def event_conflicts(listed: dict[str, date], events: Events, end: date) -> int:
+    """The names whose event last session is not the listing history's last trading day (both on
+    or before ``end``). The reference's delisting date is stamped after the last bar, so it is
+    not compared."""
+    return sum(
+        1
+        for i, day in listed.items()
+        if day <= end
+        and (days := [d for d, _, _ in events.get(i, ()) if d <= end])
+        and day not in days
+    )
 
 
 def read_panel(
@@ -250,29 +260,43 @@ def _one(
     nightly: bool,
 ) -> RunRecord:
     events, snapshot = delistings
-    left, conflicts = with_events(left_by(end, *others), events, end)
+    left = left_by(end, *others)
+    left_v3 = with_events(left, events, end)
+    conflicts = event_conflicts(others[1], events, end)
     mismatch = 0
     tables = (TABLE_V3,) if not nightly else TABLES
     with IngestRun(ctx, TASK, end) as run:
         for h, window in windows(run, end, horizons, first, nightly):
             names, pre_snapshot = universe_ids(run.reader, window.start, not nightly)
             resolver = run.resolver(window.start)
-            frames, reasons, eligible = [], {}, 0
+            frames, frames_v2, reasons, eligible, n_v2 = [], [], {}, 0, (0, 0)
             prices = panel.window(window.start, end)
             for ticker in benchmarks:
                 bench = resolver.id_for(ticker) if resolver.knows(ticker) else None
-                rows, why = window_rows(prices, window, names, bench, left, panel.flagged, events)
+                rows, why = window_rows(
+                    prices, window, names, bench, left_v3, panel.flagged, events
+                )
                 frames.append(rows.assign(benchmark=ticker))
                 reasons, eligible = why, len(rows) + len(why)
+                if nightly:  # v2: the departures the reference and listing history note only
+                    old, why_v2 = window_rows(prices, window, names, bench, left, panel.flagged)
+                    frames_v2.append(old.assign(benchmark=ticker))
+                    n_v2 = (len(old), len(why_v2))
                 if ticker == benchmarks[0]:
                     mismatch += unapplied_delistings(rows, window, events)
-            out = pd.concat(frames, ignore_index=True)
-            out = out.assign(
-                ts=close_time(window.start), horizon_sessions=h, window_end=end
-            ).sort_values(["instrument_id", "benchmark"], kind="stable")
+            order = ["instrument_id", "benchmark"]
+            stamp: dict[str, Any] = {
+                "ts": close_time(window.start),
+                "horizon_sessions": h,
+                "window_end": end,
+            }
+            out = pd.concat(frames, ignore_index=True).assign(**stamp)
+            out = out.sort_values(order, kind="stable")
+            v2 = pd.concat(frames_v2, ignore_index=True).assign(**stamp) if frames_v2 else out
+            v2 = v2.sort_values(order, kind="stable")
             written = 0
             for table in tables:
-                shown = v3_view(out) if table == TABLE_V3 else v2_view(out)
+                shown = v3_view(out) if table == TABLE_V3 else v2_view(v2)
                 fresh = (
                     shown
                     if not nightly
@@ -288,6 +312,7 @@ def _one(
                 "rows": len(out) // max(len(benchmarks), 1),  # computed, not written
                 "written": written,  # rows over the tables written
                 "reasons": len(reasons),
+                "v2": list(n_v2),  # (rows per benchmark, reasons) of forward_returns@v2, nightly
                 "examples": dict(sorted(reasons.items())[:SHOWN]),
                 "pre_snapshot": pre_snapshot,  # survivors only: no snapshot, no listing history
             }
@@ -387,9 +412,14 @@ def check_outcomes(reader: StoreReader, session: date, s: SourcesSettings) -> li
         if not (key.startswith("h") and isinstance(value, dict)):
             continue
         start = date.fromisoformat(value["start"])
-        unaccounted = len(eligible_at(reader, start)) - value["rows"] - value["reasons"]
+        eligible = len(eligible_at(reader, start))
         horizon = int(key[1:])
+        missing = 0
         for table in runs[-1].stats.get("tables", [TABLE]):
+            rows, reasons = value["v2"] if table == TABLE and "v2" in value else (
+                value["rows"], value["reasons"]
+            )  # fmt: skip
+            unaccounted = eligible - rows - reasons
             stored = reader.table(table, start)
             ours = (
                 None
@@ -400,12 +430,12 @@ def check_outcomes(reader: StoreReader, session: date, s: SourcesSettings) -> li
                 ]
             )
             mine = set() if ours is None else set(ours["instrument_id"].astype(str))
-            if unaccounted or len(mine) != value["rows"]:
-                name = table.rsplit("/", 1)[-1]
-                problems.append(
-                    f"{key} {name}: {unaccounted} names without a row or a reason, "
-                    f"{len(mine)} of {value['rows']} rows stored"
-                )
+            name = table.rsplit("/", 1)[-1]
+            missing = missing or unaccounted  # nonzero either way: a count that does not add up
+            if len(mine) != rows:
+                problems.append(f"{key} {name}: {len(mine)} of {rows} rows stored")
+        if missing:
+            problems.append(f"{key}: {missing} names without a row or a reason")
         if ours is not None and horizon <= BOUNDED_HORIZON:
             huge = ours[
                 (ours["outcome_status"] == "COMPLETE") & (ours["fwd_return"] > s.max_bounded_return)

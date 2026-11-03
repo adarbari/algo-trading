@@ -70,6 +70,7 @@ def leg_key(
     hold_rank: int | None = None,
     leg_version: int | None = None,
     option_costs: Mapping[str, Any] | None = None,
+    outcomes_table: str | None = None,
 ) -> str:
     """The key of a leg (``top_k``, ``base`` and ``picks`` of the scope's edge cut its picks and
     names and are not in the trial hash for ``main``): ``universe`` is ``universe_hash``,
@@ -81,12 +82,16 @@ def leg_key(
     ``leg_version`` (default ``LEG_VERSION``) is passed as ``DRAW_LEG_VERSION`` to key the
     random draws. ``option_costs`` (the canonical form of ``[option_costs]``, an ``option_pnl``
     edge's legs only, never the draws' key) joins the digest only when set, so no other kind's key
-    moves: an option leg's values pay the commission, so a changed one is a new leg."""
+    moves: an option leg's values pay the commission, so a changed one is a new leg.
+    ``outcomes_table`` (the table the readers read, when it is not v2, ADR 0087) joins it the same
+    way: the flip to v3 keys every leg anew."""
     extra: dict[str, Any] = (
         {} if short_adv_floor is None else {"short_adv_floor": float(short_adv_floor)}
     )
     if option_costs is not None:
         extra["option_costs"] = option_costs
+    if outcomes_table is not None:
+        extra["outcomes_table"] = outcomes_table
     subtype = {"event_subtype": event_subtype} if event_subtype else {}
     band = {} if hold_rank is None else {"hold_rank": hold_rank}
     return _digest(

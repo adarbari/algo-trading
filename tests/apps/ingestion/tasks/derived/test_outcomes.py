@@ -48,23 +48,33 @@ N = 70  # sessions of bars: room for the 60-session horizon
 IDS = {"A": "EQ:A", "B": "EQ:B", "D": "EQ:D", "SPY": SPY}
 
 
-def _reference(delisted: date | None) -> list[dict[str, object]]:
+def _reference(delisted: date | None, event_only: bool = False) -> list[dict[str, object]]:
     return [
         {"instrument_id": iid, "symbol": symbol, "asset_class": "EQ",
          "security_type": "COMMON_STOCK", "multiplier": 1.0, "status": "ACTIVE",
          "delisted_on": delisted if symbol == "D" else None}
-        for symbol, iid in IDS.items()
+        for symbol, iid in ({**IDS, "E": "EQ:E"} if event_only else IDS).items()
     ]  # fmt: skip
 
 
-def _store(a: list[float] | None = None) -> tuple[StoreWriter, StoreReader, list[date]]:
+def _store(
+    a: list[float] | None = None, event_only: bool = False
+) -> tuple[StoreWriter, StoreReader, list[date]]:
+    """``event_only``: also EQ:E, a name whose bars stop six sessions before END and that no
+    reference stamp or listing history marks delisted (only a delisting event can)."""
     writer, reader = store()
     closes = {"EQ:A": a or series(N), "EQ:B": series(N, seed=2), SPY: series(N, seed=3),
               "EQ:D": series(N - 3, seed=4)}  # fmt: skip
+    skip = {"EQ:D": [N - 3, N - 2, N - 1]}
+    if event_only:
+        closes["EQ:E"] = series(N - 3, seed=5)
+        skip["EQ:E"] = [N - 5, N - 4, N - 3, N - 2, N - 1]
     # D's bars start three sessions in and stop four before END (skip: indexes from day 0)
-    days = write_bars(writer, closes, skip={"EQ:D": [N - 3, N - 2, N - 1]})
-    write_rows(writer, "instruments/reference", days[0], _reference(days[-2]))
+    days = write_bars(writer, closes, skip=skip)
+    write_rows(writer, "instruments/reference", days[0], _reference(days[-2], event_only))
     rows = universe_rows(["A", "B", "D"]) + universe_rows(["SPY"], instrument_id=SPY)
+    if event_only:
+        rows += universe_rows(["E"])
     write_rows(writer, "universe", days[0], rows)
     return writer, reader, days
 
