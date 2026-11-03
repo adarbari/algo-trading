@@ -861,6 +861,13 @@ TASKS: dict[str, Task] = {
                 Param("edge", ("--edge",), str, "judge this one site edge only"),
                 FROM,
                 TO,
+                Param(
+                    "all_edges",
+                    ("--all-edges",),
+                    None,
+                    "every site edge, whatever its run's range end (the CLI's default session "
+                    "would otherwise be the window)",
+                ),
                 Param("limit", ("--limit",), int, "write at most N rows this run"),
                 Param(
                     "dry_run", ("--dry-run",), None, "count what would be written; write nothing"
