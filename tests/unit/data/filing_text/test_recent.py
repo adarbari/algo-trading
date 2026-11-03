@@ -16,7 +16,7 @@ from algotrade.features.rollups.text import comparison
 from algotrade.features.rollups.text import filing_text_change as ftc
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.writers import StoreWriter
-from tests.helpers.stored_frames import T0, stamped
+from tests.helpers.stored_frames import T0, stamped, stamped_at_close
 from tests.unit.features.rollups.text.test_comparison import body, words
 
 SNAPSHOT = date(2026, 1, 1)
@@ -52,7 +52,9 @@ def store(rows: list[dict[str, object]], companies: tuple[tuple[str, str], ...])
              "sector": "x", "fetched_on": SNAPSHOT}
             for i, cik in companies
         ]  # fmt: skip
-        writer.write_table("instruments/company", SNAPSHOT, "co", stamped(co, SNAPSHOT, "co"))
+        writer.write_table(
+            "instruments/company", SNAPSHOT, "co", stamped_at_close(co, SNAPSHOT, "co")
+        )
     return StoreReader(writer._backend)
 
 

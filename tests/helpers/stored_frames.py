@@ -1,7 +1,7 @@
 """Builders for stamped frames used across storage, service and app tests."""
 
 from collections.abc import Mapping
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
 
 import pandas as pd
@@ -320,3 +320,9 @@ def share_path_row(
         **overrides,
     }  # fmt: skip
     return row
+
+
+def stamped_at_close(rows: list[dict[str, object]], session: date, run_id: str) -> pd.DataFrame:
+    """``stamped`` as a snapshot taken for ``session`` itself is: known by the end of that day
+    (a ``KNOWN_BY_SESSION`` table is read only as of the session, ``data.reference``)."""
+    return stamped(rows, session, run_id, datetime.combine(session, time(23, 59), UTC))
