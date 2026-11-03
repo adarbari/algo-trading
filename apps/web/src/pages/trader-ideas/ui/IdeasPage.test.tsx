@@ -16,10 +16,20 @@ vi.mock('@/widgets/regime-strip', async () => {
     ),
   };
 });
-vi.mock('@/widgets/paused-ideas', async () => {
-  const { Button } = await import('@algotrade/ui');
+vi.mock('@/widgets/setup-ideas', async () => {
+  const { Button, Heading } = await import('@algotrade/ui');
   return {
-    PausedIdeas: (props: {
+    IdeasHeading: (props: { tab: string; onTabChange: (tab: 'premium') => void }) => (
+      <>
+        <Heading level={1}>Ideas for Fri 2 Oct</Heading>
+        <Button
+          onClick={() => {
+            props.onTabChange('premium');
+          }}
+        >{`tab ${props.tab}`}</Button>
+      </>
+    ),
+    PausedPicks: (props: {
       onOpen: (s: string, via: string) => void;
       onOpenScreener: (id: string) => void;
     }) => (
@@ -40,31 +50,9 @@ vi.mock('@/widgets/paused-ideas', async () => {
         </Button>
       </>
     ),
-  };
-});
-vi.mock('@/widgets/ideas-heading', async () => {
-  const { Heading, Button } = await import('@algotrade/ui');
-  return {
-    IdeasHeading: (props: { tab: string; onTabChange: (tab: 'premium') => void }) => (
-      <>
-        <Heading level={1}>Ideas for Fri 2 Oct</Heading>
-        <Button
-          onClick={() => {
-            props.onTabChange('premium');
-          }}
-        >{`tab ${props.tab}`}</Button>
-      </>
-    ),
-  };
-});
-vi.mock('@/widgets/setup-ideas', () => ({
-  // the tab's Unproven section is what the page composes into the widget
-  SetupIdeas: (props: { tab: string; unproven: React.ReactNode }) => <>{props.unproven}</>,
-}));
-vi.mock('@/widgets/top-ideas', async () => {
-  const { Button } = await import('@algotrade/ui');
-  return {
-    TopIdeas: (props: {
+    // the tab's Unproven section is what the page composes into the widget
+    SetupIdeas: (props: { tab: string; unproven: React.ReactNode }) => <>{props.unproven}</>,
+    UnprovenMatches: (props: {
       search: { f?: string };
       onSearchChange: (patch: { f: string }) => void;
       onCompare: (s: { sel: string; focus: string }) => void;

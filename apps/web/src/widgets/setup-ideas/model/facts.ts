@@ -1,5 +1,5 @@
 /**
- * How the top-ideas table reads an idea's served facts (ADR 0038): which of the values the
+ * How the Unproven matches table reads an idea's served facts (ADR 0038): which of the values the
  * server sent to show, never a value computed in the browser (docs/api/read-model.md
  * "Presentation is not derivation"). The Earnings cell shows the next report date, else a muted
  * "Last <d MMM>" from the last report date, else the UNKNOWN label with the server's reason.

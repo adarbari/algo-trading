@@ -174,8 +174,9 @@ Not part of any RM PR; each is its own work item:
   table, IB-B).
 - **Empty distribution on gap sessions**: `Query.distribution` on a session with no partition
   shows an empty distribution; say UNKNOWN (`NO_PARTITION`) instead.
-- **Ideas list on the feature table**: the top-ideas list still has its own columns (WEB 4
-  `PENDING`); move it to `widgets/feature-table`.
+- **Ideas list on the feature table**: the Unproven matches (`widgets/setup-ideas/model/match-columns.tsx`,
+  moved from `top-ideas` 2026-11-03) still have their own columns (WEB 4 `PENDING`); the ideas
+  read must serve feature-table rows first, then move them to `widgets/feature-table`.
 - **A final Sonnet harness dry run**: brief a Sonnet implementer on a small page read end to end
   (`add-graphql-field`) and fix the gaps it hits.
 
