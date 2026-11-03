@@ -309,8 +309,8 @@ Explain once, in the Guide; show in place through the drawer (ADR 0051).
   the workspace layout) opens on Ctrl+K / ⌘K anywhere and from the rail's button, sends the query
   about 200 ms after the last keystroke to `Query.guideSearch`, shows the server's groups in its
   order, moves with the arrows and opens the entry's page on Enter; the rail's client-side field
-  filter and `searchFields` are gone (ADR 0038). GD6c: the remaining migrations (section 4,
-  phase 3) and the baseline at its floor.
+  filter and `searchFields` are gone (ADR 0038). GD6c (done): the remaining migrations (section 4,
+  phase 3): the prose baseline `architecture/web_prose.toml` is empty (microcopy cut to one sentence; the regime chart key and the completeness states are glossary terms behind an `InfoButton`).
 
 Not recommended: a separate docs site (duplicates the read model and loses session-aware
 distributions), a guided tour (the drawer is cheaper and persistent), beginner / advanced

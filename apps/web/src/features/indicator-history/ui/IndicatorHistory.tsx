@@ -60,7 +60,7 @@ export function IndicatorHistory({ indicator, window, toolbar }: IndicatorHistor
         emptyMessage="Nothing is stored for this indicator in this range."
       />
       <Text size="sm" tone="muted">
-        Colors as in the legend above. A gap in the line is a period with no stored value.
+        A gap in the line is a period with no stored value.
       </Text>
     </Stack>
   );

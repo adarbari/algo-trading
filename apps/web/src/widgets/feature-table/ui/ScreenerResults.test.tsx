@@ -544,9 +544,7 @@ describe('ScreenerResults', () => {
     );
     setup();
     expect(
-      screen.getByText(
-        'No run stored for this screener on 2026-10-02. Run it now to see what it picks.',
-      ),
+      screen.getByText('No run stored for this screener on 2026-10-02; run it now.'),
     ).toBeInTheDocument();
   });
 });
