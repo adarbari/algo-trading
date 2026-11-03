@@ -35,13 +35,13 @@ from algotrade.services.evaluation.cross_section.hit import (
     UNMEASURED,
 )
 from algotrade.services.evaluation.cross_section.measures import SCREENER, Pick
-from algotrade.services.evaluation.cross_section.measuring import NO_ENTRY_BAR
 from algotrade.services.evaluation.cross_section.reporting.report_containment import window_end
 from algotrade.services.evaluation.cross_section.run.evaluation import (
     EdgeEvaluation,
     LegDetail,
     VariantResult,
 )
+from algotrade.services.evaluation.cross_section.scoring.pick_rows import NO_ENTRY_BAR
 from algotrade.storage.tables.edge_schemas import EDGE_TRADES
 
 RESULT = EDGE_TRADES.name.removeprefix("results/")

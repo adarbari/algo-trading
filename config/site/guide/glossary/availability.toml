@@ -27,8 +27,10 @@ short = "Nothing is stored for this instrument for the session, and nothing went
 body = """
 The instrument has no row in the data behind the field for that day, or the field is stored
 empty. A stock with no listed options has no option chain, a recent listing has no history,
-a company that has not reported has no report date. No failure stands behind it, so waiting
-does not change it. A screen treats it as missing data, like any other UNKNOWN value.
+a company that has not reported has no report date. A price the nightly data check rejected as
+wrong is left out the same way, so the close reads unknown rather than "no trade". No failure
+stands behind it, so waiting does not change it. A screen treats it as missing data, like any
+other UNKNOWN value.
 """
 see_also = ["unknown", "unavailable_not_applicable", "unavailable_system"]
 
@@ -225,3 +227,13 @@ Fundamentals stores a row for every name with a close or a share count. A compan
 """
 next = "It clears when the name trades or files; a long list is a problem for the owner to check."
 see_also = ["known_gap"]
+
+[[term]]
+id = "completeness_states"
+term = "Completeness states"
+short = "Each cell of the completeness grid is complete, partial, failed or not collected for one dataset and session."
+body = """
+A cell shows the share of expected rows present for one dataset on one session. Not collected means the session is before the dataset's first stored session, so nothing was expected. Failed means rows are missing after the dataset was being collected. Partial means some rows are present. Select a cell to drill into the rows behind it. A full cell counts rows, not values: a table can be complete while many of its values are empty.
+"""
+next = "Select a failed cell to see what is missing."
+see_also = ["unavailable_not_stored"]

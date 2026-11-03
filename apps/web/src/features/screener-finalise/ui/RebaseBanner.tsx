@@ -37,7 +37,7 @@ export function RebaseBanner({
         </Button>
       }
     >
-      {`${preset} has a newer version (v${String(current)}); this screener is pinned to v${String(pinned)}. Rebasing keeps your changes${disabled ? ' (save the draft first)' : ''}.`}
+      {`${preset} has a newer version (v${String(current)}); this screener is pinned to v${String(pinned)}${disabled ? ' (save the draft first)' : ''}.`}
     </Banner>
   );
 }

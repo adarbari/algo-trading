@@ -78,8 +78,7 @@ export function TestResultPage({
           ) : null}
           <PhoneFold label="About this page">
             <Text size="sm" tone="secondary">
-              What this screener found in its latest run. Add any catalogue feature as a column;
-              your columns and filters are saved as your view of it.
+              Your columns and filters are saved as your view of this screener.
             </Text>
           </PhoneFold>
         </Stack>

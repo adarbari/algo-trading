@@ -60,7 +60,7 @@ purpose = "fitness tests over the ingestion workflows: which steps stay in the n
 
 [[test_dir]]
 path = "tests/architecture/options"
-purpose = "fitness tests of the option figures a trader sees (the plan's decision B: derived figures only, no raw vendor quote on a trader screen)"
+purpose = "fitness tests of the option figures a trader sees (the plan's decision B: derived figures only, no raw vendor quote on a trader screen) and of the price-source split (ADR 0088 d11: every trial kind of an option edge splits by source or is declared unsplit)"
 
 [[test_dir]]
 path = "tests/architecture/pipeline"

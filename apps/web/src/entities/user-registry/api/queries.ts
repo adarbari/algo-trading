@@ -16,6 +16,7 @@ const UserRegistryQuery = graphql(`
         role
         licences
         scheduled
+        pendingProvider
       }
     }
   }

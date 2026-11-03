@@ -8,6 +8,7 @@
 import { Button, Disclosure, Stack, Text } from '@algotrade/ui';
 
 import { useIdeas, type IdeaTab, type PausedIdea } from '@/entities/idea';
+import { termHelp } from '@/features/guide-help';
 
 export interface PausedIdeasProps {
   /** The tab whose screeners' held picks are listed (ADR 0083). */
@@ -74,10 +75,12 @@ export function PausedIdeas({ tab, onOpen, onOpenScreener }: PausedIdeasProps) {
       countTone="warning"
     >
       <Stack gap={2}>
-        <Text size="sm" tone="secondary">
-          The regime gate held these picks back for the session. They are not ideas; the reason is
-          the rule that paused them.
-        </Text>
+        <Stack direction="row" gap={1}>
+          <Text size="sm" tone="secondary">
+            Held back by the regime gate.
+          </Text>
+          {termHelp('paused')}
+        </Stack>
         {data.paused.map((idea) => (
           <PausedRow
             key={`${idea.screenerId}:${idea.instrumentId}`}

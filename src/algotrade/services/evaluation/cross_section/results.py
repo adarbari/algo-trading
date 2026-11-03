@@ -32,6 +32,7 @@ from algotrade.services.evaluation.cross_section.measures import (
 from algotrade.services.evaluation.cross_section.random_picks import RANDOM
 from algotrade.services.evaluation.cross_section.reporting.decoys import decoy_overlaps
 from algotrade.services.evaluation.cross_section.run.evaluation import EdgeEvaluation, VariantResult
+from algotrade.services.evaluation.cross_section.run.sources import ALL, SourceSlice
 from algotrade.services.evaluation.evidence.measures import TailMeasures
 from algotrade.services.read.context import Stores
 from algotrade.storage.runs import RunRecord, start_run
@@ -357,6 +358,7 @@ def write_edge_eval(
     trigger: str = "cli",
     job_id: str | None = None,
     stores: Stores | None = None,
+    source: SourceSlice | None = None,
 ) -> RunRecord:
     """Save ``evaluation``: its rows, its per-session series (``results/edge_series``), its trade
     ledger (``results/edge_trades``, ADR 0064) and its legs (``results/edge_legs``, ADR 0063), all
@@ -364,16 +366,25 @@ def write_edge_eval(
     (``owner``: the edge's, default the rows' user; ``trigger``: ``nightly`` | ``ui`` | ``cli``;
     ``job_id``: the job that wrote it, none for a direct call). ``stores``: the site's store and
     documents, to frame the run's verdict headline in the same publish (none: no verdict row,
-    the reader judges live). Returns the finished record."""
+    the reader judges live). ``source``: the price-source slice of an edge that reads option rows
+    (ADR 0088 decision 11): its run is recorded under the slice's job and says its ``price_source``
+    in the stats; none: the unsplit run. Returns the finished record."""
     if trigger not in TRIGGERS:
         raise ConfigurationError(f"unknown run trigger {trigger!r}; known: {list(TRIGGERS)}")
-    record = start_run(job_name(evaluation.edge_id, evaluation.user_id), evaluation.end, now)
+    record = start_run(
+        job_name(
+            evaluation.edge_id, evaluation.user_id, "" if source is None else source.job_suffix
+        ),
+        evaluation.end,
+        now,
+    )
     frame = edge_eval_frame(evaluation, record.run_id, now)
     ledger = trades.trades_frame(evaluation, record.run_id, now)
     stats = {
         "edge": evaluation.edge_id,
         "owner": evaluation.user_id if owner is None else owner,
         "trigger": trigger,
+        "price_source": ALL if source is None else source.source,
         "job_id": job_id,
         "run_hash": evaluation.run_hash,
         "screener_hashes": dict(evaluation.screener_hashes),

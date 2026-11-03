@@ -60,6 +60,7 @@ and the key.
                       exist (the Guide's Edges section groups by it); unknown values fail; a
                       site edge must have one (fitness test), a user draft or copy may omit it
                       (a copy inherits it through ``extends``)
+    [portfolio]       optional ``book``: where a ``portfolio.*`` gate's book comes from (``paper``)
     asset_class       optional, one of ASSET_CLASSES (stocks | etfs | options): what the edge
                       trades, for the Guide's filter; bookkeeping, never a run input. Needed
                       where the universe cannot say (a hand-listed symbol universe with no
@@ -131,6 +132,7 @@ from algotrade.config.edges.portfolio import (
     PORTFOLIO_KIND,
     Canary,
     benchmark_of,
+    book_of,
     canary_of,
     check_base,
     check_portfolio,
@@ -200,15 +202,8 @@ ANNOUNCED_AHEAD = ("earnings_expected", "ipo_lockup")  # an entry may precede th
 MEASURES = ("excess_return", "realised_to_implied_vol")
 EXCESS_MEASURES = ("residual_return",)  # what an excess_return outcome may name (factor-neutral)
 DIRECTIONS = ("below", "above")
-QUALITY_BAR = (
-    "outcome",
-    "trigger_timing",
-    "replication",
-    "expected_size",
-    "capacity_costs",
-    "failure_modes",
-    "decoys",
-)
+QUALITY_BAR = ("outcome", "trigger_timing", "replication", "expected_size", "capacity_costs",
+               "failure_modes", "decoys")  # fmt: skip
 PUBLISHED_MEASURES = ("mean_excess", "decile_spread", "lift_pts")
 PUBLISHED_KEYS = ("measure", "value", "horizon_sessions", "sample", "source", "leg")
 STANDARD = "@standard"  # in ``baselines``: the site's standard decoys (``expand_baselines``)
@@ -217,8 +212,8 @@ KEYS = (
     "top_k", "screeners", "baselines", "status", "rejection_reason", "sources", "quality_bar",
     "notes", "frozen_from", "base", "picks", "variants", "evidence", "scorer", "implementation",
     "extends", "follow", "audit", "published", "family", "ensemble", "oos_class", "mechanism_kind",
-    "plain_reason",
-    "asset_class", "gate", "variant_grid", "verdict_profile", "holdout_from",
+    "plain_reason", "asset_class", "gate", "variant_grid", "verdict_profile", "holdout_from",
+    "portfolio",
 )  # fmt: skip
 OUTCOME_KEYS = (
     "kind", "horizon_sessions", "benchmark", "start_offset_sessions", "target", "max_drawdown",
@@ -391,6 +386,7 @@ class Edge:
     # ADR 0074: the screeners a book averages into ONE variant; the class of its haircut
     ensemble: tuple[str, ...] = ()
     oos_class: str | None = None
+    portfolio_book: str = "paper"  # ``[portfolio] book``: where a gate's book comes from
     # ADR 0088: the setup's gate (a rule over market features, parsed with the rules), its
     # variant grids, the verdict profile (None: the kind's) and the ``position:<id>`` baselines.
     gate: Group | None = None
@@ -444,10 +440,10 @@ LEGACY_SITE_OWNERS = ("local",)
 LEGACY_SITE_CUTOFF = datetime(2026, 10, 11, tzinfo=UTC)
 
 
-def job_name(edge_id: str, user_id: str) -> str:
-    """The run-record ``job`` whose records hold one owner's trial log of an edge (ADR 0015):
-    written by the harness, read by the read model."""
-    return f"edge-eval:{edge_id}:{user_id}"
+def job_name(edge_id: str, user_id: str, source: str = "") -> str:
+    """The run-record ``job`` of one owner's trial log of an edge (ADR 0015); ``source``: the
+    history slice's suffix (``chain.OPTION_HISTORY``, ADR 0088 d11)."""
+    return f"edge-eval:{edge_id}:{user_id}" + (f":{source}" if source else "")
 
 
 def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
@@ -525,6 +521,7 @@ def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
         variants=variants,
         ensemble=ensemble_of(t, screeners, outcome.kind),
         oos_class=oos_class_of(t),
+        portfolio_book=book_of(t),
         scorer_features=_scorer_features(t),
         evidence=_evidence(t),
         published=_published(t, outcome, len(sources)),

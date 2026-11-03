@@ -104,7 +104,27 @@ left only after five sessions below it. It can size new positions and drive the 
 both off unless turned on.
 """
 next = "Read the label as the session's backdrop, and open the regime indicators in the Guide to see which signs drove it."
-see_also = ["paused", "unknown", "edge_where_worked"]
+see_also = ["paused", "unknown", "edge_where_worked", "macro_early", "macro_confirming"]
+
+[[term]]
+id = "macro_early"
+term = "Early tier"
+short = "The part of macro risk that leads a recession's bear market by months: the yield curve, Fed hikes, permits and inflation."
+body = """
+Macro risk is the higher of two tiers, each from 0 to 100. The early tier counts the signs that came before the market's peak in recession bears since 1971. They are the yield curve, the Fed raising rates, building permits and inflation. The curve counts as a sign if it was inverted on at least a month of the last year. So the tier can stay high after the curve cards read off. That is why Clouds building (CAUTION) can show while "inverted now" is off. A high early tier is a warning with months to run, not a sign that prices fall now. It is unknown when too little of its weight is stored.
+"""
+next = "When the label is Clouds building, check this tier first: if it is the high one, the warning is the curve's year of memory, not a downturn already under way."
+see_also = ["regime", "macro_confirming"]
+
+[[term]]
+id = "macro_confirming"
+term = "Confirming tier"
+short = "The part of macro risk that moves with the downturn itself: credit, jobs, financial conditions and lending standards."
+body = """
+Macro risk is the higher of two tiers, each from 0 to 100. The confirming tier counts the signs that move once a downturn is under way: credit spreads, unemployment and jobless claims, financial conditions and banks' lending standards. It rises later than the early tier, so a high confirming tier says the economy is already weakening. Either tier at or above its threshold makes macro risk high. It is unknown when too little of its weight is stored.
+"""
+next = "A high confirming tier means the economy is weakening now; compare it with the early tier to see whether the warning is old or new."
+see_also = ["regime", "macro_early"]
 
 [[term]]
 id = "score"
@@ -556,3 +576,12 @@ The site never knows your account, your size or your other positions, so it cann
 """
 next = "Look for the label beside each figure: backtested (hypothetical) or forward paper record since a date."
 see_also = ["paper_trading", "verdict", "not_a_return", "idea_exit_rule"]
+
+[[term]]
+id = "regime_chart_key"
+term = "Reading the regime charts"
+short = "Read each chart left to right: the line is the value and the shading is what the market did."
+body = """
+The line is the stored value for each session. The dashed line is where the signal turns on, and a gap in the line is a period with nothing stored, not a zero. The shading behind the lines shows when the market fell (peak to trough), when it recovered and when the economy was in recession. Recession spans are hatched so they stay readable where they overlap a fall. The strips under a chart repeat the regime, the signal and how much evidence each session had. Don't read a gap as calm: check the stored range first.
+"""
+see_also = ["regime"]

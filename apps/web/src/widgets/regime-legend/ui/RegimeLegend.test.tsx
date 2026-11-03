@@ -1,9 +1,11 @@
 import { render, screen, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { expectNoA11yViolations } from '@/shared/lib/testing';
 
 import { RegimeLegend } from './RegimeLegend';
+
+vi.mock('@/features/guide-help', () => ({ termHelp: () => null }));
 
 describe('RegimeLegend', () => {
   it('explains the shading, the regime, signal and evidence strips once', async () => {

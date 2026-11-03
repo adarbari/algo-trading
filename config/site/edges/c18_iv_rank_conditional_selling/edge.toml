@@ -17,7 +17,11 @@ universe = "liquid_optionable_floored"
 top_k = "all"
 screeners = ["iv_rank_high"]
 baselines = ["vrp_iv_hv", "vrp_cross_section"]
-status = "candidate"
+status = "retired"
+rejection_reason = """Retired 2026-11-02 (ADR 0088, plan G2; pulled forward from build row X6): iv_rank_high is
+now a screener of the setups iv_rank_short_put (X2, the put's own P&L on the stored chains) and
+covered_call_strike_tenor (X3), judged on real chain rows. This version's modelled straddle P&L
+stays on file with its runs and trials."""
 mechanism_kind = "paid_for_risk"
 frozen_from = 2026-04-01
 holdout_from = 2026-10-26  # ADR 0088 d15: the first session of the unseen holdout (the latest of its gates' and thresholds'); no verdict until closed trades from it reach 3 months
