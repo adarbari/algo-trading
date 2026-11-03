@@ -49,12 +49,15 @@ from algotrade.services.evaluation.cross_section.events import (
     read_events,
 )
 from algotrade.services.evaluation.cross_section.hit import needs_implied_vol
-from algotrade.services.evaluation.cross_section.measuring import MEASURED_COVERAGE, names_for
 from algotrade.services.evaluation.cross_section.picks import eligible, long_picks, screen_variant
 from algotrade.services.evaluation.cross_section.run.scopes import (
     MIXED_SOURCE_IV,
     edge_universe,
     iv_field_of,
+)
+from algotrade.services.evaluation.cross_section.scoring.session_stat import (
+    MEASURED_COVERAGE,
+    names_for,
 )
 from algotrade.services.evaluation.cross_section.sessions import Leg, leg_blocks
 from algotrade.services.evaluation.training.bound import scored

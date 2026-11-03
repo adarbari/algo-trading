@@ -22,7 +22,7 @@ and ``top_k``); this task only chooses the sessions and edges, skips what is sto
 from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from time import monotonic
 
 from algotrade.config.edges.document import Edge
@@ -30,11 +30,12 @@ from algotrade.config.edges.loading import load_edges
 from algotrade.config.site.settings import SourcesSettings
 from algotrade.config.user import SITE_USER, UserContext
 from algotrade.core.model.errors import ConfigurationError
-from algotrade.core.time.calendar import sessions_between
+from algotrade.core.time.calendar import previous_session, sessions_between
 from algotrade.data import StoreReader
 from algotrade.services.evaluation.edge_picks.frame import RESULT, edge_picks_frame
 from algotrade.services.evaluation.edge_picks.named import is_named, named_night
 from algotrade.services.evaluation.edge_picks.night import SKIPPED, EdgePicks, Night, edge_night
+from algotrade.services.read.session import NIGHTLY, session_cutoff
 from algotrade.storage.runs import RunRecord, RunStatus
 from algotrade.storage.tables.edge_schemas import EDGE_PICKS, NAMED
 from algotrade_ingestion.tasks.framework.run import IngestRun, TaskContext
@@ -64,6 +65,12 @@ def stored_keys(reader: StoreReader, session: date) -> set[tuple[str, str]]:
         return set()
     site = part[(part["user_id"] == SITE_USER) & (part["status"] != SKIPPED)]  # a gap is retried
     return set(zip(site["edge_id"], site["screener"], strict=True))
+
+
+def paper_cutoff(reader: StoreReader, day: date) -> datetime | None:
+    """When the previous session's nightly finished (None: it has not): the paper record as it
+    stood then is the book a ``portfolio.*`` gate reads at ``day`` (ADR 0088 G15)."""
+    return session_cutoff(reader.runs(NIGHTLY), previous_session(day))
 
 
 def _rows_of(edge: Edge) -> int:
@@ -120,7 +127,9 @@ def store_picks(ctx: TaskContext, session: date, options: Options | None = None)
     began = monotonic()
     with IngestRun(ctx, TASK, opt.end or session) as run:
         for day in days:
-            night = Night(ctx.reader, ctx.configs, user, day)
+            night = Night(
+                ctx.reader, ctx.configs, user, day, paper_as_of=paper_cutoff(ctx.reader, day)
+            )
             rows = _one_session(run, night, edges, stored_keys(ctx.reader, day), failed)
             if rows:
                 written[day] = rows

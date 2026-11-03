@@ -279,3 +279,17 @@ def ensemble_of(t: Table, screeners: Sequence[str], kind: str) -> tuple[str, ...
 def oos_class_of(t: Table) -> str | None:
     """The edge's ``oos_class`` (None: no haircut expectation is shown for it)."""
     return t.choice("oos_class", "", OOS_CLASSES) if "oos_class" in t.names() else None
+
+
+BOOKS = ("paper", "picks")  # where the setup's own book of trades is read from (ADR 0088 G15)
+
+
+def book_of(t: Table) -> str:
+    """``[portfolio] book`` of an edge: the source of the book a ``portfolio.*`` gate reads
+    tonight, ``paper`` (the default: the setup's paper record). ``picks`` (the book rebuilt from
+    the stored edge picks) is declared but not built: it is refused until it is, so switching the
+    source later is a value in the document, never code."""
+    book = t.table("portfolio", ("book",)).choice("book", "paper", BOOKS)
+    if book == "picks":
+        raise ConfigurationError(f"{t.where} portfolio.book: 'picks' is not built yet; use 'paper'")
+    return book

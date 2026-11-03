@@ -19,7 +19,7 @@ from algotrade.core.views.feature_view import FeatureView
 from algotrade.engines.selection.evaluate import evaluate_selection
 from algotrade.services.configs import resolve_config
 from algotrade.services.evaluation.cross_section.events import event_field
-from algotrade.services.evaluation.cross_section.measuring import MIN_SCORE_COVERAGE
+from algotrade.services.evaluation.cross_section.picks import MIN_SCORE_COVERAGE
 from algotrade.storage.configs.files import FileConfigStore
 from algotrade.strategies.screeners import Decision
 from algotrade.strategies.screeners.rules import evaluate_screen

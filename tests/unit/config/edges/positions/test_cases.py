@@ -16,13 +16,18 @@ from algotrade.config.edges.positions.spec import (
     check_rules,
     exit_delay,
     exit_rules,
+    rule_groups,
 )
 from algotrade.config.edges.positions.templates import Leg, Template, load_templates
+from algotrade.config.strategy.levels import SCREENER, UNIVERSE
 from algotrade.core.model.errors import ConfigurationError
+from algotrade.core.model.predicates import Group, Rule
 from algotrade.services.configs import field_catalog
 from algotrade.storage.configs.files import FileConfigStore
 from tests.conftest import REPO_ROOT
 from tests.unit.config.edges.positions.test_spec import PUT, WHERE, document, put
+from tests.unit.config.edges.test_named import sleeve
+from tests.unit.config.edges.test_portfolio import book
 
 SHIPPED = FileConfigStore(REPO_ROOT / "config")
 TEMPLATES = load_templates(SHIPPED)
@@ -235,3 +240,56 @@ def test_case_values_making_more_points_than_a_grid_may_are_refused() -> None:
     deltas = {"cases": [{"when": HIGH_IV, "value": v} for v in values], "default": 0.3}
     with pytest.raises(ConfigurationError, match=r"at most 64"):
         check_edge(parse(tenor_days=wide, strike_delta=deltas), WHERE, TEMPLATES)
+
+
+# --- portfolio.* rules (ADR 0088 G15): the gate, entry and case sites; the setups with no book ---
+
+OPEN = {"all": [{"field": "portfolio.open_positions", "op": "lt", "value": 2}]}
+COLLATERAL = {"all": [{"field": "portfolio.open_collateral", "op": "lt", "value": 9000}]}
+
+
+def check_doc(doc: dict[str, Any]) -> None:
+    check_rules(parse_edge(doc, "drift", WHERE), WHERE, CATALOG, TEMPLATES)
+
+
+def test_a_gate_entry_and_case_may_read_the_book_of_either_position() -> None:
+    check_doc(put(entry={"when": OPEN}) | {"gate": OPEN})
+    check_doc(
+        {**document(), "gate": OPEN}
+    )  # a share setup: no template, the fields both books have
+
+
+def test_open_collateral_is_an_option_books_field_only() -> None:
+    check_doc({**put(), "gate": COLLATERAL})
+    with pytest.raises(ConfigurationError, match="open_collateral"):
+        check_doc({**document(), "gate": COLLATERAL})
+
+
+@pytest.mark.parametrize("site", [SCREENER, UNIVERSE])
+def test_a_portfolio_rule_is_closed_at_the_screener_and_universe_sites(site: str) -> None:
+    rule = Group("all", (Rule("portfolio.open_positions", "lt", 2),))
+    with pytest.raises(ConfigurationError, match="portfolio"):
+        CATALOG.check(rule, "x", site)
+
+
+def test_a_book_outcome_and_a_named_sleeve_have_no_trades_to_read() -> None:
+    with pytest.raises(ConfigurationError, match="portfolio_return"):
+        check_rules(book(gate=OPEN), WHERE, CATALOG, TEMPLATES)
+    with pytest.raises(ConfigurationError, match="time-series"):
+        check_rules(sleeve(gate=OPEN), WHERE, CATALOG, TEMPLATES)
+
+
+def test_every_rule_site_is_listed_once() -> None:
+    edge = parse_edge({**put(entry={"when": OPEN}), "gate": OPEN}, "drift", WHERE)
+    assert len(list(rule_groups(edge))) == 2
+
+
+def test_the_book_source_is_paper_and_picks_is_not_built_yet() -> None:
+    assert parse_edge(document(), "drift", WHERE).portfolio_book == "paper"
+    assert (
+        parse_edge(document(portfolio={"book": "paper"}), "drift", WHERE).portfolio_book == "paper"
+    )
+    with pytest.raises(ConfigurationError, match="not built yet"):
+        parse_edge(document(portfolio={"book": "picks"}), "drift", WHERE)
+    with pytest.raises(ConfigurationError, match="book"):
+        parse_edge(document(portfolio={"book": "nope"}), "drift", WHERE)
