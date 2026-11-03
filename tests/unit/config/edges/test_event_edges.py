@@ -19,7 +19,7 @@ from algotrade.core.views.feature_view import FeatureView
 from algotrade.engines.selection.evaluate import evaluate_selection
 from algotrade.services.configs import resolve_config
 from algotrade.services.evaluation.cross_section.events import event_field
-from algotrade.services.evaluation.cross_section.measuring import MIN_SCORE_COVERAGE
+from algotrade.services.evaluation.cross_section.picks import MIN_SCORE_COVERAGE
 from algotrade.storage.configs.files import FileConfigStore
 from algotrade.strategies.screeners import Decision
 from algotrade.strategies.screeners.rules import evaluate_screen
@@ -79,6 +79,7 @@ E4_OPTION = (
 )  # fmt: skip
 E4_FUNDS = ("closed_end_fund_discounts", "cef_distribution_trap", "etf_flow_pressure")
 E4 = (*E4_OPTION, *E4_FUNDS)
+RETIRED = ("c18_iv_rank_conditional_selling",)  # re-filed as setups (ADR 0088, X2 / X3)
 E4_EDGES = {e.id: e for e in load_edges(STORE) if e.id in E4}
 BLOCKED = {
     "c13_iv_term_structure_straddles": "no history",
@@ -97,6 +98,8 @@ def test_an_e4_edge_is_a_candidate_or_a_blocked_one_with_its_reason(edge: Edge) 
     assert str(edge.frozen_from) == "2026-04-01" and edge.family
     if edge.id in BLOCKED:
         assert edge.status == "blocked" and BLOCKED[edge.id] in edge.rejection_reason
+    elif edge.id in RETIRED:
+        assert edge.status == "retired" and edge.rejection_reason
     else:
         assert edge.status == "candidate" and edge.screeners
 

@@ -86,3 +86,18 @@ def test_a_later_lost_leg_never_shortens_an_earlier_unknown_stretch() -> None:
     book.lost(far)
     book.lost(near)
     assert book.row_at(START + timedelta(days=3), _sectors).reason == "leg_lost"
+
+
+@given(DAYS, HOLD, st.integers(1, 6))
+def test_the_rows_are_the_same_whatever_the_chunk_size(
+    days: list[date], hold: int, size: int
+) -> None:
+    """The harness measures a leg between sessions in chunks (one session each when it reads the
+    book): feeding a ``Book`` chunk by chunk gives the rows of the whole walk."""
+    whole = walk_in_order(days, _decide(hold, []), _sectors)
+    book, decide, rows = Book(), _decide(hold, []), {}
+    for at in range(0, len(days), size):
+        for day in days[at : at + size]:
+            rows[day] = book.row_at(day, _sectors)
+            book.add(decide(day, rows[day]))
+    assert rows == whole
