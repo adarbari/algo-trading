@@ -28,7 +28,7 @@ import copy
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
-from typing import Any
+from typing import Any, cast
 
 from algotrade.config.edges.document import Edge
 from algotrade.config.edges.follow import (
@@ -49,12 +49,16 @@ from algotrade.config.edges.loading import (
     edge_problems,
     load_edges,
 )
+from algotrade.config.edges.loading import (
+    RULE_SCREENS as SCREENERS,
+)
 from algotrade.config.site.fields import reject_secrets
 from algotrade.config.site.settings import load_verdict
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.model.ids import validate_id
 from algotrade.core.time.calendar import sessions_between
 from algotrade.services.authoring.scope import ConflictError, EdgeNotFoundError, author
+from algotrade.storage.configs.store import OverlayConfigStore
 from algotrade.storage.configs.writer import ConfigWriter
 
 # status -> the statuses the user may move an own edge to (a move to itself only restates it)
@@ -218,14 +222,20 @@ def save_edge_revision(
     return previous, stored
 
 
-def save_proposed_edge(
-    writer: ConfigWriter, user: str, edge_id: str, document: Mapping[str, Any], *, today: date
-) -> Edge:
-    """A NEW own edge ``edge_id`` of ``user`` proposed by a study (ED6 W5), validated as the
-    harness reads it: always ``researching`` (a ``status`` in ``document`` is refused: moving it to
-    candidate is the owner's step, so ML proposes and never judges) with the permanent label
-    ``proposed_by_study`` in its ``[audit]``. ``ConflictError`` if the id is taken or was
-    deleted; nothing is written unless it validates."""
+def check_proposed_edge(
+    writer: ConfigWriter,
+    user: str,
+    edge_id: str,
+    document: Mapping[str, Any],
+    *,
+    today: date,
+    screens: Mapping[str, Mapping[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """What ``save_proposed_edge`` would store, validated as the harness reads it with
+    ``screens`` (the user's rule screens it lists, name -> document) as if already written;
+    nothing is written. ``ConflictError`` if the id is a site edge's, taken or was deleted;
+    ``ConfigurationError`` if the document sets a status, ``[audit]`` or ``[follow]`` or does
+    not load."""
     who, edge_id = author(user).user_id, validate_id("edge", edge_id)
     if edge_id in _site_ids(writer):
         raise ConflictError(f"{edge_id} is a site edge's id")
@@ -237,9 +247,23 @@ def save_proposed_edge(
         )
     stored = {k: v for k, v in copy.deepcopy(dict(document)).items() if k != "id"}
     stored[AUDIT] = {"status_since": today, "labels": [PROPOSED_BY_STUDY]}
-    edge = _checked(writer, who, edge_id, stored)
+    pending = {(who, SCREENERS, name): doc for name, doc in (screens or {}).items()}
+    _checked(cast(ConfigWriter, OverlayConfigStore(writer, pending)), who, edge_id, stored)
+    return stored
+
+
+def save_proposed_edge(
+    writer: ConfigWriter, user: str, edge_id: str, document: Mapping[str, Any], *, today: date
+) -> Edge:
+    """A NEW own edge ``edge_id`` of ``user`` proposed by a study (ED6 W5), validated as the
+    harness reads it (``check_proposed_edge``): always ``researching`` (a ``status`` in
+    ``document`` is refused: moving it to candidate is the owner's step, so ML proposes and never
+    judges) with the permanent label ``proposed_by_study`` in its ``[audit]``. Nothing is
+    written unless it validates."""
+    who = author(user).user_id
+    stored = check_proposed_edge(writer, who, edge_id, document, today=today)
     writer.save_user_document(who, KIND, edge_id, stored)
-    return edge
+    return _visible(writer, who)[edge_id]
 
 
 def delete_edge(writer: ConfigWriter, user: str, edge_id: str, now: datetime | None = None) -> None:

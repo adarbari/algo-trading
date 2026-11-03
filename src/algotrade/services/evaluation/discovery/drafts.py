@@ -193,7 +193,7 @@ def edge_proposal(run_id: str, stats: dict[str, Any]) -> EdgeProposal:
     )
     notes = (
         f"Proposed by the winners study run {run_id}: {len(tells)} tells kept of "
-        f"{tested} features searched over {stats['blocks']} overlapping blocks of "
+        f"{tested} features with data searched over {stats['blocks']} overlapping blocks of "
         f"{stats['horizon_sessions']} sessions. The in-sample slice (before "
         f"{stats['frozen_from']}) IS the discovery sample: biased, never evidence; only the "
         "test slice counts, and the "

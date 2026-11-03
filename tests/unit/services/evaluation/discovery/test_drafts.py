@@ -111,7 +111,7 @@ def test_a_passing_run_proposes_one_ranked_screen_per_cluster_and_a_researching_
         assert doc["rank"]["tie_break_order"] == ("desc" if signs[field] > 0 else "asc")
     assert "status" not in p.edge and 504 not in p.edge["outcome"]["horizon_sessions"]
     assert p.edge["frozen_from"].isoformat() == stats["frozen_from"]
-    assert f"{p.tells_tested} features searched" in p.edge["notes"]
+    assert f"{p.tells_tested} features with data searched" in p.edge["notes"]
 
 
 def test_a_run_without_the_w5_stats_is_not_proposed() -> None:

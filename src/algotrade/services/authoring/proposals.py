@@ -4,9 +4,10 @@ rule screens, each finalised into an immutable v1, then the ``researching`` edge
 proposed. The documents come from ``services/evaluation/discovery/drafts.edge_proposal``; this
 module only writes them, through the same calls a user's own writes use.
 
-All or nothing as far as the writer allows: every id is checked free and every screen validated
-before anything is written; if the edge then fails, the screens just finalised are deleted
-(archived, ADR 0029), so nothing half-proposed stays on the nightly. A finalised screen runs on
+All or nothing: every id is checked free, every screen and the edge (with its screens as if
+written) validated before anything is written, so a refused proposal leaves nothing and can be
+retried; only a write that fails midway (I/O) leaves screens, which are then deleted (archived,
+ADR 0029) so nothing half-proposed stays on the nightly. A finalised screen runs on
 the nightly like any user screen (ADR 0033: no schedule switch); its matches never show in Ideas'
 Unproven section (``services/read/ideas/setups.in_tab``: a screener behind a proposed edge
 only)."""
@@ -17,7 +18,7 @@ from typing import Any
 
 from algotrade.config.edges.document import Edge
 from algotrade.services.authoring import screens
-from algotrade.services.authoring.edges import save_proposed_edge
+from algotrade.services.authoring.edges import check_proposed_edge, save_proposed_edge
 from algotrade.services.authoring.scope import ConflictError, author, screen_id
 from algotrade.storage.configs.writer import ConfigWriter
 
@@ -46,6 +47,7 @@ def save_proposal(
     _refuse_taken_screens(writer, who.user_id, names)
     for name, document in screen_documents.items():
         screens.validate(writer, who, name, screens.draft_document(name, document) | {"version": 1})
+    check_proposed_edge(writer, who.user_id, edge_id, edge, today=today, screens=screen_documents)
     written: list[str] = []
     try:
         for name, document in screen_documents.items():
