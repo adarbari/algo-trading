@@ -371,10 +371,10 @@ follow-up PR).
 - status: pending owner confirmation
 - Reasoning: apps never import each other and the library never imports vendors, so one shared composition with injected builders is the only shape without a copy; the owner's login must never serve the site user; spend is one time series.
 
-## 2026-11-03 | ADR 0088 build row X5 | The earnings sale enters on the announced-ahead class, not the F10 reaction-session class
+## 2026-11-03 | Options design build row X5 | The earnings sale enters on the announced-ahead class, not the F10 reaction-session class
 - Question: row X5 says c17 enters across the report by the F10 reaction-session anchor. As built, `on_event:earnings_reaction_session` is known only once the reaction session has come (`announced_ahead` false), and the parser refuses an entry before such an event, so no trade could open before the report. What does the document use?
 - Options: (a) `on_event:earnings_expected` (announced ahead) with the stored report time as a universe rule, offset -1 for before-open and 0 for after-close (variant), and `spec_of` allowing an offset below 1 on an announced-ahead schedule; (b) build F10b first, projecting the reaction session from the time known at D, then file c17; (c) enter after the event.
 - Decision: (a), with F10b a follow-up that would replace the two offsets by one.
-- decided by: orchestrator (design call: a filing detail inside ADR 0088, no policy, no stored data, no product behaviour; a point-in-time check by the architect review)
+- decided by: orchestrator (design call)
 - status: pending owner confirmation
 - Reasoning: the document is blocked until the history exists, so (a) costs nothing and keeps the point-in-time rule (the date and time of day are known by D, `known_from <= D`); (b) is a feature and schedule change with its own review; (c) is not the thesis.
