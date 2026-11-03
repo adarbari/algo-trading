@@ -2,6 +2,7 @@
 ``config/admin/events/scope.toml``, idempotent, admin only, an added symbol known to the session's
 reference snapshot, a site name removed and restored."""
 
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, date, datetime
 
 import pytest
@@ -136,3 +137,23 @@ def test_the_file_writer_keeps_the_site_file_untouched_and_the_admin_file_apart(
     written = (tmp_path / "admin" / "events" / "scope.toml").read_text()
     assert written.startswith("removed = ") and 'by = "local"' in written
     assert effective_list(FileConfigWriter(tmp_path)).symbols == ()
+
+
+def test_two_writers_at_once_never_lose_a_change(tmp_path, ctx: ReadContext) -> None:  # type: ignore[no-untyped-def]
+    """Each write is a read-modify-write under the writer's file lock: eight admins removing eight
+    site names through separate writers (as two processes would) leave all eight removals."""
+    names = [f"S{i}" for i in range(8)]
+    site = tmp_path / "site" / "events"
+    site.mkdir(parents=True)
+    (site / "scope.toml").write_text(
+        "".join(f'[[name]]\nsymbol = "{n}"\nadded_on = 2026-10-06\n\n' for n in names)
+    )
+    (tmp_path / "site" / "users.toml").write_text('[[user]]\nid = "local"\nrole = "admin"\n')
+    with ThreadPoolExecutor(8) as pool:
+        list(pool.map(lambda n: remove_scope_name(FileConfigWriter(tmp_path), "local", n), names))
+    assert sorted(c.symbol for c in load_admin_scope(FileConfigWriter(tmp_path)).removed) == names
+
+
+def test_a_removal_keeps_its_note(configs: MemoryConfigWriter) -> None:
+    remove_scope_name(configs, "local", "ETFX", " dropped  by hand ")
+    assert load_admin_scope(configs).removed[0].note == "dropped by hand"

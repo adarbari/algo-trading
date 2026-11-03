@@ -6,8 +6,9 @@ idempotent; an added symbol the session's reference snapshot does not know is a 
 list is read back by ``Query.eventScope``."""
 
 import logging
+from typing import Annotated
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 
 from algotrade.config.site.users import Role
 from algotrade.core.model.errors import PermissionDeniedError
@@ -39,9 +40,14 @@ def add_name(
 
 
 @router.delete("/{symbol}")
-def remove_name(writer: Writer, caller: Caller, symbol: str) -> ScopeChange:
+def remove_name(
+    writer: Writer,
+    caller: Caller,
+    symbol: str,
+    note: Annotated[str, Query(description="why it is removed (optional)")] = "",
+) -> ScopeChange:
     _require_admin(caller)
-    done = event_scope.remove_scope_name(writer, caller.user_id, symbol)
+    done = event_scope.remove_scope_name(writer, caller.user_id, symbol, note)
     log.info(
         "event-scope remove symbol=%s changed=%s by=%s", done.symbol, done.changed, caller.user_id
     )

@@ -329,7 +329,7 @@ def freeze(
     reader = StoreReader(backend)
     writer = StoreWriter(backend)
     for day in days:
-        now = at_session(context(reader, user="admin"), day)
+        now = at_session(context(reader, user="boss"), day)
         keys = [("site", "alpha"), ("site", "beta"), ("me", "beta"), ("me", "gamma")]
         for owner, config in keys:
             found = latest_run(now, owner, config).run
@@ -387,7 +387,7 @@ def _bare(run: Any) -> Any:
     return None if run is None else replace(run, frozen=None)
 
 
-@pytest.mark.parametrize("user", ["me", "admin", "trader"])
+@pytest.mark.parametrize("user", ["me", "boss", "trader"])
 def test_the_frozen_run_is_the_recounted_run(
     stores: tuple[StoreReader, StoreReader], user: str
 ) -> None:

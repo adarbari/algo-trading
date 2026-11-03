@@ -324,3 +324,8 @@ def test_a_later_identity_user_repeating_an_email_is_skipped_and_logged(
         users = load_users(Folders({"zoe": ONBOARDED, "zed": ONBOARDED | {"name": "Zed"}}))
     assert users.get("zoe") is not None and users.get("zed") is None
     assert "zed" in caplog.text and "zoe@example.com" not in caplog.text
+
+
+def test_admin_is_a_reserved_scope_never_a_user_id() -> None:
+    with pytest.raises(ConfigurationError, match="reserved config scope"):
+        UserRecord("admin", Role.TRADER)

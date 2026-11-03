@@ -64,7 +64,7 @@ CONFIGS: Docs = {
     # ``trader`` does not (ADR 0028)
     ("site", "settings", "users"): {
         "user": [
-            {"id": "admin", "role": "admin"},
+            {"id": "boss", "role": "admin"},
             {"id": "me", "role": "trader", "licences": ["personal", "yahoo"]},
             {"id": "trader", "role": "trader"},
         ]

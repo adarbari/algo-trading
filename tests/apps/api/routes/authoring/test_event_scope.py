@@ -101,3 +101,11 @@ def test_the_effective_list_is_read_back_by_an_admin_and_refused_to_a_trader(
     assert scope["names"] == []  # AAA removed, GONE unresolved
     refused = trader_client.post("/graphql", json={"query": READ}).json()
     assert refused["errors"][0]["extensions"]["code"] == "FORBIDDEN"
+
+
+def test_a_removal_takes_an_optional_note_query(writer_client: TestClient, root: Path) -> None:
+    events = root / "site" / "events"
+    events.mkdir(parents=True)
+    (events / "scope.toml").write_text(SITE_NAMES)
+    assert writer_client.delete(f"{URL}/AAA", params={"note": "no edge here"}).status_code == 200
+    assert admin_file(root)["removed"][0]["note"] == "no edge here"

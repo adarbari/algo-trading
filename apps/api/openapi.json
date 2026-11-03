@@ -4200,6 +4200,18 @@
               "title": "Symbol",
               "type": "string"
             }
+          },
+          {
+            "description": "why it is removed (optional)",
+            "in": "query",
+            "name": "note",
+            "required": false,
+            "schema": {
+              "default": "",
+              "description": "why it is removed (optional)",
+              "title": "Note",
+              "type": "string"
+            }
           }
         ],
         "responses": {

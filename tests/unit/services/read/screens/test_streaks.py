@@ -54,7 +54,7 @@ def _store(picks: Picks, days: Days, frozen: bool) -> MemoryBackend:
     return store
 
 
-def _alpha(reader: StoreReader, day: date, user: str = "admin") -> tuple[ReadContext, ScreenerRun]:
+def _alpha(reader: StoreReader, day: date, user: str = "boss") -> tuple[ReadContext, ScreenerRun]:
     ctx = at_session(context(reader, user=user), day)
     run = latest_run(ctx, "site", "alpha").run
     assert run is not None

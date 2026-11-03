@@ -477,7 +477,7 @@ def test_a_run_evaluated_under_licences_the_viewer_also_holds_is_fully_visible(
     assert (seen.criteria[0].value, seen.score, seen.rank) == (7.0, 50.0, 1)
 
 
-@pytest.mark.parametrize("user", ["trader", "admin"])  # a role grants no licence
+@pytest.mark.parametrize("user", ["trader", "boss"])  # a role grants no licence
 def test_the_audits_narrow_misses_of_a_withheld_field_are_dropped(
     backend: MemoryBackend, reader: StoreReader, user: str
 ) -> None:

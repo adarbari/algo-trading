@@ -278,3 +278,9 @@ the owner's run.
   and the share of its 20 largest moves of the last 252 sessions that have an attribution known by
   the session (any source; null under a year of bars), with the admin's removals, the unresolved
   symbols and the macro calendar's next 90 days count.
+- **The attributed share is an admin coverage view, not a catalogue fact.** `moves` of
+  `Query.eventScope` (the share of a name's 20 largest moves with an attribution) is computed at read
+  time from `bars/1d` and `events/attribution`, an exception to ADR 0038 ("per-instrument stored values
+  are catalogue features") because it is an admin-only operational figure about our own coverage, not a
+  fact about the stock. It lives only in the admin-only `ops` GraphQL type and in no trader-visible type
+  or feature; a trader-facing attribution figure would be a feature first.

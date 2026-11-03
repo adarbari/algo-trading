@@ -287,7 +287,7 @@ def load_ahead(ctx: ReadContext, instrument_ids: Sequence[str], end: date) -> Ah
         elif isinstance(found, Unknown):
             gaps[iid].append(EventGap(iid, kind, found))
     macro, macro_gap = macro_releases(ctx, end)
-    dossiers = dossiers_as_of(ctx.reader, start)
+    dossiers = dossiers_as_of(ctx.reader, start, ids)
     watch: dict[str, tuple[WatchItem, ...]] = {}
     for iid in ids:
         events, items = (

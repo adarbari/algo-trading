@@ -2453,7 +2453,10 @@ export interface operations {
     };
     remove_name_admin_events_scope__symbol__delete: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description why it is removed (optional) */
+                note?: string;
+            };
             header?: never;
             path: {
                 symbol: string;

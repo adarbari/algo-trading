@@ -101,6 +101,17 @@ class ConfigWriter(ConfigStore, Protocol):
         holds the read-modify-write lock (``services.authoring``)."""
         ...
 
+    def update_admin_document(
+        self,
+        kind: str,
+        name: str,
+        change: Callable[[Mapping[str, Any] | None], Mapping[str, Any] | None],
+    ) -> None:
+        """Read-modify-write ``admin/<kind>/<name>.toml`` under the scope's write lock (file lock
+        across processes): ``change`` gets the current document (None: no file) and returns the
+        new one, or None to write nothing."""
+        ...
+
     def archive_user_document(self, user: str, kind: str, name: str, at: datetime) -> bool:
         """Move that document to ``users/<user>/archive/<kind>/<name>-<stamp>.toml`` (never
         erased); ``True`` when there was one."""
@@ -268,6 +279,20 @@ class FileConfigWriter(FileConfigStore):
     @_admin_generation
     def save_admin_document(self, kind: str, name: str, document: Mapping[str, Any]) -> None:
         """Atomic replace of ``admin/<kind>/<name>.toml`` (a temp file, then a rename)."""
+        self._replace_admin(kind, name, document)
+
+    @_admin_generation
+    def update_admin_document(
+        self,
+        kind: str,
+        name: str,
+        change: Callable[[Mapping[str, Any] | None], Mapping[str, Any] | None],
+    ) -> None:
+        new = change(self.load(ADMIN, _admin_kind(kind), name))
+        if new is not None:
+            self._replace_admin(kind, name, new)
+
+    def _replace_admin(self, kind: str, name: str, document: Mapping[str, Any]) -> None:
         path = self.admin_path(_admin_kind(kind), name)
         path.parent.mkdir(parents=True, exist_ok=True)
         fd, tmp_name = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
@@ -460,6 +485,18 @@ class MemoryConfigWriter(MemoryConfigStore):
     @_memory_admin_generation
     def save_admin_document(self, kind: str, name: str, document: Mapping[str, Any]) -> None:
         self._docs[(ADMIN, _admin_kind(kind), validate_id(kind, name))] = _copy(document)
+
+    @_memory_admin_generation
+    def update_admin_document(
+        self,
+        kind: str,
+        name: str,
+        change: Callable[[Mapping[str, Any] | None], Mapping[str, Any] | None],
+    ) -> None:
+        key = (ADMIN, _admin_kind(kind), validate_id(kind, name))
+        new = change(self._docs.get(key))
+        if new is not None:
+            self._docs[key] = _copy(new)
 
     @_memory_generation
     def archive_user_document(self, user: str, kind: str, name: str, at: datetime) -> bool:

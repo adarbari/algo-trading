@@ -130,3 +130,13 @@ def test_each_name_takes_its_own_latest_run() -> None:
     second = ("r2", I2, at(I2), [factor("hbm", I2)], [])
     found = dossiers_as_of(store(("r1", I1, at(I1), [factor("hbm", I1), zz], []), second), I2)
     assert found.dossiers[MU].run_id == "r2" and found.dossiers["EQ:ZZ"].run_id == "r1"
+
+
+def test_only_the_asked_instruments_are_read_and_known_stays_table_wide() -> None:
+    zz = dict(factor("x", I1), instrument_id="EQ:ZZ")
+    reader = store(("r1", I1, at(I1), [factor("hbm", I1), zz], []))
+    only = dossiers_as_of(reader, I1, [MU])
+    assert list(only.dossiers) == [MU] and only.known
+    other = dossiers_as_of(reader, I1, ["EQ:NONE"])  # populated table, none of these names
+    assert other.dossiers == {} and other.known is True
+    assert dossiers_as_of(reader, date(2026, 11, 1), [MU]).known is False

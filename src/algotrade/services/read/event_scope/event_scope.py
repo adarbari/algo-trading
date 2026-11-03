@@ -91,7 +91,7 @@ def load_event_scope(ctx: ReadContext) -> EventScope:
     scope = scoped_instruments(ctx.reader, ctx.configs, day)
     by_symbol = {n.symbol: n for n in scope.names}
     named = {n.symbol: by_symbol[n.symbol] for n in listed.names if n.symbol in by_symbol}
-    dossiers = dossiers_as_of(ctx.reader, day).dossiers
+    dossiers = dossiers_as_of(ctx.reader, day, [n.instrument_id for n in named.values()]).dossiers
     moves = attributed_moves(ctx.reader, day, [n.instrument_id for n in named.values()])
     rows = []
     for entry in listed.names:

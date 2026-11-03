@@ -16,6 +16,7 @@ from ``dossiers`` of a populated table simply has no dossier yet.
 """
 
 import datetime as dt
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 import pandas as pd
@@ -89,10 +90,12 @@ def _latest_runs(factors: pd.DataFrame) -> dict[str, str]:
     return dict(zip(latest["instrument_id"].astype(str), latest["run_id"].astype(str), strict=True))
 
 
-def _known(reader: StoreReader, table: str, session: dt.date) -> pd.DataFrame:
+def _known(
+    reader: StoreReader, table: str, session: dt.date, instruments: Sequence[str] | None = None
+) -> pd.DataFrame:
     """Every stored row of ``table`` known on or before ``session`` (the one read rule), with
     ``known_from`` set to each row's effective date; no columns checked: empty when none."""
-    frame = reader.table_range(table, *ALL_TIME)
+    frame = reader.table_range(table, *ALL_TIME, None, instruments)
     if frame is None or frame.empty:
         return pd.DataFrame()
     frame = frame[known_from(frame) <= pd.Timestamp(session)]
@@ -103,12 +106,17 @@ def _day(value: object) -> dt.date:
     return pd.Timestamp(value).date()  # type: ignore[arg-type]
 
 
-def dossiers_as_of(reader: StoreReader, session: dt.date) -> DossierRead:
-    """The dossier of every name with one known on or before ``session`` (module doc)."""
-    factors = _known(reader, FACTORS, session)
+def dossiers_as_of(
+    reader: StoreReader, session: dt.date, instruments: Sequence[str] | None = None
+) -> DossierRead:
+    """The dossier of each of ``instruments`` (None: every name) with one known on or before
+    ``session`` (module doc); only their rows are read. ``known`` is table-wide: when none of
+    ``instruments`` has a row, the whole factor table is checked once."""
+    factors = _known(reader, FACTORS, session, instruments)
     if factors.empty:
-        return DossierRead({}, False)
-    occurrences = _known(reader, OCCURRENCES, session)
+        anywhere = instruments is not None and not _known(reader, FACTORS, session).empty
+        return DossierRead({}, anywhere)
+    occurrences = _known(reader, OCCURRENCES, session, instruments)
     if occurrences.empty:  # a dossier may list no date: the same columns, no rows
         occurrences = pd.DataFrame(
             columns=[
