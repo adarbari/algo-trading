@@ -114,3 +114,13 @@ def render_edge_report(result: Mapping[str, Any]) -> str:
     divider = "|" + "|".join("---" for _ in COLUMNS) + "|"
     body = ["| " + " | ".join(_cell(r, key, fmt) for key, _, fmt in COLUMNS) + " |" for r in rows]
     return "\n".join([*lines, "", header, divider, *body, ""])
+
+
+def proposed_line(edge_id: str, notes: str) -> str:
+    """The line printed above the report of an edge a study proposed (label ``proposed_by_study``,
+    ED6 W5): its in-sample slice is the discovery sample, and the trials counted are its screens,
+    not the features the study searched (the edge's ``notes`` say how many)."""
+    return (
+        f"PROPOSED BY A STUDY: {edge_id}: the in-sample slice is the discovery sample (biased, "
+        f"never evidence); only the test slice counts. {notes}\n"
+    )

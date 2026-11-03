@@ -123,6 +123,8 @@ def run_stats(result: DiscoveryResult) -> dict[str, Any]:
         "horizon_sessions": s.horizon_sessions,
         "benchmark": s.benchmark,
         "frozen_from": s.frozen_from.isoformat(),
+        "features_tested": len(result.tells),  # every feature the tells were sought in (W5)
+        "eligible": {"min_price": s.min_price, "min_adv_usd_20d": s.min_adv_usd_20d},
         "clusters": [list(c) for c in result.clusters],
         "tells": [
             {

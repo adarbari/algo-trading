@@ -18,6 +18,8 @@ Everything lands in ``config/users/<id>/edges/<edge id>.toml`` through the write
   a warning and never a block; on a site edge the bookmark (a file holding only ``[follow]``,
   archived to unfollow);
 - ``migrate_follows``: rewrites a user's files from the old ``[follow]`` states, idempotent.
+- ``save_proposed_edge``: a NEW own edge a study proposed (ED6 W5): always ``researching``,
+  with the permanent label ``proposed_by_study`` (``authoring/proposals.py`` writes its screens).
 Publishing an edge site-wide is not a write: the admin reads its layered document as TOML
 (``services/read/evaluation/versions.py``) and lands it in ``config/site/edges/`` by pull
 request."""
@@ -33,6 +35,7 @@ from algotrade.config.edges.follow import (
     AUDIT,
     AUDIT_LABELS,
     BOOKMARK_LABELS,
+    PROPOSED_BY_STUDY,
     Audit,
     is_legacy,
     legacy_own,
@@ -213,6 +216,30 @@ def save_edge_revision(
         )
     writer.save_user_document(who, KIND, edge_id, stored)
     return previous, stored
+
+
+def save_proposed_edge(
+    writer: ConfigWriter, user: str, edge_id: str, document: Mapping[str, Any], *, today: date
+) -> Edge:
+    """A NEW own edge ``edge_id`` of ``user`` proposed by a study (ED6 W5), validated as the
+    harness reads it: always ``researching`` (a ``status`` in ``document`` is refused: moving it to
+    candidate is the owner's step, so ML proposes and never judges) with the permanent label
+    ``proposed_by_study`` in its ``[audit]``. ``ConflictError`` if the id is taken or was
+    deleted; nothing is written unless it validates."""
+    who, edge_id = author(user).user_id, validate_id("edge", edge_id)
+    if edge_id in _site_ids(writer):
+        raise ConflictError(f"{edge_id} is a site edge's id")
+    _refuse_taken(writer, who, edge_id)
+    if "status" in document or AUDIT in document or FOLLOW in document:
+        raise ConfigurationError(
+            f"{edge_id}: a proposed edge is researching, with the server's [audit]; its document "
+            "sets no status, [audit] or [follow]"
+        )
+    stored = {k: v for k, v in copy.deepcopy(dict(document)).items() if k != "id"}
+    stored[AUDIT] = {"status_since": today, "labels": [PROPOSED_BY_STUDY]}
+    edge = _checked(writer, who, edge_id, stored)
+    writer.save_user_document(who, KIND, edge_id, stored)
+    return edge
 
 
 def delete_edge(writer: ConfigWriter, user: str, edge_id: str, now: datetime | None = None) -> None:

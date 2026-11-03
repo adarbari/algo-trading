@@ -215,7 +215,7 @@ values = { CURRENT = "term:provenance_current", STALE = "term:provenance_stale",
 [[enum]]
 source = "graphql:Edge.labels"
 values_from = "python:algotrade.config.edges.follow:AUDIT_LABELS"
-values = { followed_against_verdict = "term:edge_labels", oos_viewed_during_tuning = "term:edge_labels", replaced_without_forward_test = "term:edge_labels", split_moved_after_viewing = "term:edge_labels" }
+values = { followed_against_verdict = "term:edge_labels", oos_viewed_during_tuning = "term:edge_labels", replaced_without_forward_test = "term:edge_labels", split_moved_after_viewing = "term:edge_labels", proposed_by_study = "term:edge_labels" }
 names = { oos_viewed_during_tuning = "out-of-sample seen while tuning" }  # the label as the app shows it
 
 [[enum]]
