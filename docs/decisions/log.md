@@ -340,6 +340,20 @@ follow-up PR).
 - decided by: orchestrator (design call)
 - status: pending owner confirmation
 - Reasoning: each is the nearest accepted form of the brief; none changes a stored verdict of another setup.
+## 2026-11-02 | EV2 | the event-study groups stay out of the drafting prompt
+- Question: `event_reaction@v1` adds 48 statistic columns; their descriptions ("daily", "price", "normal day") outranked `atr_pct` for "daily range under 3% of price" and the golden case lost it from the slice (PR 1131 CI).
+- Options: reword the descriptions to dodge the words / add the groups to `UNDRAFTED_GROUPS` (the `etf_macro@v1` precedent) / raise the slice cap.
+- Decision: add `event_reaction@v1` and `market_event_reaction@v1` to `UNDRAFTED_GROUPS`; the screener fields over them are EV6's expression features, which are drafted.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the columns are statistics for the Events tab, not a stock screen's fields; rewording hides the cause and the cap is for every case.
+## 2026-11-02 | WF4: how the three ingestion workflows map onto the code
+- Question: the workflows ADR names `market-daily` / `reference` / `enrichment`; the post-session ADR already built `post-session` (descriptions, verify, edge-eval) and the `nightly` record is what reads and releases depend on. What are the three, and where does each step go?
+- Options: rename records and add a third agent; or keep `nightly` as market-daily and `post-session` as enrichment, adding only `reference`.
+- Decision: keep `nightly` and `post-session` records and jobs (aliases `market-daily`, `enrichment` for the commands); add `reference` (company-details, shares, macro-calendar, ibkr-contracts, the ETF holdings slots) as a weekly workflow; `ibkr-iv-history` joins post-session; `descriptions` stays in post-session (its Massive cap is per night, a weekly run would cut coverage 7x); per-night caps of moved steps are multiplied by 7 in the weekly run; `etf-holdings` stays nightly as the daily files only (`daily_funds` feed the flow features); a reference run yields to a pending nightly and takes the ingest lock per step.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: an architect reviewed the plan. No record is renamed, so no read, release or report changes; no second runner; the architect's blocking findings (daily ETF files, CLI lock deadlock and alias handling, nightly starvation by an unfair file lock) are each addressed in `workflows/reference/` and `cli/main.py`.
 ## 2026-11-02 | ID5 onboarding write (ADR 0040, 0044, 0057) | Local registry write only; identity-declared traders; admin by PR
 - Question: ID5 is an admin-only REST write that onboards a user. (1) May the API call Supabase's admin API (service-role key) to create or invite the account? (2) Where does a runtime-declared user live, given `config/site/users.toml` is tracked and public (a runtime write dirties the checkout; `deploy.sh` blocks on a dirty tree and `files.py` `LOCAL_SETTINGS` deliberately excludes `users` from the `.local.toml` overlay: "access a git-ignored file would change untraced")? (3) May the endpoint grant `admin`? (4) Restart or reload? (5) What does the write log?
 - Options: (1) service-role key in `.env` and a provider call vs. no provider call, the exact Supabase step returned. (2) a `users.local.toml` overlay vs. the user's own git-ignored `config/users/<id>/identity.toml` carrying the declaration vs. the API editing `users.toml`. (3) any role vs. `trader` only. (4) restart vs. in-process swap of `app.state.users`. (5) a line with or without the email.

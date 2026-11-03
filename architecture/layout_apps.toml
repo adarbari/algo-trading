@@ -332,6 +332,10 @@ path = "apps/ingestion/algotrade_ingestion/workflows/post_session"
 purpose = "the post-session workflow (ADR 0070): descriptions, verify and edge-eval after a session's nightly is done, with its own run record"
 
 [[dir]]
+path = "apps/ingestion/algotrade_ingestion/workflows/reference"
+purpose = "the weekly reference workflow (ADR 0039, WF4): company details, shares, the macro calendar, IBKR contracts and the ETF holdings slots, with its own run record, lock and due rule"
+
+[[dir]]
 path = "apps/ingestion/algotrade_ingestion/workflows/serve_release"
 purpose = "the serve-release workflow (ADR 0077): build, promote and prune the serving release under the serve lock, with its own run record"
 

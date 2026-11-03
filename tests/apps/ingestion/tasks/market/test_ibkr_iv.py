@@ -30,6 +30,7 @@ from algotrade_ingestion.tasks.market.ibkr_iv import (
     backfill_ivs,
     checked,
     history_done,
+    nightly_history,
     nightly_ivs,
     repair_ivs,
 )
@@ -142,8 +143,8 @@ def test_history_done_needs_the_window_to_reach_the_end() -> None:
 def test_a_session_missed_after_the_backfill_is_filled_by_a_one_day_backfill() -> None:
     ctx, reader = market(["A", "B"], iv_backfill_per_night=2)
     # the nightly's backfill reaches the session before; no snapshot ticks for SESSION
-    nightly = nightly_ivs(ctx, ibkr_source(fake(["A", "B"]), stream_wait_s=0.01), SESSION)
-    assert len(nightly.items) == 3 and ibkr_iv30(reader, SESSION, SESSION).empty
+    nightly = nightly_history(ctx, ibkr_source(fake(["A", "B"]), stream_wait_s=0.01), SESSION)
+    assert len(nightly.items) == 2 and ibkr_iv30(reader, SESSION, SESSION).empty
     ib = fake(["A", "B"])
     record = backfill_ivs(ctx, ibkr_source(ib), SESSION, SESSION)
     assert record.status is RunStatus.COMPLETE and record.stats["backfilled"] == 2
@@ -161,7 +162,7 @@ def test_a_name_without_history_is_no_data_not_a_failure() -> None:
     assert record.items["hist:EQ:B"] == f"NO_DATA: {WINDOW}"
 
 
-def test_nightly_snapshot_then_a_capped_backfill_of_names_without_history() -> None:
+def test_nightly_is_a_snapshot_only_and_the_history_step_is_capped_and_resumes() -> None:
     ctx, reader = market(["A", "B", "C"], iv_batch=2, iv_backfill_per_night=1)
     ib = fake(["A", "B", "C"], vols={"A": (0.31, 0.25), "B": (0.4, float("nan"))})
     record = nightly_ivs(ctx, ibkr_source(ib, stream_wait_s=0.01), SESSION)
@@ -173,11 +174,16 @@ def test_nightly_snapshot_then_a_capped_backfill_of_names_without_history() -> N
     assert ib.calls.count("reqMktData 104,106") == 3
     assert ib.calls.count("cancelMktData") == 3  # every stream is cancelled
     assert record.stats["with_iv"] == 2 and record.stats["coverage_pct"] == 66.7
-    # then the history of ONE name (the cap), up to the session before: no overlap with today
-    assert record.stats["backfilled"] == 1 and record.stats["backfill_pending"] == 2
+    assert "backfilled" not in record.stats  # market-daily takes no history
+    # the enrichment step: ONE name (the cap), up to the session before, no overlap with today
+    hist_run = nightly_history(ctx, ibkr_source(ib, stream_wait_s=0.01), SESSION)
+    assert hist_run.stats["backfilled"] == 1 and hist_run.stats["backfill_pending"] == 2
     hist = ibkr_iv30(reader, START, SESSION)
     hist = hist[hist["source_kind"] == "history"]
     assert set(hist["instrument_id"]) == {"EQ:A"} and max(hist["session_date"]) < SESSION
+    # a second run (a later night) goes on with the next name: the first one's item is read back
+    later = nightly_history(ctx, ibkr_source(ib, stream_wait_s=0.01), date(2026, 10, 6))
+    assert later.stats["backfilled"] == 1 and later.stats["backfill_pending"] == 1
 
 
 def test_names_without_a_contract_are_left_out() -> None:

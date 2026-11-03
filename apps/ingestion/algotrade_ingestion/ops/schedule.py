@@ -1,5 +1,6 @@
-"""Generate the macOS launchd agents: the nightly job (self-healing missed runs), the post-session
-watchdog (ADR 0070) and the monthly Tiingo history fill.
+"""Generate the macOS launchd agents: the nightly job (market-daily, self-healing missed runs), the
+weekly reference watchdog (ADR 0039), the post-session / enrichment watchdog (ADR 0070) and the
+monthly Tiingo history fill.
 
 The file is only written, never installed: loading it changes the machine's configuration,
 so the owner runs ``launchctl load`` themselves. launchd uses local time; the default 15:00
@@ -110,6 +111,40 @@ def post_session_plist(repo: Path, watchdog_s: int = POST_WATCHDOG_MINUTES * 60)
         "StartInterval": watchdog_s,
         "StandardOutPath": str(logs / "post-session.log"),
         "StandardErrorPath": str(logs / "post-session.err.log"),
+        **BACKGROUND,
+    }
+    return plistlib.dumps(agent)
+
+
+REFERENCE_LABEL = "com.algotrade.reference"
+REFERENCE_WATCHDOG_MINUTES = 360
+REFERENCE_DAY, REFERENCE_TIME = 6, (8, 0)  # Saturday 08:00 local (launchd Weekday 6)
+
+
+def reference_plist(repo: Path, watchdog_s: int = REFERENCE_WATCHDOG_MINUTES * 60) -> bytes:
+    """The agent that runs ``algotrade-ingest reference`` (ADR 0039, WF4): Saturday at 08:00, at
+    login and every ``watchdog_s`` seconds. A start is a quiet no-op unless the week's run is due
+    (a weekend, or none for 8 days) and no nightly or post-session run is pending
+    (``workflows/reference/``). launchd never starts a second copy while one runs, and the
+    ``reference`` lock refuses one started by hand."""
+    if watchdog_s < 1:
+        raise ValueError(f"invalid watchdog interval {watchdog_s} s")
+    logs = repo / "var" / "logs"
+    hour, minute = REFERENCE_TIME
+    agent: dict[str, object] = {
+        "Label": REFERENCE_LABEL,
+        "ProgramArguments": [
+            *CAFFEINATE,
+            str(repo / ".venv" / "bin" / "algotrade-ingest"),
+            "reference",
+            "--wait",
+        ],
+        "WorkingDirectory": str(repo),
+        "RunAtLoad": True,
+        "StartCalendarInterval": {"Weekday": REFERENCE_DAY, "Hour": hour, "Minute": minute},
+        "StartInterval": watchdog_s,
+        "StandardOutPath": str(logs / "reference.log"),
+        "StandardErrorPath": str(logs / "reference.err.log"),
         **BACKGROUND,
     }
     return plistlib.dumps(agent)

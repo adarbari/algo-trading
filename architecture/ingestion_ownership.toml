@@ -261,7 +261,7 @@ detect = [
 
 [[responsibility]]
 id = "ingestion-step-dispatch"
-description = "Decide which ingestion steps run, in what order, with which defaults (CLI, nightly, post-session): tasks are declared once in the registry; nightly is an ordered list of isolated task steps; the post-session workflow (ADR 0070) holds the steps that do not decide a session (descriptions, verify, edge-eval), runs for the last nightly-done session once, and decides when the weekly edge audit is due"
+description = "Decide which ingestion steps run, in what order, with which defaults (CLI, nightly, post-session): tasks are declared once in the registry; nightly is an ordered list of isolated task steps; the weekly reference workflow (ADR 0039: company-details, shares, macro-calendar, ibkr-contracts, the ETF holdings slots) and the post-session workflow (ADR 0070: the enrichment: descriptions, verify, the IBKR IV history, edge-eval) hold the steps that do not decide a session, runs for the last nightly-done session once, and decides when the weekly edge audit is due"
 owner = [
     "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",
     "apps/ingestion/algotrade_ingestion/tasks/framework/entries_*.py",  # the registry's run wrappers, split by domain
@@ -319,7 +319,7 @@ detect = [{ string = "events/ipo_lockup" }]
 
 [[responsibility]]
 id = "launchd-agents"
-description = "Generate the macOS launchd agents that run the apps on the owner's Mac, written and never installed (the owner runs launchctl): the nightly and the post-session watchdog (ingestion ops/schedule.py, ADR 0070), the API kept serving behind Tailscale Funnel (api ops/schedule.py, ADR 0044) and the auto-deploy poll (the same api module, ADR 0057)"
+description = "Generate the macOS launchd agents that run the apps on the owner's Mac, written and never installed (the owner runs launchctl): the nightly (market-daily), the weekly reference watchdog (ADR 0039) and the post-session / enrichment watchdog (ingestion ops/schedule.py, ADR 0070), the API kept serving behind Tailscale Funnel (api ops/schedule.py, ADR 0044) and the auto-deploy poll (the same api module, ADR 0057)"
 owner = [
     "apps/ingestion/algotrade_ingestion/ops/schedule.py",
     "apps/api/algotrade_api/ops/schedule.py",
@@ -359,6 +359,8 @@ allowed = [
     "src/algotrade/storage/tables/schemas/events.py",  # declares the table
     "src/algotrade/services/read/events/ahead.py",  # the events-ahead read of the stored calendar (known_from <= session), a display read
     "src/algotrade/features/rollups/market/edges/conditions.py",  # names the feature input of the stored calendar (known_from <= session) for the FOMC distances (ADR 0088); reads only, the table's one writer stays macro/calendar.py
+    "src/algotrade/features/rollups/event_study/event_reaction.py",  # names the feature input of the stored calendar (known_from <= session) for the macro reaction columns (ADR 0050 EV2); computes only, never writes
+    "src/algotrade/features/rollups/event_study/market_event_reaction.py",  # names the same feature input for the S&P 500's reaction; computes only
 ]
 section = "docs/adr/0050-event-sensitivity.md#decision"
 detect = [{ call = "lagged_vintages" }, { string = "events/macro_release" }]

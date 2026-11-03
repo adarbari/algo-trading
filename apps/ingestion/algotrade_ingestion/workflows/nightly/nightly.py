@@ -78,7 +78,6 @@ from algotrade_ingestion.tasks.maintenance.quality import (
     check_ibkr_vols,
     check_ipo_lockups,
     check_macro,
-    check_macro_calendar,
     check_market_rollups,
     check_reference_classification,
     check_rollup_inputs,
@@ -163,15 +162,8 @@ NIGHTLY: tuple[Step, ...] = (
         critical=False,
         accept=(check_futures_curves,),
     ),
-    # Reference data (ADR 0039: moves to the weekly `reference` workflow in WF4): optional.
-    Step("company-details", latest_only=SNAPSHOT, critical=False),
-    Step("shares", latest_only=SNAPSHOT, critical=False),
-    # The macro release calendar (ADR 0050): seven FRED requests, dates 400 days either side, so
-    # it is a weekly-cadence fact kept current nightly until the `reference` workflow exists
-    # (WF4: it moves there with the two steps above). Optional; FRED off or no key: SKIPPED.
-    Step(
-        "macro-calendar", latest_only=SNAPSHOT, critical=False, accept_with=(check_macro_calendar,)
-    ),
+    # Reference data (company-details, shares, macro-calendar, ibkr-contracts, the ETF holdings
+    # slots) is the weekly `reference` workflow's (ADR 0039, WF4): `workflows/reference/`.
     # SEC 8-Ks of the event-study names (ADR 0050): one request per CIK from its latest stored
     # filing, so a night reads the new ones; their Item 2.02 releases are earnings rows. Optional:
     # a failed night is read again the next (the default start is the latest stored filing).
@@ -210,30 +202,24 @@ NIGHTLY: tuple[Step, ...] = (
         accept=(check_chains,),
         resumable=True,
     ),
-    # What each ETF holds (ADR 0035): issuer files, a weekly slot per fund, at most
-    # [etf_holdings] per_night funds a night (new and stalest first). Optional.
+    # The iShares funds' daily share counts (ADR 0035; ``[etf_holdings] daily_funds``, read every
+    # night: the flow features need them): the weekly holdings slots are the `reference`
+    # workflow's. Optional.
     Step(
         "etf-holdings",
         needs=("universe-build",),
         requires=universe_exists,
         latest_only=SNAPSHOT,
         critical=False,
-        params={"nightly": True},
+        params={"daily_only": True},
     ),
-    # IBKR enrichment (ADR 0028), read-only, SKIPPED with a WARN when [ibkr] is disabled or IB
-    # Gateway is not reachable: conids for new optionable names (and the monthly refresh),
-    # then the session's IV snapshot (+ a capped history backfill) for ibkr_iv@v1. Optional:
-    # IV rank falls back to ours, labelled.
-    Step(
-        "ibkr-contracts",
-        needs=("universe-build",),
-        requires=universe_exists,
-        latest_only=SNAPSHOT,
-        critical=False,
-    ),
+    # IBKR session snapshot (ADR 0028), read-only, SKIPPED with a WARN when [ibkr] is disabled or
+    # IB Gateway is not reachable: the session's IV snapshot for ibkr_iv@v1 (the conids come from
+    # the `reference` workflow's ibkr-contracts; the history backfill is the post-session
+    # workflow's `ibkr-iv-history`). Optional: IV rank falls back to ours, labelled.
     Step(
         "ibkr-iv",
-        needs=("ibkr-contracts",),
+        needs=("universe-build",),
         requires=universe_exists,
         latest_only=SNAPSHOT,
         critical=False,
