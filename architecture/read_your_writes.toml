@@ -16,6 +16,16 @@ max_exempt = 5
 
 [[route]]
 method = "DELETE"
+path = "/admin/events/scope/{symbol}"
+test = "tests/contract/api/read_your_writes/test_event_scope.py::test_remove_drops_the_name_from_the_next_scoped_calendar"
+
+[[route]]
+method = "PUT"
+path = "/admin/events/scope/{symbol}"
+test = "tests/contract/api/read_your_writes/test_event_scope.py::test_add_shows_the_name_on_the_next_scoped_calendar"
+
+[[route]]
+method = "DELETE"
 path = "/edges/{edge_id}"
 test = "tests/contract/api/read_your_writes/test_edges.py::test_delete_removes_the_edge"
 

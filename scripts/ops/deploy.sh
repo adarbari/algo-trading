@@ -17,7 +17,7 @@
 # is a detached worktree the deployer alone moves: serving never touches the main checkout or its
 # venv, so a deploy takes only the `deploy` lock and never waits on an ingest (ADR 0079).
 # main is fetched into the private ref refs/deploy/main (never refs/remotes/origin/main, which
-# other sessions fetch too). The git-ignored overlay (var, .env, config/users,
+# other sessions fetch too). The git-ignored overlay (var, .env, config/users, config/admin,
 # config/site/*.local.toml) is symlinked into the tree from the main checkout.
 # State is var/deploy/ (last_sha, blocked); the web build is var/release/<slot>.web; the log is
 # var/logs/deploy.log.
@@ -226,11 +226,13 @@ link_one() {  # link_one <source> <link>: create once, check every cycle
 
 slot_links() {
   local root_dir=$root f pat pats
-  if [ "$dry" = 1 ]; then echo "[dry-run] link var, .env, config/users, config/site/*.local.toml, apps/web/{$WEB_ENV_OVERLAY} into $tree"; return 0; fi
+  if [ "$dry" = 1 ]; then echo "[dry-run] link var, .env, config/users, config/admin, config/site/*.local.toml, apps/web/{$WEB_ENV_OVERLAY} into $tree"; return 0; fi
   link_one "$root_dir/var" "$tree/var" || return 1
   if [ -e "$root_dir/.env" ]; then link_one "$root_dir/.env" "$tree/.env" || return 1; fi
   mkdir -p "$root_dir/config/users"  # always linked: a first user-config write must not make a real dir in the tree
   link_one "$root_dir/config/users" "$tree/config/users" || return 1
+  mkdir -p "$root_dir/config/admin"  # likewise: the admin scope's first write (event scope list, EV8) lands in the main checkout
+  link_one "$root_dir/config/admin" "$tree/config/admin" || return 1
   for f in "$root_dir"/config/site/*.local.toml; do
     if [ -e "$f" ]; then link_one "$f" "$tree/config/site/$(basename "$f")" || return 1; fi
   done

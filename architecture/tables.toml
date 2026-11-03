@@ -178,12 +178,12 @@ note = "ADR 0050 EV4: the cause of a big move (cause class, text, confidence, ev
 [[table]]
 name = "instruments/factors"
 owner = "apps/ingestion/algotrade_ingestion/tasks/events/dossier/run.py"
-note = "ADR 0050 EV5: the factors (drivers) of a name from its reviewed deep-dive dossier (kind, description, status active | retired, review date); every import writes the whole dossier, a reader takes, per instrument, the latest import run (newest knowledge_ts) among rows with known_from on or before its session; known_from = the import's session"
+note = "ADR 0050 EV5: the factors (drivers) of a name from its reviewed deep-dive dossier (kind, description, status active | retired, review date); every import writes the whole dossier, a reader takes, per instrument, the latest import run (newest knowledge_ts) among rows with known_from on or before its session; known_from = the import's session; read only through data/dossier (EV8a)"
 
 [[table]]
 name = "events/factor_occurrence"
 owner = "apps/ingestion/algotrade_ingestion/tasks/events/dossier/run.py"
-note = "ADR 0050 EV5: dated occurrences (past instances, next dates) and undated watch items (an expected window) of a dossier's factors; same whole-dossier, latest-run rule as instruments/factors; known_from = the import's session"
+note = "ADR 0050 EV5: dated occurrences (past instances, next dates) and undated watch items (an expected window) of a dossier's factors; same whole-dossier, latest-run rule as instruments/factors; known_from = the import's session; read only through data/dossier (the forward calendar, EV8a)"
 
 [[table]]
 name = "events/filing"

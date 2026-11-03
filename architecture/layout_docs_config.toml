@@ -189,6 +189,11 @@ path = "config/site/overrides"
 purpose = "curated CSV overrides read by the settings loader (e.g. leveraged_etfs.csv)"
 
 [[config_dir]]
+path = "config/admin"
+purpose = "the admin scope (ADR 0029 amendment 2026-11-03): documents an admin changes at run time, one folder per kind (git-ignored local state: not checked; backed up with config/users, docs/hosting.md)"
+local = true
+
+[[config_dir]]
 path = "config/users"
 purpose = "L4 user configs, one folder per user (git-ignored local state: not checked)"
 local = true

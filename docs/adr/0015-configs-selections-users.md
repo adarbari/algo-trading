@@ -42,3 +42,10 @@ edit of a reviewed file. It adds no layer to `defaults < site < user < run`.
 - Adding a strategy subset is a config change, not a code change.
 - Results are reproducible: the config hash identifies exactly what produced them.
 - A user can never widen coverage; covering a new instrument is a site change.
+
+## Amendment 2026-11-03: the admin layer (EV8)
+
+Layering is defaults < site < user < run, and for the event-study scope list one more document
+between the site file and the reader: the `admin` scope (ADR 0029 amendment 2026-11-03) is layered
+over `config/site/events/scope.toml` at load: site names + admin added - admin removed, resolved once
+(`effective_list`). It applies to that one list only; no other site document has an admin layer.

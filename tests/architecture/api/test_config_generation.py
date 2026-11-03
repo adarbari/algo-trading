@@ -32,11 +32,18 @@ def test_every_public_write_of_both_writers_runs_inside_the_generation() -> None
     """A new ``FileConfigWriter`` / ``MemoryConfigWriter`` write without its generation
     decorator fails here."""
     wanted = {"FileConfigWriter": "_generation", "MemoryConfigWriter": "_memory_generation"}
+    # the admin scope's write moves the admin scope's counter (``config/admin/.generation``,
+    # ``config_generation`` holds it in every key), not a user's
+    admin = {
+        "FileConfigWriter": "_admin_generation",
+        "MemoryConfigWriter": "_memory_admin_generation",
+    }
     missing = []
     for class_name, decorator in wanted.items():
         for method in _public_methods(class_name):
             names = {d.id for d in method.decorator_list if isinstance(d, ast.Name)}
             writes = method.name.startswith(("save_", "add_", "discard_", "delete_", "archive_"))
-            if writes and decorator not in names:
+            wrapper = admin[class_name] if method.name == "save_admin_document" else decorator
+            if writes and wrapper not in names:
                 missing.append(f"{class_name}.{method.name}")
     assert not missing, f"writes outside the generation seqlock: {missing}"

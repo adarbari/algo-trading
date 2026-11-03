@@ -66,6 +66,7 @@ def test_the_name_is_optional(store: MemoryConfigWriter) -> None:
         ("nobody", "zoe", "zoe@example.com", "", PermissionDeniedError),
         ("local", "Bad Id", "zoe@example.com", "", ConfigurationError),
         ("local", "site", "zoe@example.com", "", ConfigurationError),
+        ("local", "admin", "zoe@example.com", "", ConfigurationError),
         ("local", "../x", "zoe@example.com", "", ConfigurationError),
         ("local", "zoe", "not-an-email", "", ConfigurationError),
         ("local", "zoe", "a@b", "", ConfigurationError),

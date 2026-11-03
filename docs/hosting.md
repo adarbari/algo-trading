@@ -105,7 +105,7 @@ The API serves from a **release tree**, a detached git worktree at `var/release/
 `blue`; `var/release/current` links the active one) with its own `.venv` and web build
 (`var/release/<slot>.web`, outside every git path). The main checkout and its venv belong to
 ingestion, the nightly and the other agents; serving never touches them. The git-ignored overlay
-(`var/`, `.env`, `config/users/`, `config/site/*.local.toml`, and the web build's `apps/web/.env`,
+(`var/`, `.env`, `config/users/`, `config/admin/`, `config/site/*.local.toml`, and the web build's `apps/web/.env`,
 `.env.local`, `.env.*.local`, where `VITE_SUPABASE_*` live) is symlinked into the tree from the
 main checkout by the deployer, so `var/` (data, logs, deploy state) is still one place.
 
@@ -267,6 +267,17 @@ An **admin**, or any data licence (`personal`, `yahoo`), is granted only by a PR
 `users.toml` entry always wins over an identity-declared user of the same id. Each onboarding
 logs one line to the API log, `onboard user=<id> role=trader by=<admin id>` (no email). Refused:
 an id or email already held, `site`, an invalid id or email, anyone but an admin.
+
+### The admin scope: `config/admin/` (EV8)
+
+An admin changes the event-study scope list from the Admin screen (`PUT` / `DELETE
+/admin/events/scope/{symbol}`); the change is recorded in `config/admin/events/scope.toml`
+(`added` / `removed`, each with `by`, `at`, `note`), layered over the site list
+`config/site/events/scope.toml` (which changes only by PR). Like `config/users/` it is git-ignored
+local state on this Mac, so **back it up with `config/users/`** (and `var/`): losing it loses the
+admin's additions and removals, nothing else (no stored data is ever deleted by a removal). The
+deployer links `config/admin` into the release tree beside `config/users`. A change is only
+recorded; the next nightly's budgeted fill picks an added name up.
 
 `Too many open files` / `socket.accept() out of system resource` in `api.err.log`: launchd
 gives an agent 256 descriptors and every open connection takes one. The agent's plist sets

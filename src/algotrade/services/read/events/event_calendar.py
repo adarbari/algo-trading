@@ -8,7 +8,8 @@ Each day lists the names' own events (own and reference earnings, with the name 
 to) and the market-wide ones once (macro releases, market-structure days: ``instrument_id``
 None). Every session of the window is a day, even an empty one; a non-session day appears
 only when an event falls on it. Same point-in-time rules and gaps as ``InstrumentEvents``
-(``ahead.load_ahead``)."""
+(``ahead.load_ahead``). A name's dossier dates (``factor`` events, EV8a) are on its row; its
+undated watch windows are listed apart (``watch``)."""
 
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -17,7 +18,13 @@ from datetime import date, timedelta
 from algotrade.core.time.calendar import is_session, sessions_between
 from algotrade.services.events.scope import LIST, scoped_instruments
 from algotrade.services.read.context import ReadContext
-from algotrade.services.read.events.ahead import OWN_EARNINGS, AheadEvent, EventGap, load_ahead
+from algotrade.services.read.events.ahead import (
+    OWN_EARNINGS,
+    AheadEvent,
+    EventGap,
+    WatchItem,
+    load_ahead,
+)
 from algotrade.services.read.instruments.identity import load_instruments
 
 
@@ -37,6 +44,15 @@ class CalendarEvent:
     instrument_id: str | None
     symbol: str | None
     event: AheadEvent
+
+
+@dataclass(frozen=True)
+class CalendarWatch:
+    """An undated dossier item (an expected window) of a name on the calendar."""
+
+    instrument_id: str
+    symbol: str
+    item: WatchItem
 
 
 @dataclass(frozen=True)
@@ -61,6 +77,7 @@ class EventCalendar:
     gaps: tuple[EventGap, ...]
     missing: tuple[str, ...]
     unresolved: tuple[str, ...]
+    watch: tuple[CalendarWatch, ...]
 
 
 def _fund_own(gap: EventGap, funds: set[str]) -> bool:
@@ -108,4 +125,9 @@ def load_event_calendar(
         ),
         missing=tuple(i for i in wanted if i not in known),
         unresolved=tuple(unresolved),
+        watch=tuple(
+            CalendarWatch(n.instrument_id, n.symbol, w)
+            for n in names
+            for w in ahead.watch[n.instrument_id]
+        ),
     )

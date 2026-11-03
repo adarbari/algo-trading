@@ -7,7 +7,8 @@ from tests.helpers.api_store import END
 STUDY = """query($key: String!, $days: Int) {
   instrument(key: $key) { eventStudy(days: $days) {
     instrumentId session days months
-    ahead { date time kind label name subjectId source knownFrom }
+    ahead { date time kind label name subjectId source knownFrom factorId factorKind }
+    watch { factorId factorKind label expectedFrom expectedTo knownFrom }
     filings { accepted form items label }
     ladder { expiry days clear marked spans { date kind label } }
     reference { instrumentId symbol kind source status }
@@ -37,7 +38,12 @@ def test_what_is_coming_for_a_stock(graph: Graph) -> None:
     assert [s["label"] for s in study["ladder"][0]["spans"]] == ["Earnings", "Quarterly expiry"]
     assert study["reference"] is None and study["filings"] == []
     gaps = {g["part"]: g["unknown"]["code"] for g in study["gaps"]}
-    assert gaps == {"macro_release": "NO_PARTITION", "filings": "NO_ROW"}
+    assert gaps == {
+        "macro_release": "NO_PARTITION",
+        "filings": "NO_ROW",
+        "factor": "NO_PARTITION",  # no deep-dive dossier was ever imported in the golden store
+    }
+    assert study["watch"] == []
 
 
 def test_days_is_capped(graph: Graph) -> None:

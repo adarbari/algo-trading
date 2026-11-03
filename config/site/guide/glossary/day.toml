@@ -342,3 +342,14 @@ Read the timeline as a list of days to be careful on. A release can move every s
 A date can move after it is published. A day marked as moved is replaced by a new row for its new date.
 """
 see_also = ["unknown"]
+
+[[term]]
+id = "factor_kind"
+term = "Driver kind"
+short = "What kind of thing a reviewed driver of a name is: a peer, a macro release, a rule change, a commodity price and so on."
+body = """
+A driver is something outside the name's own earnings that has moved it, found in the owner's periodic review of that name. Its kind says what sort of thing it is. A peer is another company whose news moves this one, such as a supplier's results. Macro is a market-wide number or decision. Regulation is a rule, a ruling or an agency date. Commodity is the price of something the name sells or buys. Litigation is a court case. Product cycle is a launch, a shortage or a demand swing in what it makes. Financing is its own raising or spending of money. Flows is money moving into or out of it, for example an index change.
+
+A driver's dated occurrences appear on the calendar with its kind. Dates without a day are listed apart as watch items, with the window they are expected in. A driver the review dropped is marked retired and its dates are no longer shown.
+"""
+see_also = ["macro_days"]

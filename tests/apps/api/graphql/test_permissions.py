@@ -35,6 +35,7 @@ CALLS = {
     "figi_review": "figiReview",
     "leverage_review": "leverageReview",
     "llm_usage": "llmUsage",
+    "event_scope": "eventScope",
     "feature_requests": "featureRequests",
     "accepted_formulas": "acceptedFormulas",
     "harness_runs": "harnessRuns(limit: 1)",

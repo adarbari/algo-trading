@@ -15,13 +15,15 @@ from algotrade_api.graphql.types.instruments.feature import Unknown
 
 @strawberry.type(
     description="A dated event ahead: `kind` own_earnings | reference_earnings | "
-    "macro_release | market_structure; `time` pre_market | intraday | after_hours | unknown "
-    "for a report, the release time for a macro release (08:30 ET), close for a market-"
+    "factor | macro_release | market_structure; `time` pre_market | intraday | after_hours | "
+    "unknown for a report, the release time for a macro release (08:30 ET), close for a market-"
     "structure day; `label` short, `name` in words; `subjectId` whose event (the "
     "instrument, the fund's reference, the MACRO: release; null for a market-structure day); "
     "`knownFrom` the first session the stored row was known on (null: a catalogue value or "
     "a calendar rule); `expiry` a monthly or quarterly option expiry day; `sourceUrl` the "
-    "agency page of a macro release (null for every other kind)"
+    "agency page of a macro release (null for every other kind); `factorId` / `factorKind` "
+    "the deep-dive dossier factor of a `factor` event (an occurrence the owner's review "
+    "dated; `source` is dossier; null for every other kind)"
 )
 class AheadEvent:
     date: dt.date
@@ -34,6 +36,8 @@ class AheadEvent:
     known_from: dt.date | None
     expiry: bool
     source_url: str | None
+    factor_id: str | None
+    factor_kind: str | None
 
     @classmethod
     def of(cls, d: ahead.AheadEvent) -> Self:
@@ -48,12 +52,41 @@ class AheadEvent:
             known_from=d.known_from,
             expiry=d.expiry,
             source_url=d.source_url,
+            factor_id=d.factor_id,
+            factor_kind=d.factor_kind,
+        )
+
+
+@strawberry.type(
+    description="An undated item of a deep-dive dossier factor: expected in `expectedFrom` to "
+    "`expectedTo` (a window not over yet), `factorKind` the factor's kind, `knownFrom` the "
+    "session of the import that stored it. Listed apart from the dated events"
+)
+class WatchItem:
+    instrument_id: str
+    factor_id: str
+    factor_kind: str
+    label: str
+    expected_from: dt.date
+    expected_to: dt.date
+    known_from: dt.date
+
+    @classmethod
+    def of(cls, d: ahead.WatchItem) -> Self:
+        return cls(
+            instrument_id=d.instrument_id,
+            factor_id=d.factor_id,
+            factor_kind=d.factor_kind,
+            label=d.label,
+            expected_from=d.expected_from,
+            expected_to=d.expected_to,
+            known_from=d.known_from,
         )
 
 
 @strawberry.type(
     description="A part of the events read not known for the session: `part` own_earnings, "
-    "reference_earnings, macro_release, reference, filings or ladder; `instrumentId` null "
+    "reference_earnings, macro_release, factor, reference, filings or ladder; `instrumentId` null "
     "for a market-wide part (the macro calendar)"
 )
 class EventGap:
@@ -145,7 +178,8 @@ class FundReference:
     description="What is coming for the instrument as of the session: the events of the next "
     "`days` days (oldest first), the 8-Ks of the last `months` (newest first), the expiry "
     "ladder, a leveraged fund's reference (null: not one, or not known: see `gaps`) and the "
-    "parts not known for the session. Event rows are those known on or before the session "
+    "parts not known for the session; `watch` the dossier's undated items still open (its "
+    "dated occurrences are in `ahead`). Event rows are those known on or before the session "
     "(ADR 0050); catalogue values and the chain exactly the session's (ADR 0036)"
 )
 class InstrumentEvents:
@@ -158,6 +192,7 @@ class InstrumentEvents:
     ladder: list[LadderRung]
     reference: FundReference | None
     gaps: list[EventGap]
+    watch: list[WatchItem]
 
     @classmethod
     def of(cls, d: instrument_events.InstrumentEvents) -> Self:
@@ -171,4 +206,5 @@ class InstrumentEvents:
             ladder=[LadderRung.of(r) for r in d.ladder],
             reference=FundReference.of(d.reference) if d.reference is not None else None,
             gaps=[EventGap.of(g) for g in d.gaps],
+            watch=[WatchItem.of(w) for w in d.watch],
         )

@@ -1,5 +1,7 @@
 """Write access to L4 user configs (ADR 0029): a rule screen's draft, its immutable finalised
-versions, deleting a screen (archived, never erased), and a user's expression-feature files.
+versions, deleting a screen (archived, never erased), and a user's expression-feature files;
+and the one admin-scope document (``config/admin/events/scope.toml``, ADR 0029 amendment
+2026-11-03: the admin's changes to the event-study scope list), replaced whole.
 
 ``ConfigWriter`` extends the read-only ``ConfigStore`` protocol, so one object serves the
 resolver (which sees each user screen's latest version) and the writes. Only
@@ -29,6 +31,8 @@ from typing import Any, Protocol
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.model.ids import validate_id
 from algotrade.storage.configs.files import (
+    ADMIN,
+    ADMIN_KINDS,
     DRAFT,
     SCREENERS,
     SITE,
@@ -91,6 +95,12 @@ class ConfigWriter(ConfigStore, Protocol):
         """Replace ``users/<user>/<kind>/<name>.toml`` for a kind in ``USER_DOCUMENT_KINDS``."""
         ...
 
+    def save_admin_document(self, kind: str, name: str, document: Mapping[str, Any]) -> None:
+        """Replace ``admin/<kind>/<name>.toml`` (git-ignored) for a kind in ``ADMIN_KINDS``
+        (``events``) inside the admin scope's generation (``generation("admin")``); the caller
+        holds the read-modify-write lock (``services.authoring``)."""
+        ...
+
     def archive_user_document(self, user: str, kind: str, name: str, at: datetime) -> bool:
         """Move that document to ``users/<user>/archive/<kind>/<name>-<stamp>.toml`` (never
         erased); ``True`` when there was one."""
@@ -104,6 +114,8 @@ class ConfigWriter(ConfigStore, Protocol):
 def _user(user: str) -> str:
     if user == SITE:
         raise ConfigurationError("site configs change by PR, never through the writer")
+    if user == ADMIN:
+        raise ConfigurationError("'admin' is a reserved scope, never a user id")
     return validate_id("user", user)
 
 
@@ -117,6 +129,12 @@ def archive_name(name: str, at: datetime, id_kind: str = "screener") -> str:
 def _archived_as(name: str, id_kind: str = "screener") -> re.Pattern[str]:
     """Matches the archive names of ``name`` (and no other id that starts with it)."""
     return re.compile(rf"{re.escape(validate_id(id_kind, name))}-\d{{8}}T\d{{12}}Z")
+
+
+def _admin_kind(kind: str) -> str:
+    if kind not in ADMIN_KINDS:
+        raise ConfigurationError(f"{kind!r} is not a kind the admin scope holds")
+    return kind
 
 
 def _document_kind(kind: str) -> str:
@@ -143,6 +161,19 @@ def _generation[**P, R](method: Callable[..., R]) -> Callable[..., R]:
     def wrapped(self: "FileConfigWriter", user: str, *args: Any, **kwargs: Any) -> R:
         with writing(self.root / "users" / _user(user)):
             return method(self, user, *args, **kwargs)
+
+    return wrapped
+
+
+def _admin_generation[**P, R](method: Callable[..., R]) -> Callable[..., R]:
+    """A write of the admin scope: its counter (``config/admin/.generation``) is odd while it
+    runs and even once the file is in place, so a cached answer of any user that read the scope
+    (the event scope list) is never served from before the write (``config_generation``)."""
+
+    @functools.wraps(method)
+    def wrapped(self: "FileConfigWriter", *args: Any, **kwargs: Any) -> R:
+        with writing(self.root / ADMIN):
+            return method(self, *args, **kwargs)
 
     return wrapped
 
@@ -234,6 +265,22 @@ class FileConfigWriter(FileConfigStore):
             raise FileExistsError("identity.toml exists")
         self._write(user, path, toml_text(document))
 
+    @_admin_generation
+    def save_admin_document(self, kind: str, name: str, document: Mapping[str, Any]) -> None:
+        """Atomic replace of ``admin/<kind>/<name>.toml`` (a temp file, then a rename)."""
+        path = self.admin_path(_admin_kind(kind), name)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        fd, tmp_name = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
+        tmp = Path(tmp_name)
+        try:
+            with os.fdopen(fd, "w") as fh:
+                fh.write(toml_text(document))
+                fh.flush()
+                os.fsync(fh.fileno())
+            tmp.replace(path)
+        finally:
+            tmp.unlink(missing_ok=True)
+
     def _document_path(self, user: str, kind: str, name: str) -> Path:
         folder = self.root / "users" / _user(user) / _document_kind(kind)
         return folder / f"{_document_id(kind, name)}.toml"
@@ -268,20 +315,34 @@ def _copy(document: Mapping[str, Any]) -> dict[str, Any]:
     return tomllib.loads(toml_text(document))  # what a file round trip would give back
 
 
+def _bumped[R](writer: "MemoryConfigWriter", who: str, write: Callable[[], R]) -> R:
+    """``write()`` with ``who``'s counter odd for its duration, even after (under the lock)."""
+    with writer._lock:
+        before = writer._generations.get(who, 0)
+        odd = before + 1 if before % 2 == 0 else before + 2
+        writer._generations[who] = odd
+        try:
+            return write()
+        finally:
+            writer._generations[who] = odd + 1
+
+
 def _memory_generation[**P, R](method: Callable[..., R]) -> Callable[..., R]:
     """A write of ``MemoryConfigWriter``: the same odd-then-even counter as the file one."""
 
     @functools.wraps(method)
     def wrapped(self: "MemoryConfigWriter", user: str, *args: Any, **kwargs: Any) -> R:
-        with self._lock:
-            who = _user(user)
-            before = self._generations.get(who, 0)
-            odd = before + 1 if before % 2 == 0 else before + 2
-            self._generations[who] = odd
-            try:
-                return method(self, user, *args, **kwargs)
-            finally:
-                self._generations[who] = odd + 1
+        return _bumped(self, _user(user), lambda: method(self, user, *args, **kwargs))
+
+    return wrapped
+
+
+def _memory_admin_generation[**P, R](method: Callable[..., R]) -> Callable[..., R]:
+    """A write of the admin scope: the same counter under the scope's own key."""
+
+    @functools.wraps(method)
+    def wrapped(self: "MemoryConfigWriter", *args: Any, **kwargs: Any) -> R:
+        return _bumped(self, ADMIN, lambda: method(self, *args, **kwargs))
 
     return wrapped
 
@@ -305,7 +366,7 @@ class MemoryConfigWriter(MemoryConfigStore):
         self.archived_documents: dict[tuple[str, str, str], dict[str, Any]] = {}
 
     def generation(self, user: str) -> int:
-        return self._generations.get(_user(user), 0)
+        return self._generations.get(ADMIN if user == ADMIN else _user(user), 0)
 
     def _screen(self, user: str, name: str) -> tuple[str, str]:
         return _user(user), validate_id("screener", name)
@@ -327,7 +388,9 @@ class MemoryConfigWriter(MemoryConfigStore):
         return sorted(n for (u, n), v in self._versions.items() if u == scope and v)
 
     def users(self) -> list[str]:
-        return sorted({*super().users(), *(u for u, _ in self._versions), *self._generations})
+        return sorted(
+            {*super().users(), *(u for u, _ in self._versions), *self._generations} - {ADMIN}
+        )
 
     def draft(self, user: str, name: str) -> dict[str, Any] | None:
         found = self._drafts.get(self._screen(user, name))
@@ -393,6 +456,10 @@ class MemoryConfigWriter(MemoryConfigStore):
         self, user: str, kind: str, name: str, document: Mapping[str, Any]
     ) -> None:
         self._docs[(_user(user), _document_kind(kind), _document_id(kind, name))] = _copy(document)
+
+    @_memory_admin_generation
+    def save_admin_document(self, kind: str, name: str, document: Mapping[str, Any]) -> None:
+        self._docs[(ADMIN, _admin_kind(kind), validate_id(kind, name))] = _copy(document)
 
     @_memory_generation
     def archive_user_document(self, user: str, kind: str, name: str, at: datetime) -> bool:

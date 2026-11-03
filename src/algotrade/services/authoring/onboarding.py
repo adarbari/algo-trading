@@ -28,6 +28,7 @@ from algotrade.config.site.users import IDENTITY, Role, UsersSettings
 from algotrade.config.user import SITE_USER, validate_id
 from algotrade.core.model.errors import ConfigurationError, PermissionDeniedError
 from algotrade.services.authoring.scope import ConfigWriter, ConflictError
+from algotrade.storage.configs.files import ADMIN
 
 PROVIDER_STEP = "supabase_add_user"  # the web's Guide key for: add the email in Supabase
 MAX_EMAIL = 254
@@ -84,6 +85,8 @@ def onboard_user(
     label = _name(name)
     if user_id == SITE_USER:
         raise ConfigurationError(f"user '{SITE_USER}' runs scheduled screens: it is not onboarded")
+    if user_id == ADMIN:
+        raise ConfigurationError(f"'{ADMIN}' is a reserved scope: it is not a user id")
     who = validate_id("user", user_id)
     with _LOCK:
         users = load_users(writer)

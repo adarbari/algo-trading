@@ -426,6 +426,22 @@ source = "graphql:AheadEvent.label"
 exempt = "free text: a short label for the event, composed from its data"
 
 [[enum]]
+source = "graphql:WatchItem.label"
+exempt = "free text: the dossier item's label, written by the owner in the review"
+
+[[enum]]
+source = "graphql:AheadEvent.factorKind"
+values_from = "python:algotrade.storage.tables.schemas.events:FACTOR_KINDS"
+values = { peer = "term:factor_kind", macro = "term:factor_kind", regulation = "term:factor_kind", commodity = "term:factor_kind", litigation = "term:factor_kind", product_cycle = "term:factor_kind", financing = "term:factor_kind", flows = "term:factor_kind" }
+names = { peer = "peer", macro = "macro", regulation = "regulation", commodity = "commodity", litigation = "litigation", product_cycle = "product cycle", financing = "financing", flows = "flows" }
+
+[[enum]]
+source = "graphql:WatchItem.factorKind"
+values_from = "python:algotrade.storage.tables.schemas.events:FACTOR_KINDS"
+values = { peer = "term:factor_kind", macro = "term:factor_kind", regulation = "term:factor_kind", commodity = "term:factor_kind", litigation = "term:factor_kind", product_cycle = "term:factor_kind", financing = "term:factor_kind", flows = "term:factor_kind" }
+names = { peer = "peer", macro = "macro", regulation = "regulation", commodity = "commodity", litigation = "litigation", product_cycle = "product cycle", financing = "financing", flows = "flows" }
+
+[[enum]]
 source = "graphql:CompareRow.label"
 exempt = "free text: the name of the compared row"
 

@@ -172,6 +172,10 @@ path = "src/algotrade/data/analyst"
 purpose = "reads of analyst/estimate_snapshots (our own FMP and Finnhub history, ADR 0068): the latest version of each snapshot row, and the rows a session may see (session_date on or before it, published before the next session's open); data/ is at its module cap, so the reads of this table are a folder"
 
 [[dir]]
+path = "src/algotrade/data/dossier"
+purpose = "reads of the deep-dive dossier tables (instruments/factors, events/factor_occurrence, ADR 0050 decision 6, EV5): per name the rows of the latest import run among those known by a session (known_from on or before it); data/ is at its module cap, so the reads of these tables are a folder"
+
+[[dir]]
 path = "src/algotrade/data/feedback"
 purpose = "reads of the feedback grain (feedback/, ADR 0066): the Describe-it events and the missing-feature requests the API recorded, over a date range, unfiltered; importable only by the read model's viewer-scoped loaders"
 contracts = ["Feedback reads are quarantined: only the read model's feedback loader imports them (ADR 0066)"]
@@ -400,7 +404,7 @@ contracts = [
 
 [[dir]]
 path = "src/algotrade/services/authoring"
-purpose = "use case: author L4 user configs (ADR 0029): rule-screen drafts, immutable versions, preset copy / rebase, schedule switch, user features, onboarding a trader (ID5); the only config writer the API calls"
+purpose = "use case: author L4 user configs (ADR 0029): rule-screen drafts, immutable versions, preset copy / rebase, schedule switch, user features, onboarding a trader (ID5), and the admin's changes to the event-study scope list (config/admin/events/scope.toml, EV8); the only config writer the API calls"
 contracts = [
     "Layout: use-case packages are independent (backtests, screening, authoring, drafting, explaining, events, feedback, attributing)",
     "Config writes go only through services.authoring (ADR 0029)",
@@ -625,8 +629,13 @@ purpose = "an edge's verdict (ED8, ADR 0053, 0065) split by kind, the package ke
 contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
 
 [[dir]]
+path = "src/algotrade/services/read/event_scope"
+purpose = "the event-study scope list as the Admin screen reads it (EV8, ADR 0050 plan 5.5): each listed name with its source (site file or admin), last deep-dive review, stale flag and the share of its biggest moves attributed (big_moves.py), the admin's removals and the macro calendar's reach"
+contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
+
+[[dir]]
 path = "src/algotrade/services/read/events"
-purpose = "read objects about events for one session (ADR 0050): the stored events list by event date, what is ahead of a name (own and reference earnings by catalogue name, the macro releases known by the session, the market-structure days by rule), its 8-K filings, the expiry ladder, a fund's reference (InstrumentEvents) and the cross-name EventCalendar"
+purpose = "read objects about events for one session (ADR 0050): the stored events list by event date, what is ahead of a name (own and reference earnings by catalogue name, the macro releases known by the session, the market-structure days by rule), its 8-K filings, the expiry ladder, a fund's reference (InstrumentEvents) and the cross-name EventCalendar; a name's deep-dive dossier dates join the events ahead and its undated watch windows are listed apart (EV8a)"
 contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
 
 [[dir]]

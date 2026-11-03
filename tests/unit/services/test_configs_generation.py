@@ -23,3 +23,16 @@ def test_nothing_is_cached_while_any_users_write_is_in_flight_for_an_admin() -> 
     generation = config_generation(writer)
     assert generation("alice", False) == 2  # alice's own key is unaffected
     assert generation("local", True) is None  # an admin's depends on bob's configs too
+
+
+def test_an_admin_scope_write_moves_every_key_and_in_flight_holds_back_caching() -> None:
+    """The event scope list's change reaches a cached answer of any caller (EV8): the admin
+    scope's counter is in everyone's generation, and an odd one (a write in flight) is None."""
+    writer = MemoryConfigWriter()
+    generation = config_generation(writer)
+    trader, admin = generation("alice", False), generation("local", True)
+    writer.save_admin_document("events", "scope", {"removed": []})
+    assert generation("alice", False) == (trader or 0) + 2
+    assert generation("local", True) == (admin or 0) + 2
+    writer._generations["admin"] = 3  # a write of the admin scope is in flight
+    assert generation("alice", False) is None and generation("local", True) is None

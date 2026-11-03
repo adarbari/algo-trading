@@ -9,6 +9,7 @@ CALENDAR = """query($ids: [String!]!, $days: Int) {
     session end names { instrumentId symbol } missing unresolved
     days { date isSession events { instrumentId symbol event { kind label } } }
     gaps { instrumentId part unknown { code } }
+    watch { instrumentId symbol item { label expectedFrom expectedTo } }
   }
 }"""
 
@@ -29,4 +30,8 @@ def test_the_event_calendar(graph: Graph) -> None:
         }
     ]
     assert "2022-11-24" not in days  # Thanksgiving, with nothing on it
-    assert {(g["instrumentId"], g["part"]) for g in calendar["gaps"]} == {(None, "macro_release")}
+    assert {(g["instrumentId"], g["part"]) for g in calendar["gaps"]} == {
+        (None, "macro_release"),
+        (None, "factor"),  # no deep-dive dossier was ever imported in the golden store
+    }
+    assert calendar["watch"] == []

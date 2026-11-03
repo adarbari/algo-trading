@@ -14,7 +14,7 @@ from algotrade.core.model.fields import FEATURE_FIELD_PREFIX, group_field, is_fe
 from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.features.registry import catalogue_columns
 from algotrade.services.features import catalogue
-from algotrade.storage.configs.files import SCREENERS
+from algotrade.storage.configs.files import ADMIN, SCREENERS
 from algotrade.storage.configs.generation import is_stable
 from algotrade.storage.configs.store import ConfigStore, OverlayConfigStore
 
@@ -175,13 +175,16 @@ def config_generation(configs: ConfigStore) -> Callable[[str, bool], int | None]
     """A user's config generation for the response cache key (ADR 0077 decision 15): ``None``
     while a write of theirs is in flight (odd) or the counter cannot be read, so nothing is
     cached under a half-written config. ``everyone`` (an admin, who sees every user's screens,
-    edges and configs) sums every user's, and is ``None`` when any of them is in flight."""
+    edges and configs) sums every user's, and is ``None`` when any of them is in flight. The admin
+    scope's counter (the event scope list's changes, ADR 0029 amendment 2026-11-03) is in every
+    key: a scope list read by anyone is never cached from before an admin's change."""
 
     def generation(user: str, everyone: bool = False) -> int | None:
         try:
             values = [configs.generation(u) for u in (configs.users() if everyone else [user])]
             if everyone:
                 values.append(configs.generation(user))  # a user with no folder yet
+            values.append(configs.generation(ADMIN))
         except (OSError, AlgoTradeError):
             return None
         return sum(values) if all(is_stable(v) for v in values) else None
