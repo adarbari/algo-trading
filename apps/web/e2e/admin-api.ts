@@ -1,7 +1,7 @@
 /**
  * A mocked admin API for end-to-end tests: Playwright answers the Admin GraphQL reads
  * (`POST /api/graphql`: completeness, ingestionCell, chainCoverage, quality, verification, nightlyRuns, run,
- * runItems, figiReview, leverageReview, llmUsage, harnessRuns, harnessRun, screenerRuns, screenerRun, featureRequests, acceptedFormulas, userRegistry) from fixture JSON shaped from real responses
+ * runItems, figiReview, leverageReview, llmUsage, harnessRuns, harnessRun, screenerRuns, screenerRun, featureRequests, acceptedFormulas, userRegistry, eventScope) from fixture JSON shaped from real responses
  * (admin-ingestion.fixtures.json), keyed by the operation's Query field, or `field:<key>` for
  * a field read by key (`ingestionCell:<dataset>/<date>`, `run:<id>`, `runItems:<id>`). A field
  * with no fixture is null (nothing stored, no such thing); `FAIL` answers a GraphQL error.
@@ -10,6 +10,7 @@
 import type { Page, Route } from '@playwright/test';
 
 import fixtures from './admin-ingestion.fixtures.json' with { type: 'json' };
+import EVENT_SCOPE from './fixtures/event-scope.json' with { type: 'json' };
 
 export type AdminFixtures = Record<string, unknown>;
 
@@ -36,6 +37,7 @@ const FIELDS = new Set([
   'featureRequests',
   'acceptedFormulas',
   'userRegistry',
+  'eventScope',
 ]);
 
 interface Operation {
@@ -57,6 +59,7 @@ export async function mockAdminApi(page: Page, overrides: AdminFixtures = {}): P
     harnessRuns: [],
     screenerRuns: [],
     userRegistry: { people: [] },
+    eventScope: EVENT_SCOPE,
     ...ADMIN_FIXTURES,
     ...overrides,
   };

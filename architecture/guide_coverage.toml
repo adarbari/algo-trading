@@ -498,6 +498,10 @@ path = "/admin/feature-requests"
 start = "start:read_feature_requests"
 
 [[section]]
+path = "/admin/event-scope"
+start = "start:read_event_scope"
+
+[[section]]
 path = "/admin/screener-runs"
 start = "start:read_screener_runs"
 

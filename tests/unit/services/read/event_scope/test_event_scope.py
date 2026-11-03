@@ -62,6 +62,7 @@ def test_the_listed_names_with_their_source_review_and_the_rest() -> None:
     assert found.unresolved == ("NOPE",)
     assert [(r.symbol, r.by, r.reasons) for r in found.removed] == [("ETFX", "arvinder", ())]
     assert aaa.moves is None  # two bars: not a year
+    assert found.stale_count == 1  # AAAU, never reviewed
 
 
 def test_a_review_older_than_ninety_days_is_stale() -> None:

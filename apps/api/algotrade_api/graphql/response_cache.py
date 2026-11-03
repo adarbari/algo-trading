@@ -344,11 +344,19 @@ CLOSED_SESSION_OPERATIONS: frozenset[str] = frozenset({"IngestionCompleteness", 
 # Never kept: the caller's identity
 # (answered inline, no context opened) and the caller's own missing-feature requests (a draft
 # POST records them, and a draft writes nothing the cache keys on; the window reads the clock) and
-# the declared people (the registry is in memory: no store read to save).
+# the declared people (the registry is in memory: no store read to save) and the event scope list
+# (an admin's write to its config must show on the next read: the cache key does not see it).
 # A new operation is never in this group by default: the classification test fails until it is
 # placed.
 NEVER_CACHED: frozenset[str] = frozenset(
-    {"AcceptedFormulas", "FeatureRequests", "Viewer", "MyFeatureRequests", "UserRegistry"}
+    {
+        "AcceptedFormulas",
+        "FeatureRequests",
+        "Viewer",
+        "MyFeatureRequests",
+        "UserRegistry",
+        "EventScope",
+    }
 )
 
 

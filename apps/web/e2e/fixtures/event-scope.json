@@ -1,0 +1,51 @@
+{
+  "session": "2026-11-02",
+  "staleDays": 90,
+  "staleCount": 1,
+  "names": [
+    {
+      "instrumentId": "EQ:BBG000B9XRY4",
+      "symbol": "AAPL",
+      "reasons": ["list", "tier"],
+      "source": "site",
+      "addedOn": "2026-10-06",
+      "note": "",
+      "by": null,
+      "at": null,
+      "lastReview": "2026-10-20",
+      "stale": false,
+      "moves": {
+        "big": 20,
+        "attributed": 15,
+        "share": 0.75
+      }
+    },
+    {
+      "instrumentId": "EQ:BBG000BPH459",
+      "symbol": "MSFT",
+      "reasons": ["list"],
+      "source": "admin",
+      "addedOn": "2026-10-25",
+      "note": "requested",
+      "by": "ana",
+      "at": "2026-10-25T09:00:00+00:00",
+      "lastReview": null,
+      "stale": true,
+      "moves": null
+    }
+  ],
+  "removed": [
+    {
+      "symbol": "XYZ",
+      "by": "ana",
+      "at": "2026-10-30T12:00:00+00:00",
+      "note": "delisted",
+      "reasons": []
+    }
+  ],
+  "unresolved": [],
+  "otherNames": 1200,
+  "macroDays": 90,
+  "macroReleases": 14,
+  "macroUnknown": null
+}

@@ -726,3 +726,35 @@ title = "What the tail figures cannot show"
 body = """
 Option-selling setups win often and lose rarely but large, so their verdict also weighs the worst outcomes. Those figures resample the setup's own history. They cannot invent a crash the history does not hold. Treat the worst stored episode as the least a crash could cost, not the most.
 """
+
+# --------------------------------------------------------------------------------------- 15
+[[page]]
+id = "read_event_scope"
+order = 15
+title = "Read the Event scope page"
+summary = "Admins: the names the event study covers, how fresh each one's review is, and how to add or remove a name."
+links = [
+  { kind = "term", id = "event_scope_reasons" },
+  { kind = "term", id = "event_scope_stale" },
+  { kind = "term", id = "event_scope_last_review" },
+  { kind = "term", id = "event_scope_moves" },
+  { kind = "term", id = "event_scope_macro" },
+]
+
+[[page.section]]
+title = "What the page lists"
+body = """
+Each row is one name of the scope list. It shows why the name is in scope and where its entry came from. It also shows the date of its last deep-dive review and the share of its biggest moves with a known cause. The strip above counts the listed names, the stale ones, the other names in scope by a rule and the macro releases ahead.
+"""
+
+[[page.section]]
+title = "Adding and removing a name"
+body = """
+Add a ticker with an optional note. The server resolves it and shows its error here when it cannot. Remove a name with an optional note: the site file is unchanged, the removal is recorded beside it, and Restore adds the name back. A removal that leaves another reason in force keeps the name in the study.
+"""
+
+[[page.section]]
+title = "What to do with a stale name"
+body = """
+A stale name has no deep-dive review in the last 90 days. Run the deep-dive skill for it and import the dossier. The flag clears from the session after the import. Names with a low share of attributed big moves come first.
+"""
