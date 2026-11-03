@@ -1,0 +1,109 @@
+# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. The new version of c12_vrp_cross_section_iv_hv (ADR 0088, build row X6),
+# filed 2026-11-03 as an option setup on the bought history. BLOCKED until HistoricalOptionData L2
+# is imported (E5 job, F7 features). A new id is a new trial; the old version is retired with its runs.
+id = "c12_vrp_straddle_ranked"
+name = "Per-name volatility premium, ranked: short straddle"
+thesis = "Selling at-the-money straddles on the names whose implied volatility sits furthest above the volatility they delivered over the past year earns more than selling on every liquid name."
+mechanism = """Option traders weight recent events heavily and prices under-react to a name's own
+long-run realised volatility, which mean-reverts; the cross-sectional gap between implied and
+realised volatility is a mispricing, not a risk the standard factors explain (Goyal and Saretto
+2009)."""
+persistence = """Harvesting it takes option books across hundreds of names, with spreads of 5 to 10% of
+premium, so capacity is small and the cost is high; professionals run it and the authors' sort still
+ranks among the top predictors in later studies (Bali, Beckmeyer, Moerke and Weigert 2023)."""
+family = "C"
+schedule = "month_end"
+universe = "liquid_optionable_floored"
+top_k = 20
+screeners = []
+baselines = ["vrp_iv_hv", "size_small"]
+status = "blocked"
+plain_reason = "Needs years of option-chain history to rank names by implied against realised volatility, and the purchased history is not imported yet."
+mechanism_kind = "paid_for_risk"
+frozen_from = 2018-01-01  # ADR 0088 H7: split = end of the paper sample; the bought history starts 2018, so all of it is out-of-sample
+holdout_from = 2026-10-26  # ADR 0088 d15: the first session of the unseen holdout; no verdict until closed trades from it reach 3 months
+rejection_reason = """Blocked until the bought option history is imported (ADR 0088 build row X6). No chain row before
+2026-10-02 is stored, and the 2018 start needs HistoricalOptionData L2: E5 (the history import job,
+tasks/options_history) and F7 (the history features) are being built; neither has history yet. Its screener is not written: the source ranks on the 30-day at-the-money implied volatility over 12-month realised volatility, so it is vrp_cross_section v2 over iv30 from the history features (F7) and hv252 (vol_long@v1, F6, stored) with a new ratio feature; the preset is immutable, so v2 is a new file written then.
+On Cboe rows alone (from 2026-10-02) the open slice has too few windows for a verdict."""
+notes = """THE NEW VERSION of c12_vrp_cross_section_iv_hv (retired 2026-11-03, ADR 0088, X6): from the
+modelled straddle on one IBKR 30-day volatility (option_model_pnl) to option_pnl on stored chain rows,
+the short_straddle position held 21 sessions from the month-end decision, net of the site's option cost
+levels, judged by the tails profile. Proxies the old version had, now removed or stated: the ranking
+uses 252-session realised volatility (hv252, F6), the source's 12-month window, not the 30-session
+one; the source buys the decile where realised exceeds implied and sells the opposite, this setup
+keeps the short leg only; the harness takes the top 20 names, not a decile. Dropped: the
+delta_hedged variant (a stock leg is not a template: the delta-hedged P&L is the daily hedged
+diagnostic stored beside every straddle's unhedged one, plan row 7). The no_earnings variant stays.
+The base is every liquid optionable name. Gate: market_conditions@v2.short_premium_allowed, as the
+other short-premium setups. Data: bought chains from 2018 (E5, F7); the frozen period is all of it."""
+
+[gate]
+all = [
+  { field = "market.market_conditions@v2.short_premium_allowed", op = "eq", value = true },
+]
+
+[outcome]
+kind = "option_pnl"
+position = "short_straddle"
+tenor_days = 30
+horizon_sessions = [21]
+benchmark = "none"
+start_offset_sessions = 1
+
+# Windows with no report expected inside the horizon (read at D, the window ends at D + 1 + 21, so
+# more than 22 sessions to the expected report): the implied volatility carries no earnings move. A
+# stock whose date is UNKNOWN never passes; an ETF has no earnings, so it stays.
+[[variants]]
+id = "no_earnings"
+[variants.universe]
+[variants.universe.where]
+all = [
+  { field = "instrument.security_type", op = "in", value = ["COMMON_STOCK", "ADR", "ETF"] },
+  { field = "instrument.status", op = "eq", value = "ACTIVE" },
+  { field = "instrument.optionable", op = "eq", value = true },
+  { field = "rollup.price_stats@v2.close", op = "gt", value = 5 },
+  { field = "rollup.price_stats@v2.adv_usd_20d", op = "gte", value = 50_000_000 },
+  { any = [
+    { field = "instrument.security_type", op = "eq", value = "ETF" },
+    { all = [
+      { field = "rollup.earnings_expected@v1.expected_basis", op = "ne", value = "UNKNOWN" },
+      { field = "rollup.earnings_expected@v1.sessions_to_expected_report", op = "gt", value = 22 },
+    ] },
+  ] },
+]
+
+[quality_bar]
+outcome = """The short at-the-money straddle's return on its Reg-T collateral from the entry close to the close
+21 sessions later, net of the site's option cost levels (verdict.toml [option_costs]); the tails profile
+weighs the return, its bootstrap t, the probabilistic Sharpe ratio and the CVaR of the worst trades
+against every liquid optionable name's same straddle."""
+trigger_timing = """The ratio and the gate are stored after the close of the decision session D (the last
+session of the month), so the first fill is the next session's close, S = D + 1
+(start_offset_sessions = 1); the contract is chosen on S's chain."""
+replication = """The source's rule: a monthly decile sort on log(HV/IV) with 12-month realised volatility,
+sell the straddle on the decile where implied exceeds realised (Goyal and Saretto 2009). Here the
+screener (written at unblock) ranks by implied over hv252 and the harness holds the top 20 short."""
+expected_size = """The paper's straddle decile spread is 22.5% a month gross (1996-2005; a two-group figure,
+not filed), about half of the gross return vanishes after costs in later work (Bali et al. 2023). The
+bought history gives about 90 independent month-ends from 2018; until it is imported no size can be stated."""
+capacity_costs = """Single-name option spreads are 5 to 10% of premium: the site's effective and full cost
+levels are the test, the mid level flatters. An individual sells a handful of straddles, far below the
+open interest of names with $50M of daily volume; undefined risk needs Reg-T margin."""
+failure_modes = """Losses arrive together in volatility spikes: a short straddle is short both tails, so
+the CVaR, not the hit rate, decides. A report inside the month raises implied volatility for a known
+reason (the no_earnings variant tests it). Retire if, in the frozen period, the picks' return on collateral
+after costs is not above the unranked straddle on every liquid optionable name, or the ranking does not
+beat vrp_iv_hv on the same sessions."""
+decoys = """Implied volatility above realised before every report and after every shock (an event, not a
+mispricing); high-IV names are small and speculative: compare with vrp_iv_hv (the unranked premium) and
+the size baseline on the same sessions, and with the no_earnings variant."""
+
+[[sources]]
+title = "Goyal, A. and Saretto, A. (2009), Cross-section of option returns and volatility, Journal of Financial Economics"
+url = "https://ideas.repec.org/a/eee/jfinec/v94y2009i2p310-326.html"
+
+[[sources]]
+title = "Bali, T., Beckmeyer, H., Moerke, M. and Weigert, F. (2023), Option Return Predictability with Machine Learning and Big Data, Review of Financial Studies"
+url = "https://doi.org/10.1093/rfs/hhad037"

@@ -19,10 +19,11 @@ universe = "liquid_optionable_floored"
 top_k = 20
 screeners = ["ivol_high"]
 baselines = ["vrp_cross_section", "vrp_iv_hv"]
-status = "candidate"
+status = "retired"
 mechanism_kind = "paid_for_risk"
 frozen_from = 2026-04-01
 holdout_from = 2026-10-26  # ADR 0088 d15: the first session of the unseen holdout (the latest of its gates' and thresholds'); no verdict until closed trades from it reach 3 months
+rejection_reason = """Retired 2026-11-03 (ADR 0088, build row X6): re-filed as c14_speculative_straddle_sell, the position on stored chain rows (option_pnl), blocked there until the bought option history is imported. This version's modelled P&L stays on file with its runs and trials."""
 notes = """A selection overlay on c12, filed as its own edge so the harness can say whether the
 characteristic adds anything to the premium ranking (the baselines are the c12 ranking and the filed
 VRP screen). The P&L is a model, not a quote (basis model; ADR 0053 amendment 2026-10-17, EB H8): a

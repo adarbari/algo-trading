@@ -1,0 +1,97 @@
+# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. The new version of c14_delta_hedged_characteristics (ADR 0088, build row X6),
+# filed 2026-11-03 as an option setup on the bought history. BLOCKED until HistoricalOptionData L2
+# is imported (E5 job, F7 features). A new id is a new trial; the old version is retired with its runs.
+id = "c14_speculative_straddle_sell"
+name = "Speculative names, short straddle"
+thesis = "Selling straddles earns more on speculative names, the ones with the highest idiosyncratic volatility, because their options are overpriced."
+mechanism = """Retail demand for lottery-like options and dealers' limits to arbitrage: the traits that make
+a stock speculative (low price, high idiosyncratic volatility, distress, heavy issuance) make its
+options expensive, and delta-hedged returns fall as idiosyncratic volatility rises (Cao and Han 2013;
+Zhan, Han, Cao and Tong 2022)."""
+persistence = """The authors report Sharpe ratios above 2 after costs, explained by two option factors and
+not equity ones, and stock characteristics still add power in the machine-learning study through 2020
+(Bali, Beckmeyer, Moerke and Weigert 2023). Costs are the binding constraint, not competition."""
+family = "C"
+schedule = "month_end"
+universe = "liquid_optionable_floored"
+top_k = 20
+screeners = ["ivol_high"]
+baselines = ["vrp_iv_hv", "size_small"]
+status = "blocked"
+plain_reason = "Needs years of option-chain history to test selling options on speculative names, and the purchased history is not imported yet."
+mechanism_kind = "paid_for_risk"
+frozen_from = 2018-01-01  # ADR 0088 H7: split = end of the paper sample (1996-2008 and later); the bought history starts 2018, so all of it is out-of-sample
+holdout_from = 2026-10-26  # ADR 0088 d15: the first session of the unseen holdout; no verdict until closed trades from it reach 3 months
+rejection_reason = """Blocked until the bought option history is imported (ADR 0088 build row X6): the straddle
+is priced on stored chain rows, which exist from 2026-10-02 only, and the 2018 start needs
+HistoricalOptionData L2 (E5 import job, F7 history features; neither has history yet). The screener
+(ivol_high, stored) is ready."""
+notes = """THE NEW VERSION of c14_delta_hedged_characteristics (retired 2026-11-03, ADR 0088, X6): from the
+modelled delta-hedged straddle on one IBKR 30-day volatility to option_pnl on stored chain rows, the
+short_straddle position held 21 sessions from the month-end decision, net of the site's option cost
+levels, judged by the tails profile. The delta-hedged P&L the source measures is the daily hedged
+diagnostic stored beside every straddle's unhedged one (plan row 7), not a template or a variant; the old
+straddle variant is therefore the base. Proxies, each stated: the source sells one at-the-money call,
+here a call and a put; the source sorts on many characteristics, this setup takes idiosyncratic volatility
+alone (rollup.factor_betas@v1.ivol_252d, a four-factor residual: the Cao and Han characteristic); the
+harness takes the top 20 names, not a decile; the screener is stock-only, so the ETFs of the universe never
+qualify. The other characteristic sorts of the plan (row 28, S4: cash_op_profitability,
+cash_to_assets_high, distress_ohlson, built) are screeners over the same position and each would be its
+own setup, as iv_rank_short_put is to vrp_short_put (two screeners on one document leave no in-sample
+slice to choose a basis from); they are not filed here. The vol-of-vol sort needs a feature F7 provides and
+is not invented. Gate: market_conditions@v2.short_premium_allowed. Data: bought chains from 2018."""
+[gate]
+all = [
+  { field = "market.market_conditions@v2.short_premium_allowed", op = "eq", value = true },
+]
+
+[implementation]
+horizon = 21
+
+[outcome]
+kind = "option_pnl"
+position = "short_straddle"
+tenor_days = 30
+horizon_sessions = [21]
+benchmark = "none"
+start_offset_sessions = 1
+
+[quality_bar]
+outcome = """The short at-the-money straddle's return on its Reg-T collateral from the entry close to the close
+21 sessions later, net of the site's option cost levels (verdict.toml [option_costs]); the tails profile
+weighs the return, its bootstrap t, the probabilistic Sharpe ratio and the CVaR of the worst trades
+against every liquid optionable name's same straddle (the vrp_iv_hv and size baselines)."""
+trigger_timing = """The idiosyncratic volatility (factor_betas@v1) and the gate are stored after the close of the
+decision session D (the last session of the month), so the first fill is the next session's close,
+S = D + 1 (start_offset_sessions = 1); the contract is chosen on S's chain."""
+replication = """The source's rule: each month, for every name, sell one at-the-money call about 1.5 months
+from expiry, delta-hedge daily, hold a month, sort on each characteristic into deciles and read the
+long-short spread (Zhan, Han, Cao and Tong 2022; Cao and Han 2013 for idiosyncratic volatility). Here
+ivol_high ranks the optionable names by four-factor idiosyncratic volatility and the harness holds the
+top 20 as short straddles; the proxies are in the notes."""
+expected_size = """The papers report Sharpe ratios above 2 after costs for the characteristic sorts (not
+verified against the tables, so no figure is filed). The bought history gives about 90 independent
+month-ends from 2018; until it is imported no size can be stated."""
+capacity_costs = """Single-name option spreads and the hedge are the binding cost: the site's effective and
+full cost levels are the test. Undefined-risk straddles on speculative names need Reg-T margin and the
+stomach for gaps; the practical use is to pick which names to sell on."""
+failure_modes = """The speculative names are the ones that gap: one takeover bid or a 40% move wipes the
+premium of many windows, so the CVaR, not the hit rate, decides. Retire if, in the frozen period, the
+picks' return on collateral after costs is not above the same straddle on every liquid optionable name,
+or the CVaR is worse than the vrp_iv_hv baseline's by more than the site's max_cvar_ratio."""
+decoys = """Idiosyncratic volatility explains most of the characteristic spread (Cao and Han 2013): a name
+with high idiosyncratic volatility usually has high implied volatility too, which is c12 and the filed
+VRP setups. Compare with vrp_iv_hv and the size baseline on the same sessions."""
+
+[[sources]]
+title = "Zhan, X., Han, B., Cao, J. and Tong, Q., Option Return Predictability, Review of Financial Studies, 2022"
+url = "https://research.polyu.edu.hk/en/publications/option-return-predictability/"
+
+[[sources]]
+title = "Cao, J. and Han, B., Cross section of option returns and idiosyncratic stock volatility, Journal of Financial Economics, 2013"
+url = "https://ideas.repec.org/a/eee/jfinec/v108y2013i1p231-249.html"
+
+[[sources]]
+title = "Goyal, A. and Saretto, A. (2009), Cross-section of option returns and volatility, Journal of Financial Economics"
+url = "https://ideas.repec.org/a/eee/jfinec/v94y2009i2p310-326.html"
