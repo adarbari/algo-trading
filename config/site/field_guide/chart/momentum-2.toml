@@ -536,3 +536,31 @@ op = "eq"
 value = true
 mode = "hard"
 note = "a yes or no, so names with no value drop out; rank the flagged names with rollup.trend_stats@v2.ret_252d lowest first"
+
+[[field]]
+name = "rollup.cutler_rsi@v1.rsi_3"
+theme = "momentum and trend"
+reads = "Cutler's RSI over the last 3 sessions, 0 to 100: the share of the last three days' movement that was up, with simple averages (not Wilder's smoothing). Under 10 means almost all of it was down, a sharp short sell-off; over 90 almost all up. It times a hold of days and is not a trend. Pagonidis (2013) bought index ETFs under 10 with a weak close and held while it stayed at or under 40."
+caveats = [
+  "It is not rollup.momentum@v1.rsi_14 with a shorter window. Cutler's simple averages and Wilder's smoothing give different numbers, and three days swing between 0 and 100 on one big session. Do not carry a 14-day threshold over; 10 to enter and 40 to leave are the study's.",
+  "A deep three-day drop in a falling market keeps falling. The reversal is documented on index ETFs and faded after about 2011; on single stocks it is mixed with the news behind the drop. Pair it with feature.pct_vs_sma_200 gt 0 as the trend gate. Read the setup's measured result.",
+  "Null after a gap among the last 4 sessions or a shorter history. Also null when the close never moved. A hard criterion then rejects the name.",
+]
+sources = [
+  "Pagonidis (2013), The IBS Effect: Mean Reversion in Equity ETFs, NAAIM: RSI(3) under 10 with a bar strength of at most 0.5, held while RSI(3) is at most 40",
+  "Connors and Alvarez (2009), Short Term Trading Strategies That Work: the short-RSI reversal rules",
+]
+[[field.use]]
+for = "a short, deep sell-off (swing reversal entry)"
+op = "lt"
+value = 10
+mode = "soft"
+tolerance = 3
+note = "with rollup.trend_stats@v2.close_range_pos lte 0.5 and, for a safer read, feature.pct_vs_sma_200 gt 0"
+[[field.use]]
+for = "the sell-off has relaxed (the reversal hold ends)"
+op = "gt"
+value = 40
+mode = "soft"
+tolerance = 5
+note = "the exit side of the same rule: leave when it is no longer oversold"

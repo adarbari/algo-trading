@@ -21,7 +21,7 @@ will show it to the owner only once there are other users;
 [ADR 0028](../adr/0028-ibkr-enrichment-source.md)); an expression feature takes the most
 restrictive licence of its inputs.
 
-808 stored features in 96 groups, in dependency order; 165 expression features.
+809 stored features in 97 groups, in dependency order; 165 expression features.
 
 ## `option_liquidity@v1`
 
@@ -366,6 +366,14 @@ The largest one-day close-to-close move over the last 20 sessions. Stored as `ro
 | Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
 |---|---|---|---|---|---|---|---|---|
 | `one_day_move` | window | float32 | decimal | open | >= 0 | Largest absolute one-day close-to-close return over the last 20 sessions (split-adjusted as of the session): 0.12 is a 12% move up or down | a session among the last 21 has no close (a gap), or the history is shorter | `bars/1d.close` |
+
+## `cutler_rsi@v1`
+
+Cutler's RSI (3): the simple-average oscillator over the last 3 sessions. Stored as `rollups/instrument/cutler_rsi@v1`; reads `bars/1d`.
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `rsi_3` | window | float32 | pct_points | open | 0 .. 100 | Cutler's RSI (3) of close changes, split-adjusted as of the session: 100 - 100 / (1 + average gain / average loss), both the simple mean of the last 3 changes; 100 when there was no loss | a session among the last 4 has no close (a gap), or the history is shorter; or the close never moved over the window (no gain and no loss: 0/0) | `bars/1d.close` |
 
 ## `max_return@v1`
 

@@ -327,3 +327,10 @@ follow-up PR).
 - decided by: Fable on the owner's behalf
 - status: pending owner confirmation
 - Reasoning: `var/data` lives on `/Volumes/AlgoData` (1.7 TB free), so the ~4 GB per edge worst case of ADR 0063 fits; the step is non-critical, outside the ingest lock and published atomically (ADR 0022), so a failure leaves no legs and the run is reversible.
+## 2026-11-02 | IBS research as a swing setup | forced settings of `ibs_rsi3_etf_swing`
+- Question: the brief asked for `benchmark = "none"`, a trend and a volatility variant by `hv10` vs `hv126`, and the IBS-only rule as a variant; what does the code allow?
+- Options: follow the brief literally (refused by the parser) or the nearest setting the code accepts.
+- Decision: (a) benchmark SPY (a share path with a declared exit is scored against a benchmark; `benchmark = none` is refused), with `base = universe` over the same 26 funds so SPY cancels in the picks-against-base reading. (b) Variants are universe variants (the only per-instrument variant key; `gate` is market-level and a sleeve's): trend `pct_vs_sma_200 > 0`, volatility `hv_ratio_10_60 > 1` (a rule cannot compare `hv10` and `hv126`; no new feature added to keep the trial count small), volume `volume_z_20d > 0`. (c) The IBS-only rule is the second screener `etf_low_ibs` read at horizon 1 (`horizon_sessions = [1, 10]`, the verdict horizon 10), not a variant. (d) `holdout_from = 2026-11-03`, the day after this change, since the thresholds come from the research and the history is in-sample until then. (e) Cutler RSI(3) is a new small group `cutler_rsi@v1` in a new folder `features/rollups/oscillators/` (the price folder is at its cap), not a column of `momentum@v1` (a new stored version of a 140 MB table).
+- decided by: the implementing session, from the code (not a design choice: the alternatives are refused or cost a stored-table version)
+- status: pending owner confirmation
+- Reasoning: each is the nearest accepted form of the brief; none changes a stored verdict of another setup.

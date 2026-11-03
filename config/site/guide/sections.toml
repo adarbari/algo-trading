@@ -93,7 +93,7 @@ id = "reversals"
 title = "Reversals"
 purpose = "Shares that fell hard and show the first sign of turning back up."
 intro = "These screens look for a drop that has gone far enough to bounce: stopping at a price level, closing up after a bad week, or falling alone with no news behind it. Each reads how far the share has fallen and what else was happening."
-presets = ["support_reversal", "oversold_reversal", "exhaustion", "residual_reversal", "sector_reversal", "etf_low_ibs", "news_free_residual_reversal", "december_losers"]
+presets = ["support_reversal", "oversold_reversal", "exhaustion", "residual_reversal", "sector_reversal", "etf_low_ibs", "etf_rsi3_weak_close", "news_free_residual_reversal", "december_losers"]
 
 [[family]]
 id = "income"

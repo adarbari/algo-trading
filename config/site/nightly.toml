@@ -66,6 +66,7 @@ instrument_tables = [            # the tables Explore reads, copied for the last
     "rollups/instrument/cash_flow@v2",
     "rollups/instrument/cef_nav@v1",
     "rollups/instrument/chain_flow@v1",
+    "rollups/instrument/cutler_rsi@v1",
     "rollups/instrument/dividend_schedule@v1",
     "rollups/instrument/dividend_months@v1",
     "rollups/instrument/dividends@v2",

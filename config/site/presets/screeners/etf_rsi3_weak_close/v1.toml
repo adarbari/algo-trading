@@ -1,0 +1,56 @@
+# ETF in a short, deep sell-off that did not close at its high (ADR 0053, ADR 0088; edge
+# ibs_rsi3_etf_swing): an unleveraged ETF whose Cutler RSI over 3 sessions is under 10 and whose
+# close sits in the lower half of the session's own range, the lowest RSI first. It is Pagonidis's
+# (2013) filtered version: RSI(3) < 10 and internal bar strength <= 0.5. The paper's hold ("while
+# RSI(3) <= 40") is the edge's exit rule, not this screen's. A bar whose high equals its low, or a
+# window with a gap, has no value and never passes (ADR 0030). No liquidity gate: the edge's own
+# list of index ETFs is the universe. What it does not check: the trend (a falling market keeps
+# falling), the volatility regime or the volume of the day (the edge's variants test those).
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "etf_rsi3_weak_close"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "ETFs in a short sell-off with a weak close"
+description = "Unleveraged ETFs whose 3-session RSI is under 10 and whose close is in the lower half of the day's range."
+
+# ------------------------------------------------ who is screened and tradeable
+[criteria.security_type]
+field = "instrument.security_type"
+op = "eq"
+value = "ETF"
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.not_leveraged]
+field = "instrument.is_leveraged"
+op = "eq"
+value = false
+
+[criteria.not_inverse]
+field = "instrument.is_inverse"
+op = "eq"
+value = false
+
+# ------------------------------------------------------------------------ the signal
+[criteria.rsi3]
+field = "rollup.cutler_rsi@v1.rsi_3"
+op = "lt"
+value = 10
+
+[criteria.ibs]
+field = "rollup.trend_stats@v2.close_range_pos"
+op = "lte"
+value = 0.5
+
+[columns]
+close = "rollup.price_stats@v2.close"
+rsi_3 = "rollup.cutler_rsi@v1.rsi_3"
+close_range_pos = "rollup.trend_stats@v2.close_range_pos"
+
+[rank]
+tie_break = "rollup.cutler_rsi@v1.rsi_3"
+tie_break_order = "asc"
