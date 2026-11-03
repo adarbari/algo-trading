@@ -156,7 +156,8 @@ class Query(IdeasQuery, OptionSetupQuery, AdminReads, UserQuery):
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="Instruments x `columns` (catalogue fields, in order) for the session: "
         "the universe, or the instruments `keys` (ids or tickers) name in that order; "
-        "filtered (`filters`: the surface `universe` of `filterSet`, over the whole list, "
+        "filtered (`filters`: the `surface` of `filterSet`, `universe` or `calendar_week` "
+        "(Earnings week: `keys` the week's reports, its counts always), over the whole list, "
         "with the counts in the result's `facets`; `securityType`, `sector`, `liquidityClass`, "
         "`leveraged` and `optionable` are deprecated, they are those filters, text "
         "case-insensitive; `q`: the symbol or name contains it), sorted by `sort` (`symbol` "
@@ -184,6 +185,7 @@ class Query(IdeasQuery, OptionSetupQuery, AdminReads, UserQuery):
         page: int = 1,
         size: int = tables.DEFAULT_SIZE,
         filters: list[FilterInput] | None = None,
+        surface: str = tables.SURFACE,
         date: Day = None,
     ) -> FeatureTable | None:
         ctx = info.context.read(date)
@@ -191,7 +193,9 @@ class Query(IdeasQuery, OptionSetupQuery, AdminReads, UserQuery):
             security_type, leveraged, sector, liquidity_class, q, optionable
         )
         found = (
-            tables.load_table(ctx, columns, old, sort, page, size, keys, tuple(filters or ()))
+            tables.load_table(
+                ctx, columns, old, sort, page, size, keys, tuple(filters or ()), surface
+            )
             if ctx is not None
             else None
         )

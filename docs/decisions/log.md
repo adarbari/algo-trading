@@ -141,6 +141,7 @@ follow-up PR).
 - decided by: Fable on the owner's behalf
 - status: pending owner confirmation
 - Reasoning: a `calendar_week` surface built today would serve every meaningful filter as `withheld` (NOT_STORED): `earnings_moves@v1` and `implied_move@v1` have no rows until their first nightly after this PR merges, so the bar would be empty chrome on the Calendar's default view; reusing the `universe` surface (sector, market cap, liquidity) is less code but filters a week's reports by the wrong axes and would conflate saved views with Explore's. The rule's intent (every many-row table gets the bar) holds through the dated line; the owner may instead choose the `universe` reuse now, which costs a filter-bar shared-code raise on `/calendar` (pre-approved) on top of the raise above.
+- Follow-up (2026-11-03, V8c): built as decided. `config/site/filters/calendar_week.toml` (report window and time, priced move, priced against usual, sector, share and option liquidity; three new Guide terms), `Query.table(surface: "calendar_week")` filters the keyed week list on the server with its counts always, Earnings week draws the bar with saved views, the `[exempt]` line is deleted and the `/calendar` route budget raised once for the bar's shared code (pre-approved above).
 
 ## 2026-11-02 | Pre-push queue | A machine-wide queue for `make changed`, most dependants first
 - Question: eight sessions pushing at once ran five pre-push `make changed` together (load 42, 12+ min each); how is the load bounded?

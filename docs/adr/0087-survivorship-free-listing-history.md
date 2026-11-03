@@ -92,7 +92,7 @@ listings, with S&P 500 intervals), so `pre_snapshot` no longer applies. Measured
 ## Plan (PRs; PR4 and PR5 are file-disjoint after PR2)
 PR1 this ADR, the adapter, the table, the task, the reader and tests, not run on the real store. PR2 merge, ids
 and types (architect review). PR3 the owner's runs (below). PR4 the `filings` task for delisted CIKs (the D1 / D10
-Form 25 follow-up). PR5 `events/delisting` (architect review). PR6 `forward_returns@v3`, the harness
+Form 25 follow-up; built: `filings --delisted [--since]`, per CIK over the listing history's ended in-scope stocks with an id and a CIK from 2010-01-01, `since` defaulting to 2009-01-01, never the daily walk and no `walked_to`). PR5 `events/delisting` (architect review). PR6 `forward_returns@v3`, the harness
 disclosure and the `universe_basis` stamp (architect review). PR7 S&P 500 renames through Massive ticker events (probe first) and the 2024-26
 `EQ:<symbol>` bars migration (800 listings with no id have bars stored under `EQ:<symbol>` on 2025-06-02).
 PR3b (not in PR2): Massive ticker details `/v3/reference/tickers/{T}?date=D` are point in time (`list_date`,

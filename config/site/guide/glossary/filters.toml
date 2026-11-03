@@ -653,3 +653,33 @@ A percentile of IV rank needs about 60 sessions of IV history. A percentile with
 """
 next = "Use a filter that is on offer, or come back after the next sessions have been processed."
 see_also = ["filter_unknown_rows", "unavailable_not_stored", "filter_group_more"]
+
+[[term]]
+id = "filter_report_time"
+term = "Report time filter"
+short = "Keeps the names whose next report is due before the open, after the close, or at a time not given."
+body = """
+The time is the one the stored earnings calendar gives for the next report. Before the open means the market first trades on the news that morning. After the close means it trades on it the next session. Time not given means the calendar has a date but no time. A name with no report date ahead has no time and never passes.
+"""
+next = "Pick after the close to see which names an option held overnight would carry through a report."
+see_also = ["filter_earnings", "filter_unknown_rows"]
+
+[[term]]
+id = "filter_implied_move"
+term = "Priced move filter"
+short = "Keeps the names whose options price a move around the report inside the range you set."
+body = """
+The priced move is the at-the-money straddle at the first expiry after the report, as a share of the share price. 0.06 is shown as 6%: the options pay out if the stock moves more than about 6% either way by that expiry. It says how big a move the market expects, never which way. A name without a two-sided option quote that session has no priced move and never passes.
+"""
+next = "Set a lower limit to look only at the reports the options market expects to be large."
+see_also = ["filter_move_vs_usual", "report_inside_expiry", "filter_range", "filter_unknown_rows"]
+
+[[term]]
+id = "filter_move_vs_usual"
+term = "Priced against usual filter"
+short = "Keeps the names whose priced move is above, in line with, or below the name's usual report move."
+body = """
+Usual is the mean size of the name's moves over its last 12 reports. Above means the options price at least 15% more than that, below at least 15% less, in line anything between. A name needs four past reports with a measured move, and a priced move that covers the next report, to have a reading. Without them it never passes. A rich or cheap price is a comparison with the past, not a forecast of this report.
+"""
+next = "Pick below usual to list the reports where options look cheap against the name's history."
+see_also = ["filter_implied_move", "filter_unknown_rows"]

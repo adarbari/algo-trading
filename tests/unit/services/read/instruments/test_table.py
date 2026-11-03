@@ -260,6 +260,33 @@ def test_keys_carry_facets_only_when_a_filter_is_set(ctx: ReadContext) -> None:
     assert _symbols(found) == ["AAA"] and found.facets is not None and found.facets.total == 2
 
 
+def test_the_earnings_week_list_filters_by_its_own_surface_with_its_counts(
+    ctx: ReadContext,
+) -> None:
+    """V8c: a keyed list on ``calendar_week`` narrows by that surface's filters and always
+    carries its counts (its bar is drawn from them); a universe filter is not offered there."""
+    week = load_table(ctx, [CLOSE], keys=["AAA", "ETFX"], surface="calendar_week")
+    assert _symbols(week) == ["AAA", "ETFX"] and week.facets is not None
+    assert week.facets.total == 2
+    found = load_table(
+        ctx,
+        [CLOSE],
+        keys=["AAA", "ETFX"],
+        surface="calendar_week",
+        inputs=[FilterInput("sector", ["Technology"])],
+    )
+    assert _symbols(found) == ["AAA"]
+    with pytest.raises(FilterRefusedError):
+        load_table(
+            ctx, [], keys=["AAA"], surface="calendar_week", inputs=[FilterInput("price", min=0)]
+        )
+
+
+def test_a_table_reads_only_the_instrument_surfaces(ctx: ReadContext) -> None:
+    with pytest.raises(ValueError, match="no table surface 'ideas'"):
+        load_table(ctx, [CLOSE], surface="ideas")
+
+
 def test_a_gap_is_disclosed_only_for_the_tables_of_a_set_filter() -> None:
     early = context(store_with(_universe), D0.replace(day=1))  # the company snapshot is D0's
     assert load_table(early, [SECTOR]).missing == ()  # the facets read it: no disclosure

@@ -8,7 +8,7 @@
  * the compare set): every row in one request, sorted in the table. A row click focuses the
  * ticker; ticked rows are the caller's selection.
  *
- * With `filters` and `q` (the universe) the server filters before it pages and counts them
+ * With `filters` and `q` (the universe, or a keyed list under its own `surface`) the server filters before it pages and counts them
  * (`facets`, ADR 0082); `header` and `emptyMessage` may be given as functions of those counts, so
  * the caller draws the filter bar and the zero-result recovery from them. A change of filters
  * starts again on the first page.
@@ -39,8 +39,10 @@ export interface FeatureTableProps {
   pickerIcon?: IconName;
   /** The instruments to show (tickers), in this order; absent: the universe. */
   keys?: readonly string[];
-  /** The filters in force and the search text (server mode, the universe), sent to the server. */
+  /** The filters in force and the search text (server mode), sent to the server. */
   filters?: readonly AppliedFilter[];
+  /** Whose filters those are (`calendar_week`: the Earnings week list); absent: the universe's. */
+  surface?: string;
   q?: string;
   /** `server`: the server sorts and pages (the universe); `client`: the table sorts the rows. */
   sortMode: 'server' | 'client';
@@ -79,6 +81,7 @@ export function FeatureTable({
   pickerIcon = 'columns',
   keys,
   filters,
+  surface,
   q,
   sortMode,
   sort,
@@ -94,12 +97,12 @@ export function FeatureTable({
 }: FeatureTableProps) {
   const server = sortMode === 'server';
   const [page, setPage] = usePageOf(
-    JSON.stringify([columns, keys, filters, q, server ? sortParam(sort) : null]),
+    JSON.stringify([columns, keys, filters, surface, q, server ? sortParam(sort) : null]),
   );
   const asked = useMemo(() => withCompanions(columns), [columns]);
   const table = useFeatureTable(
     server
-      ? { columns: asked, keys, filters, q, sort: sortParam(sort), page, size: pageSize }
+      ? { columns: asked, keys, filters, surface, q, sort: sortParam(sort), page, size: pageSize }
       : { columns: asked, keys },
     !keys || keys.length > 0,
   );
