@@ -117,6 +117,7 @@ const LABEL_TEXTS: Record<string, string> = {
   oos_viewed_during_tuning: 'Out-of-sample seen while tuning',
   replaced_without_forward_test: 'Replaced without a forward test',
   split_moved_after_viewing: 'Split moved after viewing',
+  proposed_by_study: 'Proposed by a study',
 };
 
 export const labelText = (label: string): string => LABEL_TEXTS[label] ?? label;

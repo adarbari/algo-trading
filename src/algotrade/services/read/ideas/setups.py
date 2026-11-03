@@ -16,6 +16,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import StrEnum
 
+from algotrade.config.edges.follow import PROPOSED_BY_STUDY
 from algotrade.config.edges.positions.templates import holds_options
 from algotrade.config.user import SITE_USER
 from algotrade.services.ideas.setup_rule import LEVEL_ORDER, SetupStanding
@@ -79,12 +80,17 @@ def tab_of(ctx: ReadContext, outcome: object) -> str:
 def in_tab(ctx: ReadContext, tab: str) -> Callable[[str], bool]:
     """Whether a screener (by config id) is in ``tab``'s Unproven section (ADR 0083 amendment
     (a)): the tab of the site setups that list it, a screener behind setups of both kinds in
-    both, one that implements none (the viewer's own included) in Stocks."""
+    both, one that implements none (the viewer's own included) in Stocks; one behind a study's
+    proposed edge (``proposed_by_study``, ED6 W5) and no site setup in none: an ML proposal is
+    not an idea."""
     found: dict[str, set[str]] = {}
     for doc in parsed_edges(ctx, ctx.user.user_id):
         if doc.owner == SITE_USER:
             for screener in doc.screeners:
                 found.setdefault(screener, set()).add(tab_of(ctx, doc.outcome))
+        elif PROPOSED_BY_STUDY in doc.audit.labels:
+            for screener in doc.screeners:
+                found.setdefault(screener, set())
     return lambda config_id: tab in found.get(config_id, {STOCKS})
 
 
