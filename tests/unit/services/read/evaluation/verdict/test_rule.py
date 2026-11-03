@@ -31,6 +31,8 @@ from algotrade.services.read.evaluation.verdict import (
 )
 from algotrade.storage.backends.memory import MemoryBackend
 from tests.unit.services.read.evaluation.conftest import (
+    DOCS,
+    EDGE,
     FROZEN,
     series_row,
     stores,
@@ -290,6 +292,21 @@ def test_the_definition_sources_and_lost_inputs_are_served(backend: MemoryBacken
     lost = [{"variant": "main/momo", "horizon": 20, "table": "rollup", "sessions": 3}]
     assert _lost({"lost_sessions": lost}) == ("main/momo: rollup (3 sessions)",)
     assert _lost({}) == ()
+
+
+@pytest.mark.parametrize("offset", [-1, 0, 1])
+def test_an_event_setups_trade_enters_one_session_after_the_decision(
+    backend: MemoryBackend, offset: int
+) -> None:
+    """X5 follow-up: an event schedule's offset places the anchor (S = anchor + offset), and the
+    decision is D = S - 1, so the definition says one session whatever the offset."""
+    event = {
+        **EDGE, "schedule": "on_event:earnings_expected",
+        "outcome": {**EDGE["outcome"], "start_offset_sessions": offset},
+    }  # fmt: skip
+    edge = load_edge(stores(backend, docs={**DOCS, ("site", "edges", "drift"): event}), "drift")
+    assert edge is not None
+    assert edge.definition.trade.startswith("Enter 1 session after the decision ·")
 
 
 def test_a_run_without_the_in_sample_slice_reports_the_ratio_not_measured() -> None:

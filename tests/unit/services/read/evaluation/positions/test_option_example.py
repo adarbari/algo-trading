@@ -28,14 +28,14 @@ from algotrade.services.read.values import UnknownCode
 
 S = date(2026, 10, 30)
 SPY = "EQ:SPY"
-EDGE: Any = SimpleNamespace(id="put_write")
+EDGE: Any = SimpleNamespace(id="put_write", schedule="every_session")
 CTX: Any = SimpleNamespace(session=SimpleNamespace(date=S))
 SHORT_PUT = (Leg(OPTION, -1, "P", "delta", delta=0.30),)
 
 
-def _outcome(**changes: Any) -> Any:
+def _outcome(offset: int = 1, **changes: Any) -> Any:
     spec = PositionSpec("short_put", legs=SHORT_PUT, collateral="cash_secured", **changes)
-    return SimpleNamespace(position=spec, tenor_days=30, start_offset_sessions=1)
+    return SimpleNamespace(position=spec, tenor_days=30, start_offset_sessions=offset)
 
 
 def _chain() -> pd.DataFrame:
@@ -152,6 +152,25 @@ def test_the_expiry_floor_counts_the_hold_from_the_entry_not_s(
     (ex,) = load_option_examples(CTX, EDGE, _outcome(), [SPY])
     floor = module._advance(date(2026, 11, 2), 15)
     assert all(leg.expiry >= floor for leg in ex.legs) and ex.legs
+
+
+@pytest.mark.parametrize("offset", [-1, 0, 1])
+def test_an_event_setups_entry_is_the_session_after_the_served_one_whatever_its_offset(
+    monkeypatch: pytest.MonkeyPatch, offset: int
+) -> None:
+    """X5 follow-up: an event schedule's offset places the anchor, so S = D + 1 (the harness's
+    ``leg_blocks``); the expiry floor is the hold counted from that entry, never D + offset."""
+    _wire(monkeypatch, ExitRule("put_write", None, 15))
+    floors: list[date] = []
+
+    def picked(*args: Any, not_before: date, **kw: Any) -> Any:
+        floors.append(not_before)
+        return SimpleNamespace(reason="stub")
+
+    monkeypatch.setattr(module, "select_legs", picked)
+    event: Any = SimpleNamespace(id="put_write", schedule="on_event:earnings_expected")
+    load_option_examples(CTX, event, _outcome(offset), [SPY])
+    assert floors == [module._advance(date(2026, 11, 2), 15)]  # S = Monday 2 Nov
 
 
 def test_duplicate_quotes_of_a_contract_keep_the_latest_row() -> None:

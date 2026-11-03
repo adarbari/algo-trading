@@ -14,6 +14,7 @@ from algotrade.config.edges import document, loading
 from algotrade.config.edges.follow import AUDIT
 from algotrade.config.edges.follow import KEY as FOLLOW
 from algotrade.config.edges.portfolio import benchmark_words
+from algotrade.config.edges.schedules.events import entry_delay
 from algotrade.config.edges.verdict import resolve_profile
 from algotrade.config.site.settings import load_users
 from algotrade.config.user import SITE_USER
@@ -210,8 +211,8 @@ def _win(o: document.Outcome) -> str:
     return "rises"
 
 
-def _trade(o: document.Outcome) -> str:
-    n = o.start_offset_sessions
+def _trade(o: document.Outcome, schedule: str) -> str:
+    n = entry_delay(schedule, o.start_offset_sessions)
     held = " or ".join(str(h) for h in o.horizon_sessions)
     parts = [
         f"Enter {n} session{'' if n == 1 else 's'} after the decision",
@@ -283,7 +284,7 @@ def _edge(e: document.Edge, mine: bool, own: Mapping[str, Any] | None = None) ->
         evidence=EdgeEvidence(e.evidence.run_id, e.evidence.split_from) if e.evidence else None,
         rejection_reason=e.rejection_reason,
         sources=tuple(EdgeSource(x.title, x.url) for x in e.sources),
-        definition=EdgeDefinition(_picks(e), _trade(e.outcome), _compare(e), _test(e)),
+        definition=EdgeDefinition(_picks(e), _trade(e.outcome, e.schedule), _compare(e), _test(e)),
         published=_published(e),
         state="following" if e.followed else "researching",
         since=e.follow.since,
