@@ -40,6 +40,9 @@ def test_the_committed_site_files_load() -> None:
     assert sources.vendor("cboe").enabled and sources.limits_dir == "var/run/limits"
     assert sources.vendor("sec_edgar").raw_retention_days == 7
     assert sources.vendor("cboe").raw_retention_days is None  # the global window
+    assert (
+        sources.vendor("tiingo").raw_retention_days == 90
+    )  # explicit: not replayable on the free tier
     cboe = sources.vendor("cboe")
     assert (cboe.min_interval_s, cboe.max_interval_s, cboe.start_interval_s) == (1.05, 5.0, None)
     assert sources.cboe_workers == 2 and sources.cboe_priority_symbols[:2] == ("SPY", "QQQ")

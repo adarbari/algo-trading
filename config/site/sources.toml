@@ -167,6 +167,8 @@ min_interval_s = 0.4             # POWER PLAN, bought 2026-10-09 for ONE MONTH (
                                  # hour, 1,000 a day, 500 unique symbols a month; a refetch of a symbol already fetched
                                  # that month is free) and monthly_symbol_budget = 450.
 licence = "personal"             # Tiingo's terms: personal use; features derived from its bars inherit it
+raw_retention_days = 90          # explicit, not the global window: on the free tier (from 2026-11-09) a past day cannot be
+                                 # re-fetched in bulk (450 symbols a month), so the raw answers are the only replay
 monthly_symbol_budget = 100_000  # distinct tickers `bars-history` fetches in a calendar month (its run records
                                  # count them). POWER PLAN until 2026-11-09 (allows ~110,000; 100,000 leaves a buffer
                                  # and covers the ~12k listings as they were); FREE tier: 450 (allows 500; the buffer
