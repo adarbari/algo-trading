@@ -448,6 +448,9 @@ def test_the_cli_flag_reaches_the_options(evaluated: World) -> None:
 
     flags = {f for p in TASKS["edge-verdicts"].params for f in p.flags}
     assert "--expect-same-headlines" in flags
+    # a manual run always carries the default session, which is a window (2026-11-03: 66 edges
+    # OUTSIDE_WINDOW, none re-judged): the post-session step's all_edges needs a flag too
+    assert "--all-edges" in flags
     ctx = replace(task_ctx(evaluated.writer, evaluated.reader, clock=lambda: next(CLOCK)),
                   configs=lying())  # fmt: skip
     entries_ops.run_edge_verdicts(replace(ctx, configs=configs()), {"all_edges": True})
