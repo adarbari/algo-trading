@@ -34,6 +34,7 @@ correlated returns point to: a peer that never moves the name is not kept howeve
 industry. One row per instrument traded on the session.
 """
 
+import warnings
 from datetime import date
 
 import numpy as np
@@ -158,7 +159,8 @@ def standardised(returns: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     (a missing day adds nothing to a correlation); and the mask of columns with ``MIN_RETURNS``."""
     r = returns[-WINDOW:]
     ok = np.isfinite(r).sum(axis=0) >= MIN_RETURNS
-    with np.errstate(invalid="ignore", divide="ignore"):
+    with np.errstate(invalid="ignore", divide="ignore"), warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)  # an all-NaN column is 0, not an error
         z = (r - np.nanmean(r, axis=0)) / np.nanstd(r, axis=0)
     z = np.where(np.isfinite(z), z, 0.0).astype(np.float32)
     z[:, ~ok] = 0.0

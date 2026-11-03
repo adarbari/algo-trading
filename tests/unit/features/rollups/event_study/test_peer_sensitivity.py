@@ -113,3 +113,12 @@ def test_without_spy_every_name_is_no_market_not_short_history() -> None:
               "instruments/symbol_ids": None, ps.COMPANY: None}  # fmt: skip
     out = ps.compute(inputs, SESSION, None)
     assert set(out["peer_status"]) == {ps.NO_MARKET}
+
+
+def test_standardised_treats_an_all_missing_column_as_zero_without_a_warning() -> None:
+    """A name with no returns at all (a new listing) is zeros and not ok: the nightly runs pytest
+    with warnings as errors, and a numpy empty-slice warning once failed the whole rollups step."""
+    returns = np.full((ps.WINDOW, 2), np.nan)
+    returns[:, 1] = np.linspace(-0.01, 0.01, ps.WINDOW)
+    z, ok = ps.standardised(returns)
+    assert not z[:, 0].any() and list(ok) == [False, True]
