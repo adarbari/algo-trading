@@ -27,7 +27,12 @@ import numpy as np
 import numpy.typing as npt
 import pandas as pd
 
-from algotrade.core.time.calendar import last_session_of_month, monthly_expiry
+from algotrade.core.time.calendar import (
+    is_session,
+    last_session_of_month,
+    monthly_expiry,
+    next_session,
+)
 
 type Matrix = npt.NDArray[np.float64]
 
@@ -126,6 +131,15 @@ def calendar_cover(grid: list[date], releases: list[tuple[str, date, str]]) -> i
     if not releases:
         return None
     return bisect_left(grid, min(day for _, day, _ in releases))
+
+
+def reaction_session(day: date, time_et: str | None = CLOSE_ET) -> date:
+    """The session an event on ``day`` reacts on, with no grid (the maths of ``reaction_position``
+    for a date ahead of the session): a release after the close, or on a day the exchange is
+    closed, reacts on the next session."""
+    if is_session(day) and (time_et is None or time_et <= CLOSE_ET):
+        return day
+    return next_session(day)
 
 
 def reaction_position(grid: list[date], day: date, time_et: str | None = CLOSE_ET) -> int | None:

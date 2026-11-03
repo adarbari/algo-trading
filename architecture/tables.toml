@@ -391,6 +391,11 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 note = "ADR 0050 EV3: the measured peers of a name (candidates by correlation and industry; kept when their earnings reports moved it by 1.5 normal days at the median over 4 or more), ranked, and the next peer report; reads bars/1d, events/earnings through earnings_reaction's reading, instruments/company"
 
 [[table]]
+name = "rollups/instrument/event_calendar@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+note = "ADR 0050 EV6: the next reaction session of each scheduled macro release, repeated per instrument (an expression reads one entity); reads events/macro_release (known_from <= S); the expression features days_to_next_impact_event and impact_events_before_expiry read it with event_reaction@v1"
+
+[[table]]
 name = "rollups/market/market_event_reaction@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/market_rollups.py"
 note = "ADR 0050 EV2: the S&P 500's (IDX:SPX) reaction to each macro release and rule day in normal days, one MKT:US row; reads macro/series and events/macro_release"

@@ -59,6 +59,7 @@ from algotrade.features.rollups.corporate import (
     fundamentals,
 )
 from algotrade.features.rollups.event_study import (
+    event_calendar,
     event_reaction,
     market_event_reaction,
     peer_sensitivity,
@@ -179,6 +180,7 @@ GROUPS: dict[str, FeatureGroup] = {
             event_reaction.GROUP,
             market_event_reaction.GROUP,
             peer_sensitivity.GROUP,
+            event_calendar.GROUP,
             iv30.GROUP,
             iv_history.GROUP,
             ibkr_iv.GROUP,
