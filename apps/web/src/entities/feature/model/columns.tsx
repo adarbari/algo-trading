@@ -298,7 +298,7 @@ export function criterionColumn(criterion: CriterionInfo, info?: ColumnInfo): Pl
     id: `criterion:${criterion.id}`,
     ...(info ? fieldHelp(info.name) : {}),
     header: info ? featureLabel(info.name) : decisionLabel(criterion.id),
-    description: `${info?.description ?? criterion.field} (criterion ${criterion.id}, ${criterion.mode}). A tint marks a near miss or a miss.`,
+    description: `${info?.description ?? criterion.field} (criterion ${criterion.id}, ${criterion.mode})`,
     value: (row) => shownValue(of(row)?.value ?? null),
     format: info ? valueFormat(info) : { kind: 'number', digits: 2 },
     fill: (row) => OUTCOME_FILL[of(row)?.outcome ?? ''],

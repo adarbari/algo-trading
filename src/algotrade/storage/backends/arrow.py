@@ -71,6 +71,8 @@ def conform(table: str, data: pa.Table, strict: bool = False) -> pa.Table:
     spec = table_spec(table)
     if spec is None:
         return data
+    if not strict and _is_conformed(spec, data):
+        return data  # a partition read through ``concat`` once: the cast below would rebuild it
     fields, arrays, problems = [], [], []
     for name in data.column_names:
         column, values = spec.column(name), data.column(name)
@@ -95,6 +97,20 @@ def conform(table: str, data: pa.Table, strict: bool = False) -> pa.Table:
     # pandas' own metadata describes the frame before the casts; Arrow types are the truth.
     metadata = {k: v for k, v in (data.schema.metadata or {}).items() if k != b"pandas"}
     return pa.Table.from_arrays(arrays, schema=pa.schema(fields, metadata=metadata))
+
+
+def _is_conformed(spec: TableSpec, data: pa.Table) -> bool:
+    """``conform`` would return ``data`` as it is: no pandas metadata, and every declared column
+    already of its declared type and nullability."""
+    if b"pandas" in (data.schema.metadata or {}):
+        return False
+    for field in data.schema:
+        column = spec.column(field.name)
+        if column is not None and (
+            field.type != ARROW_TYPES[column.type] or field.nullable != column.nullable
+        ):
+            return False
+    return True
 
 
 def concat(table: str, parts: list[pa.Table]) -> pa.Table:

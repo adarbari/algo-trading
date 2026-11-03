@@ -576,3 +576,12 @@ The site never knows your account, your size or your other positions, so it cann
 """
 next = "Look for the label beside each figure: backtested (hypothetical) or forward paper record since a date."
 see_also = ["paper_trading", "verdict", "not_a_return", "idea_exit_rule"]
+
+[[term]]
+id = "regime_chart_key"
+term = "Reading the regime charts"
+short = "Read each chart left to right: the line is the value and the shading is what the market did."
+body = """
+The line is the stored value for each session. The dashed line is where the signal turns on, and a gap in the line is a period with nothing stored, not a zero. The shading behind the lines shows when the market fell (peak to trough), when it recovered and when the economy was in recession. Recession spans are hatched so they stay readable where they overlap a fall. The strips under a chart repeat the regime, the signal and how much evidence each session had. Don't read a gap as calm: check the stored range first.
+"""
+see_also = ["regime"]
