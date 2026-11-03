@@ -58,6 +58,17 @@ def _features() -> tuple[Feature, ...]:
                 inputs=(_REL,),
             )
         )
+    out.append(
+        Feature(
+            "calendar_through",
+            "date",
+            "date",
+            "The latest release date the stored calendar lists (any scheduled release): the "
+            "calendar's horizon, past which 'no release' means unlisted, not none",
+            "no release is stored, or none is known by the session",
+            inputs=(_REL,),
+        )
+    )
     return tuple(out)  # fmt: skip
 
 
@@ -79,15 +90,15 @@ def compute(inputs: Inputs, session: date, params: None) -> pd.DataFrame:
         nxt = ahead.get(key)
         row[f"{k}_next_date"] = nxt if nxt is not None else pd.NaT
         row[f"{k}_sessions_to"] = sessions_to(session, nxt) if nxt is not None else np.nan
+    known = moves.release_days(inputs.get(MACRO_RELEASE), session)
+    row["calendar_through"] = max((d for k, d, _ in known if k in moves.MACRO_KEYS), default=pd.NaT)
     bars = inputs[BARS]
     assert bars is not None  # required input
     ids = sorted(set(bars.loc[bars["session_date"] == session, "instrument_id"].astype(str)))
     frame = pd.DataFrame(
         [{"instrument_id": i, **row} for i in ids], columns=["instrument_id", *COLUMNS]
     )
-    for name, dtype in COLUMNS.items():
-        if dtype == "int":
-            frame[name] = frame[name].astype("Int64")
+    moves.nullable_ints(frame, COLUMNS)
     return frame
 
 

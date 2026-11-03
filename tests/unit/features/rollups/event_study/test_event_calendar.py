@@ -63,14 +63,29 @@ def fs() -> FeatureSet:
     return site_features(FileConfigStore(REPO_ROOT / "config"))
 
 
-def _frames(multiples: dict[str, float | None], status: str = "OK", expiry_days: int = 14):
+def _frames(
+    multiples: dict[str, float | None],
+    status: str = "OK",
+    expiry_days: int = 14,
+    through_days: int | None = 90,
+    earnings_days: int = 30,
+    earnings_multiple: float | None = None,
+) -> dict[str, pd.DataFrame]:
     day = SESSION
-    cal = {f"{k.lower()}_next_date": None for k in MACRO_KEYS}
+    cal: dict[str, object] = {f"{k.lower()}_next_date": None for k in MACRO_KEYS}
     cal |= {f"{k.lower()}_sessions_to": np.nan for k in MACRO_KEYS}
     cal["cpi_next_date"], cal["cpi_sessions_to"] = day + timedelta(days=7), 5
     cal["fomc_next_date"], cal["fomc_sessions_to"] = day + timedelta(days=20), 14
-    react = {f"macro_{k.lower()}_multiple_median": multiples.get(k) for k in MACRO_KEYS}
-    react |= {"reaction_status": status, "earnings_n": 8, "earnings_multiple_median": None}
+    cal["calendar_through"] = None if through_days is None else day + timedelta(days=through_days)
+    react: dict[str, object] = {}
+    for k in MACRO_KEYS:
+        react[f"macro_{k.lower()}_multiple_median"] = multiples.get(k)
+        react[f"macro_{k.lower()}_n"] = 30
+    react |= {
+        "reaction_status": status,
+        "earnings_n": 8,
+        "earnings_multiple_median": earnings_multiple,
+    }
     frames = {
         "rollups/instrument/event_calendar@v1": {
             "instrument_id": [A],
@@ -82,8 +97,8 @@ def _frames(multiples: dict[str, float | None], status: str = "OK", expiry_days:
         },
         "rollups/instrument/earnings@v1": {
             "instrument_id": [A],
-            "days_to_earnings": [30],
-            "next_earnings_date": [day + timedelta(days=45)],
+            "days_to_earnings": [earnings_days],
+            "next_earnings_date": [day + timedelta(days=earnings_days)],
         },
         "rollups/instrument/nearest_expiry@v1": {
             "instrument_id": [A],
@@ -96,30 +111,58 @@ def _frames(multiples: dict[str, float | None], status: str = "OK", expiry_days:
     }
 
 
+NAMES = ["days_to_next_impact_event", "impact_events_before_expiry"]
+
+
 def test_the_expressions_count_only_kinds_that_have_moved_the_name(fs: FeatureSet) -> None:
-    frames = _frames({"CPI": 2.0, "FOMC": 1.0})  # CPI matters (2.0 >= 1.5), FOMC does not
-    out = fs.evaluate(frames, ["days_to_next_impact_event", "impact_events_before_expiry"])
-    row = out.set_index("instrument_id").loc[A]
+    row = fs.evaluate(_frames({"CPI": 2.0, "FOMC": 1.0}), NAMES).iloc[0]  # FOMC 1.0 < 1.5
     assert row["days_to_next_impact_event"] == 5
     assert row["impact_events_before_expiry"] == 1  # CPI in 7 days, expiry in 14
-    both = fs.evaluate(
-        _frames({"CPI": 2.0, "FOMC": 2.0}, expiry_days=30), ["impact_events_before_expiry"]
-    )
-    assert both.iloc[0]["impact_events_before_expiry"] == 2
+    both = fs.evaluate(_frames({"CPI": 2.0, "FOMC": 2.0}, expiry_days=30), NAMES).iloc[0]
+    assert both["impact_events_before_expiry"] == 2
 
 
 def test_no_impact_event_is_null_for_the_days_and_zero_for_the_count(fs: FeatureSet) -> None:
-    out = fs.evaluate(
-        _frames({"CPI": 0.9, "FOMC": 1.0}),
-        ["days_to_next_impact_event", "impact_events_before_expiry"],
-    )
-    row = out.iloc[0]
+    row = fs.evaluate(_frames({"CPI": 0.9, "FOMC": 1.0}), NAMES).iloc[0]
     assert pd.isna(row["days_to_next_impact_event"])  # none ahead of a kind that matters
     assert row["impact_events_before_expiry"] == 0
-    short = fs.evaluate(
-        _frames({"CPI": 2.0}, status="SHORT_HISTORY"),
-        ["days_to_next_impact_event", "impact_events_before_expiry"],
-    ).iloc[0]
+    short = fs.evaluate(_frames({"CPI": 2.0}, status="SHORT_HISTORY"), NAMES).iloc[0]
     assert pd.isna(short["days_to_next_impact_event"]) and pd.isna(
         short["impact_events_before_expiry"]
     )
+
+
+def test_a_calendar_that_stops_short_of_the_expiry_is_unknown_never_event_free(
+    fs: FeatureSet,
+) -> None:
+    short = fs.evaluate(_frames({"CPI": 2.0}, expiry_days=30, through_days=10), NAMES).iloc[0]
+    assert pd.isna(short["impact_events_before_expiry"])  # the calendar ends before the expiry
+    missing = fs.evaluate(_frames({"CPI": 2.0}, through_days=None), NAMES).iloc[0]
+    assert pd.isna(missing["impact_events_before_expiry"]) and pd.isna(
+        missing["days_to_next_impact_event"]
+    )
+
+
+def test_a_report_made_today_has_reacted_and_is_not_ahead(fs: FeatureSet) -> None:
+    today = fs.evaluate(_frames({}, earnings_days=0, earnings_multiple=3.0), NAMES).iloc[0]
+    assert pd.isna(today["days_to_next_impact_event"]) and today["impact_events_before_expiry"] == 0
+    ahead = fs.evaluate(_frames({}, earnings_days=3, earnings_multiple=3.0), NAMES).iloc[0]
+    assert ahead["days_to_next_impact_event"] == 3 and ahead["impact_events_before_expiry"] == 1
+
+
+def test_a_macro_median_over_too_few_releases_does_not_count(fs: FeatureSet) -> None:
+    frames = _frames({"CPI": 2.0})
+    frames["rollups/instrument/event_reaction@v1"]["macro_cpi_n"] = 3
+    row = fs.evaluate(frames, NAMES).iloc[0]
+    assert pd.isna(row["days_to_next_impact_event"]) and row["impact_events_before_expiry"] == 0
+
+
+def test_the_calendars_horizon_is_the_latest_known_release() -> None:
+    row = _row(
+        [
+            _release("CPI", SESSION + timedelta(days=5)),
+            _release("FOMC", SESSION + timedelta(days=60)),
+        ]
+    )
+    assert row["calendar_through"] == SESSION + timedelta(days=60)
+    assert pd.isna(_row([])["calendar_through"])

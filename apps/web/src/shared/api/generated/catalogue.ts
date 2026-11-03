@@ -271,6 +271,7 @@ export const SITE_FEATURES = [
   'rollup.event_calendar@v1.ism_services_sessions_to',
   'rollup.event_calendar@v1.fomc_next_date',
   'rollup.event_calendar@v1.fomc_sessions_to',
+  'rollup.event_calendar@v1.calendar_through',
   'rollup.iv30@v1.iv30',
   'rollup.iv30@v1.iv30_cboe',
   'rollup.iv30@v1.iv30_status',

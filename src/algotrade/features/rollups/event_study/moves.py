@@ -183,6 +183,14 @@ def structure_positions(grid: list[date]) -> dict[str, list[int]]:
     return {cls: [p for p in ps if p is not None] for cls, ps in found.items()}
 
 
+def nullable_ints(frame: pd.DataFrame, columns: dict[str, str]) -> pd.DataFrame:
+    """``frame`` with each ``int`` column (by the group's ``column_types``) as a nullable Int64."""
+    for name, dtype in columns.items():
+        if dtype == "int":
+            frame[name] = frame[name].astype("Int64")
+    return frame
+
+
 def class_stats(
     mult: Matrix, returns: Matrix, positions: list[int]
 ) -> tuple[npt.NDArray[np.int64], Matrix, Matrix]:
