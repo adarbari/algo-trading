@@ -15,29 +15,25 @@ A named-symbol setup's row is ``named.py``'s. Reads only what was known at the s
 (``screen_variant`` and ``eligible`` are point in time) and no outcome. A screener's run is made
 once per session whatever the number of edges that list it (``Night``)."""
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from functools import cached_property
 
 from algotrade.config.edges.document import Edge
 from algotrade.config.edges.named import LADDER
 from algotrade.config.edges.portfolio import ENSEMBLE, PORTFOLIO_KIND
+from algotrade.config.edges.positions.chain import CHAIN_KIND
 from algotrade.config.site.settings import load_verdict
 from algotrade.config.strategy.regime import site_regime
 from algotrade.config.user import UserContext
 from algotrade.core.model.errors import ConfigurationError, MissingDataError
-from algotrade.core.model.predicates import Group
+from algotrade.core.model.predicates import FieldValue, Group
 from algotrade.core.time.calendar import sessions_between
 from algotrade.data import StoreReader
 from algotrade.engines.screening.gate import UNDECIDED, UNKNOWN
 from algotrade.services.configs import field_catalog, resolve_config
 from algotrade.services.evaluation.cross_section.events import EventDayMissingError
-from algotrade.services.evaluation.cross_section.measuring import (
-    MEASURED_COVERAGE,
-    Names,
-    names_for,
-)
 from algotrade.services.evaluation.cross_section.picks import (
     MIN_SCORE_COVERAGE,
     Eligible,
@@ -54,12 +50,28 @@ from algotrade.services.evaluation.cross_section.reads.session import (
     numbers_at,
 )
 from algotrade.services.evaluation.cross_section.run.scopes import edge_universe
+from algotrade.services.evaluation.cross_section.scoring.session_stat import (
+    MEASURED_COVERAGE,
+    Names,
+    names_for,
+)
 from algotrade.services.evaluation.cross_section.sessions import decision_sessions
-from algotrade.services.evaluation.forward.signals import legs_between
+from algotrade.services.evaluation.forward.signals import (
+    legs_between,
+    paper_traded,
+)
+from algotrade.services.evaluation.portfolio_level.book import (
+    PortfolioRow,
+    portfolio_row,
+    unknown_row,
+)
+from algotrade.services.evaluation.portfolio_level.ordered import in_order
+from algotrade.services.evaluation.portfolio_level.paper import paper_book
 from algotrade.services.screening.regime import edge_gate
 from algotrade.storage.configs.store import ConfigStore
 
 PICKED, NOT_DECISION_DAY, UNJUDGED, SKIPPED = "picked", "not_decision_day", "unjudged", "skipped"
+NO_PAPER_RECORD = "no paper record yet"  # a portfolio gate's book has no paper record to read
 GATE_CLOSED = "gate_closed"  # the setup gate closed at the session (ADR 0088 decision 7)
 # ``unjudged`` is no longer written (E9 decides short, long-short and book picks); a row stored
 # before says it.
@@ -114,6 +126,7 @@ class Night:
     user: UserContext
     session: date
     runs: dict[str, RankedRun | str] = field(default_factory=dict)
+    paper_as_of: datetime | None = None  # the previous session's cut-off: the paper record's book
     selections: SelectionReads = field(init=False)
 
     def __post_init__(self) -> None:
@@ -248,16 +261,36 @@ def _sided(
     return replace(made, status=PICKED, pick_ids=ids, pick_sides=sides)
 
 
-def gate_shut(night: Night, gate: Group) -> tuple[str, str] | None:
+def book_row(night: Night, edge: Edge) -> PortfolioRow:
+    """The edge's portfolio row at the session (ADR 0088 G15, ``[portfolio] book = "paper"``): its
+    paper trades as the previous session's cut-off knew them. Every field UNKNOWN (reason
+    ``NO_PAPER_RECORD``) when there is no cut-off or the edge records no paper trades, never an
+    empty book."""
+    option = edge.outcome.kind == CHAIN_KIND
+    if night.paper_as_of is None or not paper_traded(edge):
+        return unknown_row(NO_PAPER_RECORD, option=option)
+    trades = paper_book(night.reader, edge.id, night.user.user_id, night.session, night.paper_as_of)
+    held = frozenset(t.instrument_id for t in trades)
+    sectors = night.reads.sectors(held, night.session) if held else {}
+    return portfolio_row(trades, night.session, sectors, option=option)
+
+
+def gate_shut(
+    night: Night,
+    gate: Group,
+    extra: Mapping[str, FieldValue] | None = None,
+    why: str | None = None,
+) -> tuple[str, str] | None:
     """``(status, reason)`` when the setup gate holds the session's picks back (None: it is open),
     whatever ``[regime].enabled`` says: closed is ``gate_closed`` with the gate's reason, unknown
-    is ``skipped`` (fail closed: neither picks)."""
+    is ``skipped`` (fail closed: neither picks) with ``why`` (the book's, when it is the missing
+    fact) else the regime's. ``extra``: the book's row (``book_row``) for a ``portfolio.*`` rule."""
     domains = field_catalog(night.configs).domains
-    decision = edge_gate(night.reader, gate, night.session, domains)
+    decision = edge_gate(night.reader, gate, night.session, domains, extra=extra)
     if decision.open:
         return None
     if decision.state == UNDECIDED:
-        return SKIPPED, UNKNOWN
+        return SKIPPED, why or UNKNOWN
     return GATE_CLOSED, decision.reason or "gate closed"
 
 
@@ -293,7 +326,9 @@ def edge_night(
         return [EdgePicks(edge.id, s, SKIPPED, reason=why, top_k=top_k) for s in screeners]
     if not fired:
         return [EdgePicks(edge.id, s, NOT_DECISION_DAY, top_k=top_k) for s in screeners]
-    if edge.gate is not None and (shut := gate_shut(night, edge.gate)) is not None:
+    row = book_row(night, edge) if edge.gate is not None and in_order(edge) else None
+    extra, missing = (None, None) if row is None else (row.values, row.reason)
+    if edge.gate is not None and (shut := gate_shut(night, edge.gate, extra, missing)) is not None:
         status, why = shut
         return [EdgePicks(edge.id, s, status, reason=why, top_k=top_k) for s in screeners]
     return [

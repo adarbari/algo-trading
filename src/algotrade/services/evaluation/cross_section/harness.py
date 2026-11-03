@@ -400,7 +400,12 @@ def evaluate_edge(
                 plan, variant, stats, (closed, kept, exits), start, projected
             )
             legs = stats.randoms.get((plan.key, variant.id), {})
-            found = tagged(stats.legs.get((plan.key, variant.id), {}), scope.edge, session)
+            found = tagged(
+                stats.legs.get((plan.key, variant.id), {}),
+                scope.edge,
+                session,
+                stats.gates.get((plan.key, variant.id)),
+            )
             every, blocks_open, block_stats = pooled_blocks(scope.edge, found, vkept, vclosed)
             pooled = [
                 pool_random([legs[leg.decision] for leg in block if leg.decision in legs])

@@ -39,6 +39,7 @@ BOOKKEEPING = (
     "rejection_reason", "evidence", "promoted", "compared", "basis_horizon", "extends", "follow",
     "audit", "owner", "published", "family", "oos_class",
     "mechanism_kind", "asset_class", "plain_reason", "verdict_profile", "holdout_from",
+    "portfolio_book",  # tonight's picks read it only; the harness never does
 )  # fmt: skip
 
 
