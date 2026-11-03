@@ -1,6 +1,7 @@
 """Task entries for market data: earnings, bars, filings, rates, chains, rollups, macro (ADR 19)."""
 
 from datetime import timedelta
+from pathlib import Path
 
 from algotrade.config.site.events.releases import load_macro_releases
 from algotrade.config.site.settings import load_macro
@@ -20,10 +21,12 @@ from algotrade_ingestion.tasks.events import (
     ipo_lockups,
 )
 from algotrade_ingestion.tasks.events.attribution import run as attribution
+from algotrade_ingestion.tasks.events.dossier import run as dossier
 from algotrade_ingestion.tasks.framework.params import (
     FROM,
     SESSION,
     TO,
+    Param,
     Params,
     Task,
     session_of,
@@ -130,6 +133,10 @@ def run_insider(ctx: TaskContext, p: Params) -> RunRecord:
         p.get("limit"),
         bool(p.get("force")),
     )
+
+
+def run_dossier_import(ctx: TaskContext, p: Params) -> RunRecord:
+    return dossier.ingest_dossiers(ctx, session_of(p), Path(str(p["path"])))
 
 
 def run_attribution(ctx: TaskContext, p: Params) -> RunRecord:
@@ -289,3 +296,29 @@ def run_macro_calendar(ctx: TaskContext, p: Params) -> RunRecord:
     return macro_calendar.ingest_macro_calendar(
         ctx, load_macro_releases(ctx.configs), session_of(p), symbols(p, "only")
     )
+
+
+# Declared here, not in ``registry.py`` (at the file-length cap): the registry adds them to TASKS.
+EVENT_TASKS = (
+    Task(
+        "attribution",
+        "Why each big mover moved (events/attribution): the 8-K causes and the headline causes",
+        attribution,
+        (attribution.TABLE,),
+        run_attribution,
+        optional_sources=("massive_news",),
+        params=(SESSION,),
+    ),
+    Task(
+        "dossier-import",
+        "Import reviewed deep-dive dossiers (TOML): factors, factor occurrences and the "
+        "analyst-reviewed causes of big moves (ADR 0050); validated whole, owner-run",
+        dossier,
+        (dossier.FACTORS, dossier.OCCURRENCES, dossier.ATTRIBUTIONS),
+        run_dossier_import,
+        params=(
+            SESSION,
+            Param("path", ("--path",), str, "a dossier file or a folder of them", True),
+        ),
+    ),
+)

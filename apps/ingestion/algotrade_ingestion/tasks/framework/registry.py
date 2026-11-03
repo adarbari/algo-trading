@@ -28,7 +28,6 @@ from algotrade_ingestion.tasks.derived import (
 from algotrade_ingestion.tasks.edges import picks as edge_picks
 from algotrade_ingestion.tasks.edges import verdicts as edge_verdicts
 from algotrade_ingestion.tasks.events import filing_text, filings, insider, ipo_lockups
-from algotrade_ingestion.tasks.events.attribution import run as attribution
 from algotrade_ingestion.tasks.framework import (
     entries_market,
     entries_ops,
@@ -36,6 +35,7 @@ from algotrade_ingestion.tasks.framework import (
     source_guards,
 )
 from algotrade_ingestion.tasks.framework.entries_history import HISTORY_TASKS
+from algotrade_ingestion.tasks.framework.entries_market import EVENT_TASKS
 from algotrade_ingestion.tasks.framework.params import (
     FROM,
     SESSION,
@@ -440,15 +440,6 @@ TASKS: dict[str, Task] = {
                 Param("limit", ("--limit",), int, "backfill: read at most N quarters this run"),
                 Param("force", ("--force",), None, "backfill: also quarters already read"),
             ),
-        ),
-        Task(
-            "attribution",
-            "Why each big mover moved (events/attribution): the 8-K causes and the headline causes",
-            attribution,
-            (attribution.TABLE,),
-            entries_market.run_attribution,
-            optional_sources=("massive_news",),
-            params=(SESSION,),
         ),
         Task(
             "ipo-lockups",
@@ -981,6 +972,7 @@ TASKS: dict[str, Task] = {
             params=(Param("golden_dir", ("--golden-dir",), Path, default=GOLDEN_DIR),),
         ),
         *HISTORY_TASKS,
+        *EVENT_TASKS,
     )
 }
 

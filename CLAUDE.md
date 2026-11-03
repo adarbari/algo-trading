@@ -198,6 +198,7 @@ Every table, list or feed uses the shared filter bar (ADR 0082, once accepted) a
 | A decision that changes architecture | `.claude/skills/write-adr` |
 | Review and release a PR (reviewer loop, owner decisions, removing `no-automerge`) | `.claude/skills/review-and-release` |
 | A lesson from this session (owner correction, rule-preventable error) | `.claude/skills/capture-learning` |
+| Owner-run deep dive on a name: factors, dated occurrences, reviewed causes -> a dossier, imported | `.claude/skills/event-deep-dive` |
 | Promote an accepted formula or backlog item to a site feature | `.claude/skills/promote-feature` |
 | Start of day: what slowed the last sessions down, top 3 fixed before new work | `.claude/skills/review-sessions` (`/review-sessions`, `make friction`) |
 
