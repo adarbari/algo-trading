@@ -1,6 +1,7 @@
 """A ``portfolio.*`` setup gate at tonight's picks (ADR 0088 G15): the book is the edge's paper
-record as the previous session's cut-off knew it; with no cut-off, or an edge that records no
-paper trades, the book is UNKNOWN and the picks are skipped, never decided on an empty book."""
+record as the previous session's cut-off knew it (the record applies the gate too, E9, so a
+recording gated edge has a book, flat until it buys); with no cut-off, or an edge the record
+cannot trade, the book is UNKNOWN and the picks are skipped, never decided on an empty book."""
 
 from datetime import UTC, date, datetime
 from typing import Any
@@ -30,13 +31,6 @@ SIGNAL, KNOWN, CUTOFF = (
 )
 
 
-@pytest.fixture
-def gates_apply(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The paper record applying setup gates (E9): today it refuses a gated edge, so it has no
-    book to read (``test_a_portfolio_gated_edge_...``)."""
-    monkeypatch.setattr(night_module, "not_possible", lambda _edge: None)
-
-
 def paper(w: World, *names: str, known: datetime = KNOWN) -> None:
     rows = [
         {
@@ -58,19 +52,17 @@ def run(w: World, cutoff: datetime | None = CUTOFF, **changes: Any) -> Any:
     return stored
 
 
-def test_the_book_is_the_paper_record_known_at_the_cutoff(world: World, gates_apply: None) -> None:
+def test_the_book_is_the_paper_record_known_at_the_cutoff(world: World) -> None:
     paper(world, "EQ:N01", "EQ:N02")
     assert run(world).status == GATE_CLOSED  # two open trades: open_positions < 2 is false
 
 
-def test_a_book_below_the_limit_leaves_the_gate_open(world: World, gates_apply: None) -> None:
+def test_a_book_below_the_limit_leaves_the_gate_open(world: World) -> None:
     paper(world, "EQ:N01")
     assert run(world).status == PICKED
 
 
-def test_a_trade_written_after_the_cutoff_is_not_in_the_book(
-    world: World, gates_apply: None
-) -> None:
+def test_a_trade_written_after_the_cutoff_is_not_in_the_book(world: World) -> None:
     paper(world, "EQ:N01", "EQ:N02", known=datetime(2026, 9, 1, 22, tzinfo=UTC))
     assert run(world).status == PICKED
 
@@ -86,9 +78,16 @@ def test_an_edge_that_records_no_paper_trades_skips_the_picks(world: World) -> N
     assert (stored.status, stored.reason) == (SKIPPED, NO_PAPER_RECORD)
 
 
+def test_a_recording_gated_edge_with_no_paper_trades_yet_holds_a_flat_book(world: World) -> None:
+    """The record applies the gate (E9): before it buys, its book is known and empty."""
+    assert run(world).status == PICKED
+
+
 def test_a_portfolio_gated_edge_the_record_cannot_trade_is_skipped_never_picked(
-    world: World,
+    world: World, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The record refuses a gated edge, so it has no rows: an empty book must not open the gate."""
+    """An edge the record refuses (``not_possible``) has no rows: an empty book must not open the
+    gate."""
+    monkeypatch.setattr(night_module, "not_possible", lambda _edge: "refused")
     stored = run(world)
     assert (stored.status, stored.reason, stored.pick_ids) == (SKIPPED, NO_PAPER_RECORD, ())

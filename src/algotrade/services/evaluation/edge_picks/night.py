@@ -61,13 +61,9 @@ from algotrade.services.evaluation.forward.signals import (
     not_possible,
     paper_traded,
 )
-from algotrade.services.evaluation.portfolio_level.book import (
-    PortfolioRow,
-    portfolio_row,
-    unknown_row,
-)
+from algotrade.services.evaluation.portfolio_level.book import PortfolioRow, unknown_row
 from algotrade.services.evaluation.portfolio_level.ordered import in_order
-from algotrade.services.evaluation.portfolio_level.paper import paper_book
+from algotrade.services.evaluation.portfolio_level.paper import paper_row
 from algotrade.services.screening.regime import edge_gate
 from algotrade.storage.configs.store import ConfigStore
 
@@ -264,17 +260,16 @@ def _sided(
 
 def book_row(night: Night, edge: Edge) -> PortfolioRow:
     """The edge's portfolio row at the session (ADR 0088 G15, ``[portfolio] book = "paper"``): its
-    paper trades as the previous session's cut-off knew them. Every field UNKNOWN (reason
-    ``NO_PAPER_RECORD``) when there is no cut-off or the edge records no paper trades, never an
-    empty book: the record cannot trade an edge with a setup gate (``not_possible``), so a
-    portfolio-gated edge has no paper rows and its picks wait for the record to apply gates."""
+    paper trades as the previous session's cut-off knew them (``paper_row``, the row the record's
+    own gate reads). Every field UNKNOWN (reason ``NO_PAPER_RECORD``) when there is no cut-off or
+    the record cannot trade the edge (not recording, or ``not_possible``), never an empty book."""
     option = edge.outcome.kind == CHAIN_KIND
     if night.paper_as_of is None or not paper_traded(edge) or not_possible(edge) is not None:
         return unknown_row(NO_PAPER_RECORD, option=option)
-    trades = paper_book(night.reader, edge.id, night.user.user_id, night.session, night.paper_as_of)
-    held = frozenset(t.instrument_id for t in trades)
-    sectors = night.reads.sectors(held, night.session) if held else {}
-    return portfolio_row(trades, night.session, sectors, option=option)
+    owner, as_of = night.user.user_id, night.paper_as_of
+    return paper_row(
+        night.reader, edge.id, owner, night.session, as_of, night.reads.sectors, option=option
+    )
 
 
 def gate_shut(

@@ -14,16 +14,25 @@ read only at the signal session. The buy session is the entry session S (the dec
 plus the document's start offset) and the sell session the close of the window h sessions
 later, both from the trading calendar. An event schedule (``on_event:``) fires on the harness's
 own legs (``sessions.leg_blocks``: the event names read at D, S = D + 1), and its picks are the
-qualified names among the event's. An edge the paper record cannot trade (no screener, a
-mixed-source implied vol) or whose screen could not be read returns no signals and says why:
-never an empty record that reads as "nothing to buy"."""
+qualified names among the event's. A setup gate is read at the signal session, as tonight's picks
+read it (``screening.regime.edge_gate``): closed, the edge buys nothing and says the gate's
+reason (``closed``); unknown, the signal is skipped (fail closed); a ``portfolio.*`` rule reads the
+record's own book (``portfolio_level.paper_row``: the trades signalled before tonight, as the
+table stands at ``as_of``, the job's own time), so a record that never traded starts flat and a
+restarted one still holds its earlier run's open trades. In the nightly that is the book tonight's
+picks read at the previous nightly's cut-off; a hand re-run of a missed night can make them differ
+until the next night. An edge the paper record cannot trade (no
+screener, a mixed-source implied vol, an entry condition or case values) or whose screen could
+not be read returns no signals and says why: never an empty record that reads as "nothing to
+buy"."""
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 
 from algotrade.config.edges.document import Edge
 from algotrade.config.edges.loading import SITE, records_paper
 from algotrade.config.edges.portfolio import PORTFOLIO_KIND
+from algotrade.config.edges.positions.chain import CHAIN_KIND
 from algotrade.config.site.settings import load_verdict
 from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.config.strategy.schema import Selection
@@ -36,7 +45,8 @@ from algotrade.core.time.calendar import (
     sessions_to,
 )
 from algotrade.data import StoreReader
-from algotrade.services.configs import resolve_config
+from algotrade.engines.screening.gate import UNDECIDED
+from algotrade.services.configs import field_catalog, resolve_config
 from algotrade.services.evaluation.cross_section.detail.licences import (
     edge_fields,
     fitted_floor,
@@ -50,6 +60,7 @@ from algotrade.services.evaluation.cross_section.events import (
 )
 from algotrade.services.evaluation.cross_section.hit import needs_implied_vol
 from algotrade.services.evaluation.cross_section.picks import eligible, long_picks, screen_variant
+from algotrade.services.evaluation.cross_section.reads.session import SECTOR_FIELD, labels_at
 from algotrade.services.evaluation.cross_section.run.scopes import (
     MIXED_SOURCE_IV,
     edge_universe,
@@ -60,8 +71,11 @@ from algotrade.services.evaluation.cross_section.scoring.session_stat import (
     names_for,
 )
 from algotrade.services.evaluation.cross_section.sessions import Leg, leg_blocks
+from algotrade.services.evaluation.portfolio_level.ordered import in_order
+from algotrade.services.evaluation.portfolio_level.paper import paper_row
 from algotrade.services.evaluation.training.bound import scored
 from algotrade.services.features import catalogue
+from algotrade.services.screening.regime import edge_gate
 from algotrade.storage.configs.store import ConfigStore
 
 # Sessions an event schedule reads back to dedupe names. The dedupe is a chain (a name counted
@@ -87,7 +101,8 @@ class EdgeSignals:
     possible), ``skipped`` why a due signal could not be made (None: nothing was wrong),
     ``licence`` the strictest data licence of what the picks were read from (``trial_licences``:
     the screen's and the universe's features, the implied vol field), recorded on every row so a
-    reader hides a name by the licence recorded at the signal (ADR 0064 decision 10)."""
+    reader hides a name by the licence recorded at the signal (ADR 0064 decision 10); ``closed``
+    the setup gate's reason when it held a due signal back (None: no gate, or it was open)."""
 
     edge_id: str
     session: date
@@ -97,6 +112,7 @@ class EdgeSignals:
     signals: tuple[Signal, ...] = ()
     skipped: str | None = None
     licence: str | None = None
+    closed: str | None = None
 
 
 def advance(day: date, sessions: int) -> date:
@@ -153,9 +169,7 @@ def not_possible(edge: Edge) -> str | None:
     if needs_implied_vol(edge) and iv_field_of(edge) in MIXED_SOURCE_IV:
         return "its implied vol field mixes sources: name one vendor's field"
     rule = (
-        "setup gate"
-        if edge.gate is not None
-        else "entry condition"
+        "entry condition"
         if edge.outcome.entry
         else (
             "case values"
@@ -163,7 +177,7 @@ def not_possible(edge: Edge) -> str | None:
             else ""
         )
     )
-    if rule:  # the record would trade what the rule rules out, or at the default point (E9)
+    if rule:  # the record would enter at D's offset or at the default point (E13)
         return f"its {rule} is not applied to the paper record yet"
     if edge.outcome.result_side != "long":
         return (
@@ -193,6 +207,39 @@ def _licence(
     )
 
 
+def gate_held(
+    reader: StoreReader,
+    configs: ConfigStore,
+    user: UserContext,
+    edge: Edge,
+    session: date,
+    as_of: datetime | None,
+) -> tuple[str | None, str | None]:
+    """``(closed, unknown)``: the reason ``edge``'s setup gate is closed or unknown at ``session``
+    (both None: no gate, or it is open). A ``portfolio.*`` rule reads the record's own book as
+    known at ``as_of`` (``paper_row``); its reason, when the book is the missing fact, is the
+    unknown's."""
+    if edge.gate is None:
+        return None, None
+    row = (
+        paper_row(
+            reader, edge.id, user.user_id, session, as_of,
+            lambda ids, day: labels_at(reader, SECTOR_FIELD, ids, day),
+            option=edge.outcome.kind == CHAIN_KIND,
+        )
+        if in_order(edge)
+        else None
+    )  # fmt: skip
+    extra = None if row is None else row.values
+    decision = edge_gate(reader, edge.gate, session, field_catalog(configs).domains, extra=extra)
+    if decision.open:
+        return None, None
+    if decision.state == UNDECIDED:
+        why = (row.reason if row is not None else None) or decision.reason or "unknown"
+        return None, f"the setup gate is unknown ({why})"
+    return decision.reason or "gate closed", None
+
+
 def edge_signals(
     reader: StoreReader,
     configs: ConfigStore,
@@ -200,10 +247,12 @@ def edge_signals(
     edge: Edge,
     since: date,
     session: date,
+    as_of: datetime | None = None,
 ) -> EdgeSignals:
-    """``edge``'s paper picks at ``session`` (none when its schedule does not fire there), the
-    record counted from ``since``. ``user`` is the record owner's context (the ``site`` user's for
-    a site edge): its presets and universes are the ones read, never a follower's."""
+    """``edge``'s paper picks at ``session`` (none when its schedule does not fire there or its
+    setup gate is shut), the record counted from ``since``. ``user`` is the record owner's context
+    (the ``site`` user's for a site edge): its presets and universes are the ones read, never a
+    follower's; ``as_of`` the cut-off the record's own book is read at (``gate_held``)."""
     horizon = edge.outcome.horizon_sessions[0]
     if (why := not_possible(edge)) is not None:
         return EdgeSignals(edge.id, session, None, None, horizon, (), why)
@@ -223,20 +272,39 @@ def edge_signals(
     selection = edge_universe(configs, user, edge)
     licence = _licence(configs, user, edge, config, selection)
 
-    def made(signals: tuple[Signal, ...] = (), skipped: str | None = None) -> EdgeSignals:
+    def made(
+        signals: tuple[Signal, ...] = (), skipped: str | None = None, closed: str | None = None
+    ) -> EdgeSignals:
         return EdgeSignals(
-            edge.id, session, screener, config.hash, horizon, signals, skipped, licence
+            edge.id, session, screener, config.hash, horizon, signals, skipped, licence, closed
         )
 
     try:
-        run = screen_variant(reader, config, session)
-        universe = eligible(reader, selection, session)
+        closed, unknown = gate_held(reader, configs, user, edge, session, as_of)
+        if closed is not None or unknown is not None:  # held back: the screen is not read
+            return made(skipped=unknown, closed=closed)
+        bought, why = _screened(reader, edge, config, selection, events, leg)
     except MissingDataError as missing:
         return made(skipped=f"no {missing.dataset} for {session.isoformat()}")
+    return made(bought, why)
+
+
+def _screened(
+    reader: StoreReader,
+    edge: Edge,
+    config: ResolvedConfig,
+    selection: Selection,
+    events: EventSchedule | None,
+    leg: Leg,
+) -> tuple[tuple[Signal, ...], str | None]:
+    """The paper buys of ``edge`` at ``leg``'s decision session, best first, sold a horizon after
+    the entry, or why the screen could not decide them (a missing input raises)."""
+    session = leg.decision
+    run = screen_variant(reader, config, session)
+    universe = eligible(reader, selection, session)
     if run.coverage not in MEASURED_COVERAGE:
-        return made(skipped=f"the screen read incomplete data ({run.coverage.value})")
+        return (), f"the screen read incomplete data ({run.coverage.value})"
     names = None if events is None else events.names[session]
-    pickable = names_for(edge, universe.ids, names).pickable
-    picks = long_picks(edge, run.qualified, pickable)
-    sell = advance(leg.entry, horizon)
-    return made(tuple(Signal(i, rank, leg.entry, sell) for rank, i in enumerate(picks, start=1)))
+    picks = long_picks(edge, run.qualified, names_for(edge, universe.ids, names).pickable)
+    sell = advance(leg.entry, edge.outcome.horizon_sessions[0])
+    return tuple(Signal(i, rank, leg.entry, sell) for rank, i in enumerate(picks, start=1)), None
