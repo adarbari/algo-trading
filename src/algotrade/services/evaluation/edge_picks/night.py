@@ -58,6 +58,7 @@ from algotrade.services.evaluation.cross_section.scoring.session_stat import (
 from algotrade.services.evaluation.cross_section.sessions import decision_sessions
 from algotrade.services.evaluation.forward.signals import (
     legs_between,
+    not_possible,
     paper_traded,
 )
 from algotrade.services.evaluation.portfolio_level.book import (
@@ -265,9 +266,10 @@ def book_row(night: Night, edge: Edge) -> PortfolioRow:
     """The edge's portfolio row at the session (ADR 0088 G15, ``[portfolio] book = "paper"``): its
     paper trades as the previous session's cut-off knew them. Every field UNKNOWN (reason
     ``NO_PAPER_RECORD``) when there is no cut-off or the edge records no paper trades, never an
-    empty book."""
+    empty book: the record cannot trade an edge with a setup gate (``not_possible``), so a
+    portfolio-gated edge has no paper rows and its picks wait for the record to apply gates."""
     option = edge.outcome.kind == CHAIN_KIND
-    if night.paper_as_of is None or not paper_traded(edge):
+    if night.paper_as_of is None or not paper_traded(edge) or not_possible(edge) is not None:
         return unknown_row(NO_PAPER_RECORD, option=option)
     trades = paper_book(night.reader, edge.id, night.user.user_id, night.session, night.paper_as_of)
     held = frozenset(t.instrument_id for t in trades)

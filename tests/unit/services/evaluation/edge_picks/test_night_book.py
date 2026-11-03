@@ -5,7 +5,10 @@ paper trades, the book is UNKNOWN and the picks are skipped, never decided on an
 from datetime import UTC, date, datetime
 from typing import Any
 
+import pytest
+
 from algotrade.config.user import UserContext
+from algotrade.services.evaluation.edge_picks import night as night_module
 from algotrade.services.evaluation.edge_picks.night import (
     GATE_CLOSED,
     NO_PAPER_RECORD,
@@ -25,6 +28,13 @@ SIGNAL, KNOWN, CUTOFF = (
     datetime(2026, 8, 28, 22, tzinfo=UTC),
     datetime(2026, 8, 31, 22, tzinfo=UTC),
 )
+
+
+@pytest.fixture
+def gates_apply(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The paper record applying setup gates (E9): today it refuses a gated edge, so it has no
+    book to read (``test_a_portfolio_gated_edge_...``)."""
+    monkeypatch.setattr(night_module, "not_possible", lambda _edge: None)
 
 
 def paper(w: World, *names: str, known: datetime = KNOWN) -> None:
@@ -48,17 +58,19 @@ def run(w: World, cutoff: datetime | None = CUTOFF, **changes: Any) -> Any:
     return stored
 
 
-def test_the_book_is_the_paper_record_known_at_the_cutoff(world: World) -> None:
+def test_the_book_is_the_paper_record_known_at_the_cutoff(world: World, gates_apply: None) -> None:
     paper(world, "EQ:N01", "EQ:N02")
     assert run(world).status == GATE_CLOSED  # two open trades: open_positions < 2 is false
 
 
-def test_a_book_below_the_limit_leaves_the_gate_open(world: World) -> None:
+def test_a_book_below_the_limit_leaves_the_gate_open(world: World, gates_apply: None) -> None:
     paper(world, "EQ:N01")
     assert run(world).status == PICKED
 
 
-def test_a_trade_written_after_the_cutoff_is_not_in_the_book(world: World) -> None:
+def test_a_trade_written_after_the_cutoff_is_not_in_the_book(
+    world: World, gates_apply: None
+) -> None:
     paper(world, "EQ:N01", "EQ:N02", known=datetime(2026, 9, 1, 22, tzinfo=UTC))
     assert run(world).status == PICKED
 
@@ -72,3 +84,11 @@ def test_no_cutoff_skips_the_picks_with_the_reason(world: World) -> None:
 def test_an_edge_that_records_no_paper_trades_skips_the_picks(world: World) -> None:
     stored = run(world, status="researching")
     assert (stored.status, stored.reason) == (SKIPPED, NO_PAPER_RECORD)
+
+
+def test_a_portfolio_gated_edge_the_record_cannot_trade_is_skipped_never_picked(
+    world: World,
+) -> None:
+    """The record refuses a gated edge, so it has no rows: an empty book must not open the gate."""
+    stored = run(world)
+    assert (stored.status, stored.reason, stored.pick_ids) == (SKIPPED, NO_PAPER_RECORD, ())

@@ -8,6 +8,7 @@ from typing import Any
 import pytest
 
 from algotrade.config.user import UserContext
+from algotrade.core.time.calendar import next_session
 from algotrade.services.evaluation.cross_section import harness, measuring
 from algotrade.services.evaluation.cross_section.harness import evaluate_edge
 from algotrade.services.evaluation.cross_section.measures import Pick
@@ -85,3 +86,13 @@ def test_a_personal_trade_in_the_book_leaves_every_field_unknown() -> None:
     assert row.reason == PERSONAL_BOOK
     assert set(row.values.values()) == {None}
     assert measuring._row_at(None, None, D2) is None  # type: ignore[arg-type]
+
+
+def test_a_leg_with_no_closed_partition_leaves_the_later_book_unknown(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """D2's entry has no stored partition, so its trades are unknown: D3 (inside their window)
+    reads an UNKNOWN book, never a too empty one that opens the gate."""
+    every = [*DAYS, next_session(DAYS[-1])]
+    states = decided(monkeypatch, build_world(closed=[d for d in every if d != DAYS[3]]), 4)
+    assert D2 not in states and states[D3] == "unknown"

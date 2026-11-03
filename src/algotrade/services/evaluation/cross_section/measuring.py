@@ -444,10 +444,11 @@ def _measure_plan(
     option = scope.edge.outcome.kind == CHAIN_KIND
     for block in p.blocks:
         for leg in block:
-            if leg.decision not in chunk or leg.entry not in closed[p.horizon]:
+            if leg.decision not in chunk:
                 continue
-            if not other and leg.entry not in out.plan_closed[p.key]:
-                continue  # rows of another setup's key only: not closed for this one
+            if _unclosed(leg, closed[p.horizon], out.plan_closed[p.key], other):
+                _unknown_book(out, p, variant, leg, ordered, option)
+                continue  # no partition at its entry (or rows of another setup's key only)
             names = None if events is None else events.names[leg.decision]
             rows = closed[p.horizon][leg.entry]
             drawing = _drawing(spec, variant, block, scope.edge)
@@ -516,6 +517,22 @@ def _measure_plan(
                 out.outcome_reads[p.scope.key, p.horizon, leg.decision] = OutcomeRead(
                     leg.decision, p.scope.key, p.horizon, leg.entry, as_of, out.seqs.get(leg.entry)
                 )
+
+
+def _unclosed(leg: Leg, closed: Mapping[date, Any], owned: set[date], other: bool) -> bool:
+    """Whether ``leg`` has no closed window to measure: no partition at its entry, or (the plans'
+    own grain) none of this setup's own key."""
+    return leg.entry not in closed or (not other and leg.entry not in owned)
+
+
+def _unknown_book(
+    out: _Measured, p: _Plan, variant: Variant, leg: Leg, ordered: bool, option: bool
+) -> None:
+    """A leg never measured has trades no one knows: an in-order setup's book is unknown through
+    its window, so a later session never reads a book too empty."""
+    if ordered:
+        book = out.books.setdefault((p.key, variant.id), Book(option=option))
+        book.lost(window_end(leg.entry, p.horizon))
 
 
 def _row_at(book: Book | None, session: SessionReads, day: date) -> Mapping[str, Any] | None:
