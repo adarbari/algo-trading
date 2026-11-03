@@ -65,7 +65,7 @@ def load_session(cache_dir: str) -> Session:
 def yahoo_transport(
     headers: dict[str, str],  # no credential: the registry hands every transport its headers
     cache_dir: str = "var/cache/yahoo",
-    session: Callable[[str], Session] = load_session,
+    session: Callable[[str], Session] | None = None,
 ) -> Transport:
     """A GET transport over ``YfData``, created on the first request (see the module docstring)."""
     held: list[Session] = []
@@ -74,7 +74,7 @@ def yahoo_transport(
     def get(url_: str) -> bytes:
         with lock:
             if not held:
-                held.append(session(cache_dir))
+                held.append((session or load_session)(cache_dir))
         parts = urlsplit(url_)
         base = f"{parts.scheme}://{parts.netloc}{parts.path}"
         try:
