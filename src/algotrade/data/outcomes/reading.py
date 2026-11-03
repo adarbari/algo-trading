@@ -1,9 +1,9 @@
-"""Read forward outcomes (``outcomes/instrument/forward_returns@v2``, written by the ingestion
-``outcomes`` task) for the start sessions a harness evaluates: one row per (instrument, start
-session S, horizon, benchmark). A window not closed, or not computed, has no row: the caller
-excludes it, never counts it a miss; an ``UNMEASURED`` row (a flagged bar in the window, ADR 0061;
-``outcome_reason``) has no returns and is excluded the same way. ``as_of`` keeps only rows
-known by then (row by row, not only by run)."""
+"""Read forward outcomes (``READ_TABLE``: ``outcomes/instrument/forward_returns@v2``, then v3;
+written by the ingestion ``outcomes`` task) for the start sessions a harness evaluates: one row
+per (instrument, start session S, horizon, benchmark). A window not closed, or not computed, has no
+row: the caller excludes it, never counts it a miss; an ``UNMEASURED`` row (a flagged bar in the
+window, ADR 0061; ``outcome_reason``) has no returns and is excluded the same way. ``as_of`` keeps
+only rows known by then (row by row, not only by run)."""
 
 from collections.abc import Collection, Iterable, Sequence
 from datetime import UTC, date, datetime, time
@@ -16,6 +16,10 @@ from algotrade.data.outcomes.residuals import residual_known, residual_seqs
 from algotrade.storage.tables.readers import StoreReader
 from algotrade.storage.tables.schemas import FORWARD_RETURNS
 
+# The one table every forward-outcome reader reads. v2 (the last-bar return) until the 2010 v3
+# backfill has run and a later PR moves it to ``FORWARD_RETURNS_V3`` (ADR 0087, PR6c): a one-line
+# change, so no reader names a version.
+READ_TABLE = FORWARD_RETURNS
 SEQ_SCALE = 1_000_000  # ``outcome_seqs(residuals=True)``: forward sequence x this + residual's
 OUTCOME_FIELDS = (
     "fwd_return", "fwd_excess_return", "fwd_max_return", "fwd_max_drawdown", "fwd_realised_vol",
@@ -91,7 +95,7 @@ def missing_in(table: str, what: str, task: str, sessions: Sequence[date]) -> Mi
 
 def stored_sessions(reader: StoreReader) -> list[date]:
     """The start sessions with a stored outcome partition, ascending (empty: none stored)."""
-    return list(reader.dates(FORWARD_RETURNS))
+    return list(reader.dates(READ_TABLE))
 
 
 def outcome_seqs(
@@ -105,7 +109,7 @@ def outcome_seqs(
     wanted = sorted(set(sessions))
     if not wanted:
         return {}
-    found = reader.partition_seq(FORWARD_RETURNS, wanted[0], wanted[-1])
+    found = reader.partition_seq(READ_TABLE, wanted[0], wanted[-1])
     own = {d: s for d, s in found.items() if d in set(wanted)}
     if not residuals:
         return own
@@ -130,7 +134,7 @@ def outcome_stamps(
     names: dict[tuple[date, int], set[str]] = {}
     for day in sorted(set(sessions)):
         frame = reader.table_range(
-            FORWARD_RETURNS,
+            READ_TABLE,
             day,
             day,
             as_of,
@@ -170,7 +174,7 @@ def missing_outcomes(sessions: Sequence[date]) -> MissingDataError:
     """The error of start ``sessions`` none of which has a stored outcome."""
     wanted = sorted(set(sessions))
     hint = f"run `algotrade-ingest run outcomes --from ... --to ...` past {wanted[-1]}"
-    return MissingDataError(FORWARD_RETURNS, f"no outcomes for {wanted[0]}..{wanted[-1]}", hint)
+    return MissingDataError(READ_TABLE, f"no outcomes for {wanted[0]}..{wanted[-1]}", hint)
 
 
 def read_stored(
@@ -185,16 +189,16 @@ def read_stored(
     (ADR 0060)."""
     wanted = sorted(set(sessions))
     if as_of is None:
-        return reader.table_range(FORWARD_RETURNS, wanted[0], wanted[-1], as_of, instruments)
-    stored = set(reader.dates(FORWARD_RETURNS))
-    parts = [reader.table(FORWARD_RETURNS, d, as_of) for d in wanted if d in stored]
+        return reader.table_range(READ_TABLE, wanted[0], wanted[-1], as_of, instruments)
+    stored = set(reader.dates(READ_TABLE))
+    parts = [reader.table(READ_TABLE, d, as_of) for d in wanted if d in stored]
     parts = [p for p in parts if p is not None and not p.empty]
     if not parts:
         # the span semantics of the range read: a partition visible in it, wanted or not, means
         # stored but no rows; none visible (all after ``as_of``, or none stored) is "nothing"
         between = sorted(d for d in stored if wanted[0] <= d <= wanted[-1] and d not in set(wanted))
         for d in between:
-            frame = reader.table(FORWARD_RETURNS, d, as_of)
+            frame = reader.table(READ_TABLE, d, as_of)
             if frame is not None and not frame.empty:
                 return pd.DataFrame(columns=[*_KEY, *OUTCOME_FIELDS, "knowledge_ts"])
         return None

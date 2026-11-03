@@ -145,3 +145,22 @@ def test_the_draw_key_ignores_the_option_costs_so_a_seed_never_moves_with_them()
     assert spec.key_for(scope, variant) != cheaper.key_for(scope, variant)  # type: ignore[arg-type]
     share = _Scope("main", edge(), parse_selection(ACTIVE, "active"), "feature.x")
     assert _spec(OptionCosts()).key_for(share, variant) == _spec(None).key_for(share, variant)  # type: ignore[arg-type]
+
+
+def test_the_outcomes_table_joins_the_key_only_when_given() -> None:
+    before = leg_key(**BASE)
+    assert leg_key(**BASE, outcomes_table=None) == before  # v2: today's keys are unchanged
+    assert leg_key(**BASE, outcomes_table="outcomes/instrument/forward_returns@v3") != before
+
+
+def test_the_spec_keys_a_leg_by_the_read_table_only_after_the_flip(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from algotrade.services.evaluation.cross_section import measuring  # noqa: PLC0415
+    from algotrade.storage.tables.schemas import FORWARD_RETURNS_V3  # noqa: PLC0415
+
+    scope = _Scope("main", edge(), parse_selection(ACTIVE, "active"), "feature.x")
+    variant = SimpleNamespace(id="v", hash="h", members=(), config=SimpleNamespace(hash="h"))
+    today = _spec(None).key_for(scope, variant)  # type: ignore[arg-type]
+    monkeypatch.setattr(measuring, "READ_TABLE", FORWARD_RETURNS_V3)
+    assert _spec(None).key_for(scope, variant) != today  # type: ignore[arg-type]

@@ -21,8 +21,19 @@ The path fields run over the bars after S up to the measured end: ``fwd_max_retu
 highs (favourable excursion), ``fwd_max_drawdown`` from the lows (adverse excursion, a positive
 fraction, 0 when no low is below close(S)), ``fwd_realised_vol`` the annualised standard
 deviation of the daily log close returns (null under two returns). ``fwd_excess_return`` is
-``fwd_return`` minus the benchmark's over the same sessions (null without its bars). Pure: no
-storage, no clock.
+``fwd_return`` minus the benchmark's over the same sessions (null without its bars). Max
+return, drawdown and volatility always stop at the last bar.
+
+Delistings (ADR 0087 decision 5): with ``events`` (id -> ``(last_session, delisting_return,
+basis)`` of the delisting snapshot, read at write time) the rows also carry the
+delisting step beside the v2 figures: a DELISTED name whose last bar is the event's
+``last_session``, inside (S, T], gets its ``delisting_return`` and ``delisting_basis``; a DELISTED
+name with no such event is ``NO_EVENT`` (no return, never a silent zero); a COMPLETE name (a bar
+at T) has neither, whatever an event says (``unapplied_delistings`` counts them). The rows are
+the v2 figures; ``v2_view`` and ``v3_view`` give the two tables' columns, ``v3_view`` folding the
+step in: ``fwd_return`` = (1 + last-bar return) x (1 + delisting_return) - 1, the excess moving
+with it, so the zero figure of a row is (1 + fwd) / (1 + delisting_return) - 1. Pure: no storage,
+no clock.
 """
 
 from collections.abc import Collection, Mapping, Sequence
@@ -32,7 +43,7 @@ from datetime import date
 import numpy as np
 import pandas as pd
 
-from algotrade.storage.tables.schemas import UNMEASURED
+from algotrade.storage.tables.schemas import NO_EVENT, UNMEASURED
 
 TRADING_DAYS = 252  # annualises the realised volatility
 BAD_BAR = "BAD_BAR"  # the outcome_reason of an UNMEASURED row (ADR 0061)
@@ -41,6 +52,8 @@ _COLUMNS = (
     "instrument_id", "fwd_return", "fwd_excess_return", "fwd_max_return", "fwd_max_drawdown",
     "fwd_realised_vol", "outcome_status", "outcome_reason",
 )  # fmt: skip
+DELISTING_COLUMNS = ("delisting_return", "delisting_basis")  # the v3 columns, beside the v2 ones
+Events = Mapping[str, Sequence[tuple[date, float, str]]]  # id -> (last_session, return, basis)
 
 
 @dataclass(frozen=True)
@@ -69,13 +82,15 @@ def window_rows(
     benchmark: str | None,
     delisted: Mapping[str, date],
     flagged: Collection[tuple[str, date]] = (),
+    events: Events | None = None,
 ) -> tuple[pd.DataFrame, dict[str, str]]:
     """``bars`` (``instrument_id``, ``session_date``, ``high``, ``low``, ``close``; S..T, adjusted
     as of T) -> (one row per measured name, ``_COLUMNS``; reason per eligible name without one).
     ``eligible``: the universe at S (names without a bar at S are dropped, not reasons);
     ``benchmark``: its instrument id, or None; ``delisted``: id -> delisting date, as the
     latest reference snapshot records it; ``flagged``: the (instrument, session) of the bars
-    dropped as flagged (``SessionBars.flagged``)."""
+    dropped as flagged (``SessionBars.flagged``); ``events``: the delisting events (None: the rows
+    have no ``DELISTING_COLUMNS``)."""
     close, high, low = (wide_closes(bars, window, field) for field in ("close", "high", "low"))
     bad = {i for i, d in flagged if window.start <= d <= window.end and i in eligible}
     unmeasured = sorted(
@@ -92,7 +107,7 @@ def window_rows(
         ]
     )
     if not len(ids):
-        return _unmeasured_rows(unmeasured), {}
+        return _unmeasured_rows(unmeasured, events is not None), {}
     c = close[ids].to_numpy(dtype=float)
     complete = ~np.isnan(c[-1])
     gone = np.array([_gone(delisted.get(i), window) for i in ids])
@@ -116,14 +131,18 @@ def window_rows(
             "outcome_reason": None,
         }
     )
+    if events is not None:
+        step, basis = _delisting_step(ids, window, last, complete, events)
+        rows = rows.assign(delisting_return=step, delisting_basis=basis)
     if unmeasured:
-        rows = pd.concat([rows, _unmeasured_rows(unmeasured)], ignore_index=True)
+        rows = pd.concat([rows, _unmeasured_rows(unmeasured, events is not None)],
+                         ignore_index=True)  # fmt: skip
     return rows, reasons
 
 
-def _unmeasured_rows(ids: Sequence[str]) -> pd.DataFrame:
+def _unmeasured_rows(ids: Sequence[str], delistings: bool = False) -> pd.DataFrame:
     """The UNMEASURED rows of ``ids``: a reason, no return and no path fields."""
-    return pd.DataFrame(
+    frame = pd.DataFrame(
         {
             "instrument_id": list(ids),
             **dict.fromkeys(_COLUMNS[1:6], np.nan),
@@ -132,6 +151,61 @@ def _unmeasured_rows(ids: Sequence[str]) -> pd.DataFrame:
         },
         columns=list(_COLUMNS),
     )
+    if delistings:
+        frame = frame.assign(delisting_return=np.nan, delisting_basis=None)
+    return frame
+
+
+def _delisting_step(
+    ids: np.ndarray, window: Window, last: np.ndarray, complete: np.ndarray, events: Events
+) -> tuple[np.ndarray, np.ndarray]:
+    """Per measured name, its (``delisting_return``, ``delisting_basis``): an event applies only to
+    a DELISTED name whose last bar is the event's ``last_session``, inside (S, T]."""
+    step = np.full(len(ids), np.nan)
+    basis = np.full(len(ids), None, dtype=object)
+    for j, i in enumerate(ids):
+        if complete[j]:
+            continue
+        basis[j] = NO_EVENT
+        ended = window.sessions[last[j]]
+        for day, value, kind in events.get(str(i), ()):
+            if window.start < day <= window.end and day == ended:
+                step[j], basis[j] = value, kind
+    return step, basis
+
+
+def unapplied_delistings(rows: pd.DataFrame, window: Window, events: Events) -> int:
+    """The names whose delisting event disagrees with their bars, counted in the run's stats: a bar
+    at T while the event's last session is before T (a name that came back, or a wrong date), and
+    a DELISTED row whose last bar is not the event's last session in (S, T] (``NO_EVENT``). A
+    window ending on the event's own last session is COMPLETE and right: not counted."""
+    count = 0
+    for iid, status, basis in zip(
+        rows["instrument_id"].astype(str), rows["outcome_status"], rows["delisting_basis"],
+        strict=True,
+    ):  # fmt: skip
+        days = [d for d, _, _ in events.get(iid, ()) if window.start < d <= window.end]
+        if status == "COMPLETE":
+            count += any(d < window.end for d in days)
+        elif status == "DELISTED" and basis == NO_EVENT:
+            count += bool(days)
+    return count
+
+
+def v2_view(rows: pd.DataFrame) -> pd.DataFrame:
+    """``forward_returns@v2``'s columns: the last-bar figures, no delisting step."""
+    return rows.drop(columns=list(DELISTING_COLUMNS), errors="ignore")
+
+
+def v3_view(rows: pd.DataFrame) -> pd.DataFrame:
+    """``forward_returns@v3``'s rows: the delisting return folded into ``fwd_return`` and
+    ``fwd_excess_return`` where an event applied, every other figure as in v2."""
+    step = rows["delisting_return"]
+    hit = (step.notna() & (step != 0)).to_numpy()
+    fwd = np.where(hit, (1 + rows["fwd_return"]) * (1 + step) - 1, rows["fwd_return"])
+    excess = np.where(hit, rows["fwd_excess_return"] + (fwd - rows["fwd_return"]),
+                      rows["fwd_excess_return"])  # fmt: skip
+    return rows.assign(fwd_return=fwd, fwd_excess_return=excess)
 
 
 def wide_closes(bars: pd.DataFrame, window: Window, field: str) -> pd.DataFrame:

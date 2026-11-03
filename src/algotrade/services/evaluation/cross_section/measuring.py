@@ -31,6 +31,7 @@ from algotrade.data.outcomes import (
     read_residuals,
     reads_of,
 )
+from algotrade.data.outcomes.reading import READ_TABLE
 from algotrade.engines.screening.gate import OPEN
 from algotrade.features.framework.feature import strictest
 from algotrade.services.evaluation.cross_section.baselines.variant import (
@@ -92,6 +93,7 @@ from algotrade.services.evaluation.portfolio_level.ordered import in_order
 from algotrade.services.evaluation.portfolio_level.trades import trades_of
 from algotrade.services.evaluation.portfolio_level.walk import Book
 from algotrade.services.evaluation.training.bound import scored_identity
+from algotrade.storage.tables.schemas import FORWARD_RETURNS
 
 CHUNK_SESSIONS = 20  # decision sessions screened and measured before the frames are dropped
 
@@ -226,6 +228,7 @@ class _RandomSpec:
             scope.edge.outcome.hold_rank,
             leg_version,
             asdict(self.option_costs) if priced and self.option_costs else None,
+            None if READ_TABLE == FORWARD_RETURNS else READ_TABLE,  # a flip to v3 is a new leg
         )
         return key
 

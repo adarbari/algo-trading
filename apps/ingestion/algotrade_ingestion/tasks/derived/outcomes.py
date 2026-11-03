@@ -1,5 +1,16 @@
 """The ``outcomes`` task (ADR 0053 decision 3): write every forward-outcome window a session
-closes to ``outcomes/instrument/forward_returns@v2``, the grain only the edge harness reads.
+closes to ``outcomes/instrument/forward_returns@v2`` and ``@v3``, the grain only the edge harness
+reads. v2 is the last-bar return, its meaning unchanged; v3 (ADR 0087 decision 5) is the same
+window with the delisting return of the delisting snapshot folded into a DELISTED row
+(``delisting_return``, ``delisting_basis``). Every run writes both, the nightly and a
+``--from/--to`` backfill alike (a backfill of v3 alone left every v2 reader, the golden edge
+included, with no outcomes for the backfilled sessions), and the readers keep v2
+(``data.outcomes.reading.READ_TABLE``) until a later PR moves them. The delistings are read from
+the latest snapshot at WRITE time, never as of S or T, whatever their ``known_from`` (the label
+reads the future of S, 0053's one exception); a row is rewritten when a later snapshot changes it
+(``changed_rows``). The run's stats count ``delisting_conflicts`` (an event whose last session is
+not the date another source gives) and ``delisting_mismatch`` (events in a window that no row
+applied).
 
 For a window-end session T and each horizon h, S is the h-th exchange session before T; the
 rows are the names in the universe at S with a bar at S, measured from S's close to T's
@@ -42,6 +53,7 @@ bound with no suspect bar (a real squeeze) is a WARN naming the names.
 
 from collections.abc import Iterator, Sequence
 from datetime import date
+from typing import Any
 
 import pandas as pd
 
@@ -54,13 +66,21 @@ from algotrade.config.site.settings import SourcesSettings
 from algotrade.core.model.errors import MissingDataError
 from algotrade.core.time.calendar import close_time, next_session, sessions_between, sessions_ending
 from algotrade.data import StoreReader
+from algotrade.data.listings.delistings import read_delistings
 from algotrade.data.listings.universe import delisted_by, universe_asof
 from algotrade.data.prices import SessionBars, bars_with_flags, session_bars
 from algotrade.data.reference import instruments, load_universe
 from algotrade.storage.configs.files import FileConfigStore
 from algotrade.storage.runs import RunRecord, RunStatus
-from algotrade.storage.tables.schemas import FORWARD_RETURNS
-from algotrade_ingestion.tasks.derived.outcome_paths import Window, window_rows
+from algotrade.storage.tables.schemas import FORWARD_RETURNS, FORWARD_RETURNS_V3
+from algotrade_ingestion.tasks.derived.outcome_paths import (
+    Events,
+    Window,
+    unapplied_delistings,
+    v2_view,
+    v3_view,
+    window_rows,
+)
 from algotrade_ingestion.tasks.framework.run import IngestRun, TaskContext
 from algotrade_ingestion.tasks.maintenance.bar_quality import suspect_instruments
 from algotrade_ingestion.tasks.maintenance.quality import Check
@@ -68,7 +88,8 @@ from algotrade_ingestion.tasks.maintenance.quality import Check
 TASK = "outcomes"
 SOURCE = "outcomes"
 TABLE = FORWARD_RETURNS
-TABLES = (TABLE,)
+TABLE_V3 = FORWARD_RETURNS_V3
+TABLES = (TABLE, TABLE_V3)
 DEFAULT_HORIZON = 20  # sessions: the harness default (ADR 0053), always computed
 DEFAULT_BENCHMARK = "SPY"
 CHUNK = 40  # window ends whose bars are read at once in a backfill
@@ -113,12 +134,23 @@ def compute_outcomes(
     horizons, benchmarks = horizons_and_benchmarks(ctx.configs)
     nightly = start is None
     gone, listed, first = scope_of(ctx.reader, ends[-1])
+    events, snapshot = delisting_events(ctx.reader)
     record: RunRecord | None = None
     for i in range(0, len(ends), CHUNK):
         chunk = ends[i : i + CHUNK]
         panel = read_panel(ctx, chunk, horizons, nightly, first)
         for t in chunk:
-            record = _one(ctx, t, horizons, benchmarks, first, panel, gone, listed, nightly)
+            record = _one(
+                ctx,
+                t,
+                horizons,
+                benchmarks,
+                first,
+                panel,
+                (gone, listed),
+                (events, snapshot),
+                nightly,
+            )
     assert record is not None
     return record
 
@@ -131,6 +163,52 @@ def scope_of(reader: StoreReader, last: date) -> tuple[dict[str, date], dict[str
         delisted_stamps(reader, last),
         listing_delisted(reader, last),
         stored[0] if stored else last,
+    )
+
+
+def delisting_events(reader: StoreReader) -> tuple[Events, date | None]:
+    """Instrument id -> ``(last_session, delisting_return, terminal_basis)`` of every row of the
+    latest delisting snapshot (``read_delistings``), and that snapshot's date (None: none stored).
+    Read at write time, never as of a window's S or T and whatever ``known_from`` says."""
+    try:
+        frame, day = read_delistings(reader)
+    except MissingDataError:
+        return {}, None
+    events: dict[str, list[tuple[date, float, str]]] = {}
+    frame = frame.sort_values(["instrument_id", "last_session"])
+    for iid, last, value, basis in zip(
+        frame["instrument_id"].astype(str),
+        pd.to_datetime(frame["last_session"]).dt.date,
+        frame["delisting_return"].astype(float),
+        frame["terminal_basis"].astype(str),
+        strict=True,
+    ):
+        events.setdefault(iid, []).append((last, value, basis))
+    return events, day
+
+
+def with_events(left: dict[str, date], events: Events, end: date) -> dict[str, date]:
+    """``left`` plus the names an event says left on or before ``end`` (its latest such last
+    session; a name another source already dates keeps that date): the departures of v3 only, v2
+    never counts a name only an event marks."""
+    out = dict(left)
+    for i, rows in events.items():
+        days = [d for d, _, _ in rows if d <= end]
+        if days and i not in out:
+            out[i] = max(days)
+    return out
+
+
+def event_conflicts(listed: dict[str, date], events: Events, end: date) -> int:
+    """The names whose event last session is not the listing history's last trading day (both on
+    or before ``end``). The reference's delisting date is stamped after the last bar, so it is
+    not compared."""
+    return sum(
+        1
+        for i, day in listed.items()
+        if day <= end
+        and (days := [d for d, _, _ in events.get(i, ()) if d <= end])
+        and day not in days
     )
 
 
@@ -178,39 +256,71 @@ def _one(
     benchmarks: Sequence[str],
     first: date,
     panel: SessionBars,
-    gone: dict[str, date],
-    listed: dict[str, date],
+    others: tuple[dict[str, date], dict[str, date]],
+    delistings: tuple[Events, date | None],
     nightly: bool,
 ) -> RunRecord:
-    left = left_by(end, gone, listed)
+    events, snapshot = delistings
+    left = left_by(end, *others)
+    left_v3 = with_events(left, events, end)
+    conflicts = event_conflicts(others[1], events, end)
+    mismatch = 0
+    tables = TABLES  # a backfill writes v2 too: the readers read v2 until PR6c
     with IngestRun(ctx, TASK, end) as run:
         for h, window in windows(run, end, horizons, first, nightly):
             names, pre_snapshot = universe_ids(run.reader, window.start, not nightly)
             resolver = run.resolver(window.start)
-            frames, reasons, eligible = [], {}, 0
+            frames, frames_v2, reasons, eligible, n_v2 = [], [], {}, 0, (0, 0)
             prices = panel.window(window.start, end)
             for ticker in benchmarks:
                 bench = resolver.id_for(ticker) if resolver.knows(ticker) else None
-                rows, why = window_rows(prices, window, names, bench, left, panel.flagged)
+                rows, why = window_rows(
+                    prices, window, names, bench, left_v3, panel.flagged, events
+                )
                 frames.append(rows.assign(benchmark=ticker))
                 reasons, eligible = why, len(rows) + len(why)
-            out = pd.concat(frames, ignore_index=True)
-            out = out.assign(
-                ts=close_time(window.start), horizon_sessions=h, window_end=end
-            ).sort_values(["instrument_id", "benchmark"], kind="stable")
-            fresh = out if not nightly else changed_rows(run.reader.table(TABLE, window.start), out)
-            if len(fresh):
-                run.write(TABLE, fresh.reset_index(drop=True), SOURCE, session=window.start)
+                # v2: the departures the reference and listing history note only
+                old, why_v2 = window_rows(prices, window, names, bench, left, panel.flagged)
+                frames_v2.append(old.assign(benchmark=ticker))
+                n_v2 = (len(old), len(why_v2))
+                if ticker == benchmarks[0]:
+                    mismatch += unapplied_delistings(rows, window, events)
+            order = ["instrument_id", "benchmark"]
+            stamp: dict[str, Any] = {
+                "ts": close_time(window.start),
+                "horizon_sessions": h,
+                "window_end": end,
+            }
+            out = pd.concat(frames, ignore_index=True).assign(**stamp)
+            out = out.sort_values(order, kind="stable")
+            v2 = pd.concat(frames_v2, ignore_index=True).assign(**stamp) if frames_v2 else out
+            v2 = v2.sort_values(order, kind="stable")
+            written = 0
+            for table in tables:
+                shown = v3_view(out) if table == TABLE_V3 else v2_view(v2)
+                fresh = (
+                    shown
+                    if not nightly
+                    else changed_rows(run.reader.table(table, window.start), shown)
+                )
+                if len(fresh):
+                    run.write(table, fresh.reset_index(drop=True), SOURCE, session=window.start)
+                written += len(fresh)
             run.record_item(f"h{h}", f"OK: {len(out)} rows")
             run.stats[f"h{h}"] = {
                 "start": window.start.isoformat(),
                 "eligible": eligible,
                 "rows": len(out) // max(len(benchmarks), 1),  # computed, not written
-                "written": len(fresh),
+                "written": written,  # rows over the tables written
                 "reasons": len(reasons),
+                "v2": list(n_v2),  # (rows per benchmark, reasons) of forward_returns@v2
                 "examples": dict(sorted(reasons.items())[:SHOWN]),
                 "pre_snapshot": pre_snapshot,  # survivors only: no snapshot, no listing history
             }
+        run.stats["tables"] = list(tables)
+        run.stats["delisting_snapshot"] = snapshot.isoformat() if snapshot else None
+        run.stats["delisting_conflicts"] = conflicts
+        run.stats["delisting_mismatch"] = mismatch
     return run.record
 
 
@@ -303,21 +413,30 @@ def check_outcomes(reader: StoreReader, session: date, s: SourcesSettings) -> li
         if not (key.startswith("h") and isinstance(value, dict)):
             continue
         start = date.fromisoformat(value["start"])
-        unaccounted = len(eligible_at(reader, start)) - value["rows"] - value["reasons"]
-        stored = reader.table(TABLE, start)
+        eligible = len(eligible_at(reader, start))
         horizon = int(key[1:])
-        ours = (
-            None
-            if stored is None
-            else stored[
-                (pd.to_datetime(stored["window_end"]).dt.date == session)
-                & (stored["horizon_sessions"] == horizon)
-            ]
-        )
-        mine = set() if ours is None else set(ours["instrument_id"].astype(str))
-        if unaccounted or len(mine) != value["rows"]:
-            problems.append(f"{key}: {unaccounted} names without a row or a reason, "
-                            f"{len(mine)} of {value['rows']} rows stored")  # fmt: skip
+        missing = 0
+        for table in runs[-1].stats.get("tables", [TABLE]):
+            rows, reasons = value["v2"] if table == TABLE and "v2" in value else (
+                value["rows"], value["reasons"]
+            )  # fmt: skip
+            unaccounted = eligible - rows - reasons
+            stored = reader.table(table, start)
+            ours = (
+                None
+                if stored is None
+                else stored[
+                    (pd.to_datetime(stored["window_end"]).dt.date == session)
+                    & (stored["horizon_sessions"] == horizon)
+                ]
+            )
+            mine = set() if ours is None else set(ours["instrument_id"].astype(str))
+            name = table.rsplit("/", 1)[-1]
+            missing = missing or unaccounted  # nonzero either way: a count that does not add up
+            if len(mine) != rows:
+                problems.append(f"{key} {name}: {len(mine)} of {rows} rows stored")
+        if missing:
+            problems.append(f"{key}: {missing} names without a row or a reason")
         if ours is not None and horizon <= BOUNDED_HORIZON:
             huge = ours[
                 (ours["outcome_status"] == "COMPLETE") & (ours["fwd_return"] > s.max_bounded_return)

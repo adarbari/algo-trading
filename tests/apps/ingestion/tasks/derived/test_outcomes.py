@@ -25,6 +25,7 @@ from algotrade_ingestion.tasks.derived.outcomes import (
     DEFAULT_HORIZON,
     RECHECK,
     TABLE,
+    TABLE_V3,
     check_outcomes,
     compute_outcomes,
     horizons_and_benchmarks,
@@ -47,29 +48,39 @@ N = 70  # sessions of bars: room for the 60-session horizon
 IDS = {"A": "EQ:A", "B": "EQ:B", "D": "EQ:D", "SPY": SPY}
 
 
-def _reference(delisted: date | None) -> list[dict[str, object]]:
+def _reference(delisted: date | None, event_only: bool = False) -> list[dict[str, object]]:
     return [
         {"instrument_id": iid, "symbol": symbol, "asset_class": "EQ",
          "security_type": "COMMON_STOCK", "multiplier": 1.0, "status": "ACTIVE",
          "delisted_on": delisted if symbol == "D" else None}
-        for symbol, iid in IDS.items()
+        for symbol, iid in ({**IDS, "E": "EQ:E"} if event_only else IDS).items()
     ]  # fmt: skip
 
 
-def _store(a: list[float] | None = None) -> tuple[StoreWriter, StoreReader, list[date]]:
+def _store(
+    a: list[float] | None = None, event_only: bool = False
+) -> tuple[StoreWriter, StoreReader, list[date]]:
+    """``event_only``: also EQ:E, a name whose bars stop six sessions before END and that no
+    reference stamp or listing history marks delisted (only a delisting event can)."""
     writer, reader = store()
     closes = {"EQ:A": a or series(N), "EQ:B": series(N, seed=2), SPY: series(N, seed=3),
               "EQ:D": series(N - 3, seed=4)}  # fmt: skip
+    skip = {"EQ:D": [N - 3, N - 2, N - 1]}
+    if event_only:
+        closes["EQ:E"] = series(N - 3, seed=5)
+        skip["EQ:E"] = [N - 5, N - 4, N - 3, N - 2, N - 1]
     # D's bars start three sessions in and stop four before END (skip: indexes from day 0)
-    days = write_bars(writer, closes, skip={"EQ:D": [N - 3, N - 2, N - 1]})
-    write_rows(writer, "instruments/reference", days[0], _reference(days[-2]))
+    days = write_bars(writer, closes, skip=skip)
+    write_rows(writer, "instruments/reference", days[0], _reference(days[-2], event_only))
     rows = universe_rows(["A", "B", "D"]) + universe_rows(["SPY"], instrument_id=SPY)
+    if event_only:
+        rows += universe_rows(["E"])
     write_rows(writer, "universe", days[0], rows)
     return writer, reader, days
 
 
-def _outcomes(reader: StoreReader) -> pd.DataFrame:
-    parts = [reader.table(TABLE, d) for d in reader.dates(TABLE)]
+def _outcomes(reader: StoreReader, table: str = TABLE) -> pd.DataFrame:
+    parts = [reader.table(table, d) for d in reader.dates(table)]
     frame = pd.concat([p for p in parts if p is not None], ignore_index=True)
     keys = ["session_date", "horizon_sessions", "benchmark", "instrument_id"]
     return frame.drop(columns=["run_id", "knowledge_ts"]).sort_values(keys).reset_index(drop=True)
@@ -107,7 +118,10 @@ def test_backfill_rows_equal_nightly_rows() -> None:
     backfill_writer, backfill_reader, _ = _store()
     first = days[-3 - RECHECK]  # each night also recomputes the RECHECK window ends before it
     compute_outcomes(task_ctx(backfill_writer), days[-1], first, days[-1])
-    pd.testing.assert_frame_equal(_outcomes(nightly_reader), _outcomes(backfill_reader))
+    for table in (TABLE, TABLE_V3):  # a backfill writes v2 too: the readers read v2 until PR6c
+        pd.testing.assert_frame_equal(
+            _outcomes(nightly_reader, table), _outcomes(backfill_reader, table)
+        )
     assert len(backfill_reader.runs("outcomes")) == 3 + RECHECK  # one run per window end
 
 
@@ -335,7 +349,8 @@ def test_a_delisting_writes_exactly_the_changed_rows(monkeypatch: pytest.MonkeyP
     written = pd.concat(seen)
     assert len(written) and set(written["instrument_id"]) == {"EQ:D"}
     assert set(written["outcome_status"]) == {"DELISTED"}
-    assert len(written) == len(written.drop_duplicates(["horizon_sessions", "window_end"]))
+    # each changed row once per table (v2 and v3), none twice
+    assert len(written) == 2 * len(written.drop_duplicates(["horizon_sessions", "window_end"]))
 
 
 def test_changed_rows_writes_new_keys_and_value_changes_only() -> None:

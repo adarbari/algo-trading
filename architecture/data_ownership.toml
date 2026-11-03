@@ -56,6 +56,7 @@ owner = ["src/algotrade/data/listings/delistings.py"]
 allowed = [
     "apps/ingestion/algotrade_ingestion/tasks/listings/delistings.py",  # the writer: the table's name, vocabulary and convention
     "apps/ingestion/algotrade_ingestion/tasks/listings/delisting_reason.py",  # the reasons it assigns
+    "apps/ingestion/algotrade_ingestion/tasks/derived/outcomes.py",  # the outcome label: the delisting return of forward_returns@v3, the latest snapshot at write time (decision 5)
 ]
 section = "docs/adr/0087-survivorship-free-listing-history.md#decision"
 detect = [{ call = "read_delistings" }, { call = "convention" }]

@@ -60,7 +60,10 @@ def test_compaction_lists_only_merge_tables_without_a_history_copy() -> None:
     # a snapshot table keeps one run, so there is nothing to merge
     nightly = load_nightly(FileConfigStore(REPO_ROOT / "config", local=False))
     copied = nightly.history_copy
-    assert nightly.compaction.tables == ("outcomes/instrument/forward_returns@v2",)
+    assert nightly.compaction.tables == (
+        "outcomes/instrument/forward_returns@v2",
+        "outcomes/instrument/forward_returns@v3",
+    )
     for table in nightly.compaction.tables:
         assert spec_for(table).runs == "merge", f"{table} is not a merge-mode table"
         assert table not in copied.instrument_tables, f"{table} has a history copy declared"
