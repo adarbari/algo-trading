@@ -19,6 +19,13 @@ count and date fields (an 8-K item) or a ``field`` that must read ``value`` (an 
 for a class whose fields are all per subtype, is a ``ConfigurationError``; a name whose count
 is at the target but whose subtype field is another value is no event of this subtype (not
 UNKNOWN), one with no value there is UNKNOWN (``NO_EVENT_ROW``).
+
+**Projection** (F10b): an announced-ahead class may move its anchor per name by a whole number
+of sessions read at D (``Projection``): ``earnings_reaction_expected`` is the expected report's
+reaction session, the report session for a before-open report and the next for an after-close
+one, from the report time stored at D for that same date. A name whose time is unknown (or
+stored for another date) is UNKNOWN (``TIME_UNKNOWN``) on the one decision session its
+earliest shift reaches, never guessed; a time revised after D cannot change D's read.
 """
 
 from collections import Counter
@@ -40,6 +47,10 @@ ETF_CATEGORY = "rollup.etf_launches@v1.etf_category"
 DEDUPE_SESSIONS = 40  # one report per name in this many sessions
 NO_EVENT_ROW = "no_event_row"  # eligible at D, but the event field has no value for the name
 NOT_KNOWN_AT_D = "event_not_known_at_decision"  # the field's event date is after D
+TIME_UNKNOWN = "event_time_unknown"  # a projection's label is null, unusable or for another date
+# The classes anchored on an expected report, whose runs carry the report-containment
+# diagnostic (``harness``: how many trades really held the report).
+REPORT_ANCHORED = ("earnings_expected", "earnings_reaction_expected")
 
 
 class EventDayMissingError(MissingDataError):
@@ -63,12 +74,24 @@ class Subtype:
 
 
 @dataclass(frozen=True)
+class Projection:
+    """Moves a class's anchor by ``shifts[label]`` sessions per name: ``field`` is the label read
+    at D, ``date`` the date that label is for (it must equal the class's own event date, so a
+    label of another event is never used). Any other label is UNKNOWN (module doc)."""
+
+    field: str
+    date: str
+    shifts: Mapping[str, int]
+
+
+@dataclass(frozen=True)
 class EventField:
     """Where one event class is read: ``count`` (the field whose value says how far D is from
     the anchor, scaled by ``sign``), ``date`` (the event's date), and whether the event is
     announced ahead (its date may be after D; otherwise it must be on or before D).
     ``subtypes``: the class's subtypes (module doc); ``where``: the (field, value) a resolved
-    subtype requires. An empty ``count`` means every field is per subtype."""
+    subtype requires; ``projection``: the per-name anchor shift, if any. An empty ``count`` means
+    every field is per subtype."""
 
     count: str
     date: str
@@ -76,13 +99,20 @@ class EventField:
     announced_ahead: bool
     subtypes: Mapping[str, Subtype] = field(default_factory=dict)
     where: tuple[str, str] | None = None
+    projection: Projection | None = None
 
     def target(self, offset: int) -> int:
         return self.sign * (offset - 1)
 
     def fields(self) -> tuple[str, ...]:
         """The field names one read of this (resolved) class needs."""
-        return (self.count, self.date, *(self.where[:1] if self.where else ()))
+        p = self.projection
+        return (
+            self.count,
+            self.date,
+            *(self.where[:1] if self.where else ()),
+            *((p.field, p.date) if p else ()),
+        )
 
 
 EVENT_FIELDS: Mapping[str, EventField] = {
@@ -103,6 +133,17 @@ EVENT_FIELDS: Mapping[str, EventField] = {
         "rollup.earnings_expected@v1.expected_report_date",
         sign=-1,
         announced_ahead=True,
+    ),
+    "earnings_reaction_expected": EventField(
+        "rollup.earnings_expected@v1.sessions_to_expected_report",
+        "rollup.earnings_expected@v1.expected_report_date",
+        sign=-1,
+        announced_ahead=True,
+        projection=Projection(
+            "rollup.earnings@v1.earnings_time",
+            "rollup.earnings@v1.next_earnings_date",
+            {"pre": 0, "post": 1},  # earnings@v1 reads ``intraday`` as unknown: never projected
+        ),
     ),
     "index_change": EventField(
         "rollup.index_changes@v1.sessions_since_index_change",
@@ -259,15 +300,15 @@ def read_events_for(
             view, _ = fields_view(reader, spec.fields(), day, historical=True, held=HARNESS_ALL)
         except MissingDataError as error:
             raise EventDayMissingError(error, day) from error
-        reads = {i: _read(view.get(i, spec.count), view.get(i, spec.date)) for i in view}
-        if not any(count == target for count, _ in reads.values()):
+        reads = {i: _counts(spec, view, i) for i in view}
+        if not any(counts and target in counts for counts, _, _ in reads.values()):
             continue
         for key, eligible in eligible_of.items():
             reasons: Counter[str] = Counter()
             known: set[str] = set()
             for i in sorted(eligible(day)):
-                count, when = reads.get(i, (None, None))
-                verdict = _verdict(spec, count, when, target, day, _label(view, i, spec))
+                counts, when, blocked = reads.get(i, (None, None, ""))
+                verdict = _verdict(spec, counts, when, target, day, _label(view, i, spec), blocked)
                 if verdict == KNOWN:
                     known.add(i)
                 elif verdict:
@@ -294,20 +335,23 @@ def _label(view: Any, instrument: str, spec: EventField) -> object:
 
 def _verdict(
     spec: EventField,
-    count: int | None,
+    counts: frozenset[int] | None,
     when: date | None,
     target: int,
     day: date,
     label: object,
+    blocked: str = "",
 ) -> str:
     """``KNOWN``, the UNKNOWN reason of a name with a row that cannot say, or "" (no event of
-    this class and subtype: another count, another subtype)."""
-    if count is None:
+    this class and subtype: another count, another subtype). ``counts``: the values the name's
+    count may read (one, unless a projection's label is unknown); ``blocked``: why it cannot say
+    which."""
+    if counts is None:
         return NO_EVENT_ROW
-    if count != target:
+    if target not in counts:
         return ""
-    if spec.where and label is None:
-        return NO_EVENT_ROW
+    if blocked or (spec.where and label is None):
+        return blocked or NO_EVENT_ROW
     if spec.where and label != spec.where[1]:
         return ""
     if not spec.announced_ahead and (when is None or when > day):
@@ -315,7 +359,30 @@ def _verdict(
     return KNOWN
 
 
+def _counts(
+    spec: EventField, view: Any, instrument: str
+) -> tuple[frozenset[int] | None, date | None, str]:
+    """The counts ``instrument`` may read at D (None: no value), its event date and, when a
+    projection's label is unusable, ``TIME_UNKNOWN`` with the earliest shift's count."""
+    count, when = _read(view.get(instrument, spec.count), view.get(instrument, spec.date))
+    p = spec.projection
+    if count is None or p is None:
+        return (None if count is None else frozenset({count})), when, ""
+    label = view.get(instrument, p.field)
+    shift = p.shifts.get(label) if isinstance(label, str) else None
+    if shift is not None and when is not None and _date(view.get(instrument, p.date)) == when:
+        return frozenset({count - spec.sign * shift}), when, ""
+    # Unknown: counted once, on the session the earliest shift would reach (the next session's
+    # count reaches a later shift for the same report, and UNKNOWN names are not deduplicated).
+    return frozenset({count - spec.sign * min(p.shifts.values())}), when, TIME_UNKNOWN
+
+
 def _read(count: object, when: object) -> tuple[int | None, date | None]:
     """The count field as an int and the date field as a date (None when not stored)."""
     number = int(count) if isinstance(count, (int, float)) and not isinstance(count, bool) else None
-    return number, date.fromisoformat(when[:10]) if isinstance(when, str) else None
+    return number, _date(when)
+
+
+def _date(value: object) -> date | None:
+    """A stored date field as a date (None when not stored)."""
+    return date.fromisoformat(value[:10]) if isinstance(value, str) else None

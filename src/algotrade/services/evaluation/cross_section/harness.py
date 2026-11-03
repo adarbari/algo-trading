@@ -86,6 +86,7 @@ from algotrade.services.evaluation.cross_section.detail.windows import (
     series_facts,
     unit_of,
 )
+from algotrade.services.evaluation.cross_section.events import REPORT_ANCHORED
 from algotrade.services.evaluation.cross_section.hit import (
     IMPLIED_VOL_FIELD,
     is_return,
@@ -390,7 +391,7 @@ def evaluate_edge(
             horizon, sum(all(leg.entry not in closed for leg in b) for b in plan.blocks)
         )
         diagnostic = None
-        if scope.edge.event_class == "earnings_expected":
+        if scope.edge.event_class in REPORT_ANCHORED:
             reports = reports_after(reader, as_of) if reports is None else reports
             diagnostic = containment(
                 [
@@ -730,5 +731,5 @@ def residual_plans(plans: Sequence[_Plan]) -> bool:
 
 def _earnings_horizons(plans: Sequence[_Plan]) -> frozenset[int]:
     """The horizons of the plans whose report diagnostic needs the names with an outcome row
-    (``earnings_expected``): the only ones whose names an incremental run reads."""
-    return frozenset(p.horizon for p in plans if p.scope.edge.event_class == "earnings_expected")
+    (``REPORT_ANCHORED``): the only ones whose names an incremental run reads."""
+    return frozenset(p.horizon for p in plans if p.scope.edge.event_class in REPORT_ANCHORED)

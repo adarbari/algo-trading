@@ -24,6 +24,10 @@ EVENT_CLASSES: Mapping[str, str] = {
     "after-hours one",
     "earnings_expected": "a next report expected, scheduled or from the year-ago report "
     "(earnings_expected@v1); anchor: the expected report date's session",
+    "earnings_reaction_expected": "the reaction session of a next report expected from a date "
+    "and time of day known at D (earnings_expected@v1, earnings@v1.earnings_time; F10b, opt-in): "
+    "the report's own session for a before-open report, the next for an after-close one, an "
+    "unknown time skipped and counted; anchor: that projected session; may be entered ahead of it",
     "index_change": "an S&P 500 membership change (index_changes@v1); anchor: the session it is "
     "first stored (never the announcement)",
     "filing_8k": "an 8-K carrying one Item (filing_events@v1); needs the item as its subtype; "
