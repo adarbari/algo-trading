@@ -11,7 +11,8 @@ idempotent: an edge that already has rows for the session is not signalled again
 trade is not open any more, so a re-run writes the same rows. An edge's record starts on the first
 night this job sees it recording (``_since``), never backfilled to when its status changed; a due
 signal that could not be made is listed in the run record's ``skipped`` with its reason (never as
-an empty record), and a session between two nights that nobody signalled in ``missed``. A settled
+an empty record), a setup gate that closed a due signal as ``no_picks`` with the gate's reason,
+and a session between two nights that nobody signalled in ``missed``. A settled
 trade also carries the trade contract's ``exit_kind``, ``return_on_capital`` and ``price_source``
 (ADR 0088, 2.5a; null while open, skipped and in older rows); ``return`` keeps its meaning."""
 
@@ -151,6 +152,7 @@ def _signals(
     session: date,
     user_id: str,
     since: dict[str, date],
+    now: datetime,
 ) -> tuple[list[dict[str, Any]], dict[str, int], list[dict[str, str]], dict[str, dict[str, str]]]:
     tonight: dict[str, dict[str, str]] = {}
     rows: list[dict[str, Any]] = []
@@ -162,7 +164,9 @@ def _signals(
             tonight[edge.id] = {"state": SIGNALLED, "reason": ""}
             continue
         try:
-            found = edge_signals(reader, configs, user, edge, since.get(edge.id, session), session)
+            found = edge_signals(
+                reader, configs, user, edge, since.get(edge.id, session), session, now
+            )
         except ConfigurationError as error:
             skipped.append({"edge": edge.id, "reason": str(error)})
             tonight[edge.id] = {"state": SKIPPED_TONIGHT, "reason": str(error)}
@@ -172,8 +176,8 @@ def _signals(
             tonight[edge.id] = {"state": SKIPPED_TONIGHT, "reason": found.skipped}
         elif found.signals:
             tonight[edge.id] = {"state": SIGNALLED, "reason": ""}
-        elif found.screener is not None:
-            tonight[edge.id] = {"state": NO_PICKS, "reason": ""}
+        elif found.screener is not None:  # a closed setup gate is no picks, with its reason
+            tonight[edge.id] = {"state": NO_PICKS, "reason": found.closed or ""}
         else:
             tonight[edge.id] = {"state": NOT_DUE, "reason": ""}
         for s in found.signals:
@@ -280,7 +284,7 @@ def run_night(
     nights = _nights(writer, user, session)
     since = _since(nights)
     signals, signalled, skipped, tonight = _signals(
-        reader, configs, user, recording, book, session, user_id, since
+        reader, configs, user, recording, book, session, user_id, since, now
     )
     rows = [*settled, *signals]
     record = start_run(job_name(user_id), session, now)

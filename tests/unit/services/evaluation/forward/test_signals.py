@@ -158,10 +158,10 @@ def test_the_gate_is_by_status_and_by_whose_edge_it_is() -> None:
     assert records_paper("live", site=False) and records_paper("evidenced", site=False)
 
 
-def test_a_gated_edge_is_not_paper_traded_until_the_record_applies_its_gate() -> None:
+def test_a_gated_edge_is_paper_traded_the_record_applies_its_gate() -> None:
+    """E9: the gate is read at the signal session (``test_gate.py``), never a refusal."""
     gate = {"all": [{"field": "market.regime@v3.label", "op": "not_in", "value": ["STRESS"]}]}
-    why = not_possible(edge(gate=gate))
-    assert why is not None and "gate" in why
+    assert not_possible(edge(gate=gate)) is None
 
 
 def test_an_entry_condition_or_case_values_are_never_paper_traded_until_applied() -> None:
