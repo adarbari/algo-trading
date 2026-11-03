@@ -17,12 +17,12 @@ universe = "liquid_optionable_floored"
 top_k = 20
 screeners = []
 baselines = ["vrp_iv_hv"]
-status = "blocked"
+status = "retired"
 plain_reason = "Needs years of option-chain history to compare short and long implied volatility; we have only about two weeks."
 mechanism_kind = "paid_for_risk"
 frozen_from = 2026-04-01
 holdout_from = 2026-10-26  # ADR 0088 d15: the first session of the unseen holdout (the latest of its gates' and thresholds'); no verdict until closed trades from it reach 3 months
-rejection_reason = """The slope has no history. The long end (term_ratio_30_90, the iv_90d of iv_term@v1)
+rejection_reason = """Retired 2026-11-03 (ADR 0088, build row X6): re-filed as c13_term_slope_straddle_buy, the position on stored chain rows (option_pnl), blocked there until the bought option history is imported. This version's modelled P&L stays on file with its runs and trials. Its own earlier reason, kept: The slope has no history. The long end (term_ratio_30_90, the iv_90d of iv_term@v1)
 is computed from option chains, which are stored from 2026-10-02 only, about two weeks of sessions;
 IBKR's stored history (502 sessions) is the 30-day volatility alone, with no 6-month or 1-year
 point. The bar asks 40 independent sessions: month-end windows need about three years of chains. Unblock

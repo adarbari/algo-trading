@@ -34,7 +34,7 @@ def test_every_shipped_template_parses() -> None:
     templates = load_templates(SHIPPED)
     assert {
         "long_shares", "short_shares", "short_put", "put_spread", "covered_call",
-        "short_straddle", "iron_fly",
+        "short_straddle", "iron_fly", "long_straddle",
     } <= set(templates)  # fmt: skip
     assert templates["covered_call"].has_option and templates["long_shares"].share_only
     assert templates["put_spread"].legs[1].qty == 1
