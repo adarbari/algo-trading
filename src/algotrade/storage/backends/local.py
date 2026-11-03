@@ -229,10 +229,12 @@ class LocalTables:
         own_run: str | None,
         upto: int,
         columns: Sequence[str] | None = None,
+        threaded: bool = True,
     ) -> pa.Table | None:
         """The partition as a read at ``as_of`` sees it (``run_selection``), conformed.
         ``upto``: the commit sequence the read captured before opening any index.
-        ``columns``: only those (and the key / point-in-time columns) are decoded."""
+        ``columns``: only those (and the key / point-in-time columns) are decoded.
+        ``threaded``: False inside a pool of partitions (``_read_file``)."""
         directory = self._dir(table, session_date)
         entries = self._entries(directory, table, session_date, own_run, upto)
         runs = select_runs(entries, as_of, run_mode(table))
@@ -240,7 +242,7 @@ class LocalTables:
             return None
         try:
             parts = [
-                _read_file(directory / run_file(run, entries[run]), instruments, columns)
+                _read_file(directory / run_file(run, entries[run]), instruments, columns, threaded)
                 for run in runs
             ]
         except FileNotFoundError as gone:  # a commit replaced the version and removed its file
@@ -412,8 +414,12 @@ class LocalTables:
                     if d.year not in by_year
                 ]
 
+                threaded = not _pooled(len(days))  # a pool already spreads the files
+
                 def one(d: date) -> pa.Table | None:
-                    return self._partition(table, d, as_of, instruments, own_run, seq, columns)
+                    return self._partition(
+                        table, d, as_of, instruments, own_run, seq, columns, threaded
+                    )
 
                 for d, data in zip(days, _map_days(one, days), strict=True):
                     if data is not None:
@@ -730,19 +736,27 @@ READ_WORKERS = min(8, os.cpu_count() or 1)
 PARALLEL_FROM = 64  # fewer days than this read serially: a pool costs more than it saves
 
 
+def _pooled(n: int) -> bool:
+    """Whether ``n`` days read on the pool (``_map_days``)."""
+    return n >= PARALLEL_FROM and READ_WORKERS >= 2
+
+
 def _map_days[T](read: Callable[[date], T], days: Sequence[date]) -> list[T]:
     """``read`` of each day, in ``days`` order, on a bounded pool for a long range (the work is
     file opens and Arrow decoding, both off the GIL). Each read is pinned to the caller's commit
     sequence and touches no shared state, so order and results equal the serial loop; the first
     failure (a ``StaleSnapshotError``) propagates after the pool drains."""
-    if len(days) < PARALLEL_FROM or READ_WORKERS < 2:
+    if not _pooled(len(days)):
         return [read(d) for d in days]
     with ThreadPoolExecutor(READ_WORKERS, thread_name_prefix="partition-read") as pool:
         return list(pool.map(read, days, chunksize=1))
 
 
 def _read_file(
-    path: Path, instruments: Sequence[str] | None, columns: Sequence[str] | None
+    path: Path,
+    instruments: Sequence[str] | None,
+    columns: Sequence[str] | None,
+    threaded: bool = True,
 ) -> pa.Table:
     """One version file (``columns``: only those and ``keep_columns``), its rows of
     ``instruments`` in file order. ``ParquetFile`` + an Arrow filter, not ``read_table``: a
@@ -750,15 +764,20 @@ def _read_file(
     value set takes the id column's type: an empty ``instruments`` selects no rows (as the
     memory backend does). A file of several row groups (a clustered table) decodes only the
     groups whose ``instrument_id`` statistics can hold a wanted id (``row_groups_passing``; a
-    group without statistics is kept), then the exact filter below."""
-    with pq.ParquetFile(path) as parquet:
+    group without statistics is kept), then the exact filter below. ``threaded=False`` decodes
+    on the calling thread (Arrow's pool per tiny file doubled the CPU of a long range read,
+    which already runs one file per pool worker); no read-ahead buffer either way: a local
+    file, read once."""
+    with pq.ParquetFile(path, pre_buffer=False) as parquet:
         keep = None if columns is None else keep_columns(columns)
         present = None if keep is None else [c for c in parquet.schema_arrow.names if c in keep]
         if instruments is not None and parquet.metadata.num_row_groups > 1:
             wanted = [RowFilter("instrument_id", frozenset(instruments))]
-            data = parquet.read_row_groups(row_groups_passing(parquet, wanted), columns=present)
+            data = parquet.read_row_groups(
+                row_groups_passing(parquet, wanted), columns=present, use_threads=threaded
+            )
         else:
-            data = parquet.read(columns=present)
+            data = parquet.read(columns=present, use_threads=threaded)
     if instruments is None:
         return data
     ids = data.column("instrument_id")
