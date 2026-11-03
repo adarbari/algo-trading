@@ -28,6 +28,7 @@ export const removedName = (over: Partial<RemovedName> = {}): RemovedName => ({
 export const eventScope = (over: Partial<EventScope> = {}): EventScope => ({
   session: '2026-11-02',
   staleDays: 90,
+  staleCount: 1,
   names: [
     scopeName(),
     scopeName({

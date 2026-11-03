@@ -45,17 +45,23 @@ export function EventScopeList() {
         label="Scope summary"
         loading={scope.isPending}
         items={[
-          { id: 'names', label: 'Listed names', value: count(names.length) },
+          { id: 'names', label: 'Listed names', value: data ? count(names.length) : '—' },
           {
             id: 'stale',
             label: 'Stale reviews',
-            value: count(names.filter((n) => n.stale).length),
-            tone: names.some((n) => n.stale) ? 'warning' : 'default',
+            value: data ? count(data.staleCount) : '—',
+            tone: data && data.staleCount > 0 ? 'warning' : 'default',
           },
-          { id: 'other', label: 'Other names in scope', value: count(data?.otherNames ?? 0) },
+          {
+            id: 'other',
+            label: 'Other names in scope',
+            value: data ? count(data.otherNames) : '—',
+          },
           {
             id: 'macro',
-            label: `Macro releases, next ${String(data?.macroDays ?? 90)} days`,
+            label: data
+              ? `Macro releases, next ${String(data.macroDays)} days`
+              : 'Macro releases ahead',
             value:
               data?.macroReleases == null ? (
                 data?.macroUnknown ? (

@@ -1188,11 +1188,12 @@ type EventGap {
 }
 
 """
-The event-study scope list as of the session (the site file plus the admin's additions minus removals): `names` in list order, the admin's `removed`, the `unresolved` symbols the session's reference snapshot does not know, `otherNames` how many more names are in scope by a put tier or as a fund's reference, and the macro calendar's reach: `macroReleases` scheduled in the next `macroDays` days (null with `macroUnknown`: the calendar has nothing known by the session)
+The event-study scope list as of the session (the site file plus the admin's additions minus removals): `names` in list order, `staleCount` how many of them are stale, the admin's `removed`, the `unresolved` symbols the session's reference snapshot does not know, `otherNames` how many more names are in scope by a put tier or as a fund's reference, and the macro calendar's reach: `macroReleases` scheduled in the next `macroDays` days (null with `macroUnknown`: the calendar has nothing known by the session)
 """
 type EventScope {
   session: Date!
   staleDays: Int!
+  staleCount: Int!
   names: [ScopeName!]!
   removed: [RemovedName!]!
   unresolved: [String!]!

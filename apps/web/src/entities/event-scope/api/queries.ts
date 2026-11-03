@@ -13,6 +13,7 @@ const EventScopeQuery = graphql(`
     eventScope {
       session
       staleDays
+      staleCount
       names {
         instrumentId
         symbol

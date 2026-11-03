@@ -66,10 +66,12 @@ class EventScope:
     """The scope list as of ``session``: ``names`` in list order, the admin's ``removed`` names,
     the ``unresolved`` symbols, how many other names are in scope by tier or reference
     (``other_names``), the macro releases scheduled in the next ``macro_days`` days (None with
-    ``macro_unknown``: none known) and the staleness limit."""
+    ``macro_unknown``: none known), the staleness limit and how many listed names are
+    stale (``stale_count``)."""
 
     session: date
     stale_days: int
+    stale_count: int
     names: tuple[ScopeName, ...]
     removed: tuple[RemovedName, ...]
     unresolved: tuple[str, ...]
@@ -123,6 +125,7 @@ def load_event_scope(ctx: ReadContext) -> EventScope:
     return EventScope(
         session=day,
         stale_days=STALE_DAYS,
+        stale_count=sum(1 for r in rows if r.stale),
         names=tuple(rows),
         removed=gone,
         unresolved=scope.unresolved,

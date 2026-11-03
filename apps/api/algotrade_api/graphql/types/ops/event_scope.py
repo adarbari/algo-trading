@@ -82,7 +82,8 @@ class RemovedName:
 
 @strawberry.type(
     description="The event-study scope list as of the session (the site file plus the admin's "
-    "additions minus removals): `names` in list order, the admin's `removed`, the `unresolved` "
+    "additions minus removals): `names` in list order, `staleCount` how many of them are stale, "
+    "the admin's `removed`, the `unresolved` "
     "symbols the session's reference snapshot does not know, `otherNames` how many more names "
     "are in scope by a put tier or as a fund's reference, and the macro calendar's reach: "
     "`macroReleases` scheduled in the next `macroDays` days (null with `macroUnknown`: the "
@@ -91,6 +92,7 @@ class RemovedName:
 class EventScope:
     session: dt.date
     stale_days: int
+    stale_count: int
     names: list[ScopeName]
     removed: list[RemovedName]
     unresolved: list[str]
@@ -104,6 +106,7 @@ class EventScope:
         return cls(
             session=d.session,
             stale_days=d.stale_days,
+            stale_count=d.stale_count,
             names=[ScopeName.of(r) for r in d.names],
             removed=[RemovedName.of(r) for r in d.removed],
             unresolved=list(d.unresolved),

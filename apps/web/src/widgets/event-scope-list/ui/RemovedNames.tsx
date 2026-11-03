@@ -1,9 +1,10 @@
 /** The names an admin removed: who, when and why; adding one again restores it (a button here). */
-import { Button, DataTable, Mono, type DataTableColumn } from '@algotrade/ui';
+import { Banner, Button, DataTable, Mono, Stack, type DataTableColumn } from '@algotrade/ui';
 import { useMemo } from 'react';
 
 import { reasonLabel, type RemovedName } from '@/entities/event-scope';
 import { useAddScopeName } from '@/features/event-scope-edit';
+import { errorDetail } from '@/shared/api';
 
 export function RemovedNames({ removed }: { removed: readonly RemovedName[] }) {
   const add = useAddScopeName();
@@ -55,14 +56,17 @@ export function RemovedNames({ removed }: { removed: readonly RemovedName[] }) {
     [add],
   );
   return (
-    <DataTable<RemovedName>
-      label="Removed names"
-      columns={columns}
-      rows={[...removed]}
-      getRowId={(r) => r.symbol}
-      getRowLabel={(r) => r.symbol}
-      sortMode="client"
-      emptyMessage="No name was removed."
-    />
+    <Stack gap={2}>
+      {add.error && <Banner tone="negative">{errorDetail(add.error)}</Banner>}
+      <DataTable<RemovedName>
+        label="Removed names"
+        columns={columns}
+        rows={[...removed]}
+        getRowId={(r) => r.symbol}
+        getRowLabel={(r) => r.symbol}
+        sortMode="client"
+        emptyMessage="No name was removed."
+      />
+    </Stack>
   );
 }

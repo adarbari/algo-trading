@@ -406,7 +406,7 @@ export type ScreenerTrackRecordsQuery = { edges: Array<{ id: string, status: str
 export type EventScopeQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type EventScopeQuery = { eventScope: { session: string, staleDays: number, unresolved: Array<string>, otherNames: number, macroDays: number, macroReleases: number | null, names: Array<{ instrumentId: string, symbol: string, reasons: Array<string>, source: string, addedOn: string, note: string, by: string | null, at: string | null, lastReview: string | null, stale: boolean, moves: { big: number, attributed: number, share: number } | null }>, removed: Array<{ symbol: string, by: string, at: string, note: string, reasons: Array<string> }>, macroUnknown: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null } | null };
+export type EventScopeQuery = { eventScope: { session: string, staleDays: number, staleCount: number, unresolved: Array<string>, otherNames: number, macroDays: number, macroReleases: number | null, names: Array<{ instrumentId: string, symbol: string, reasons: Array<string>, source: string, addedOn: string, note: string, by: string | null, at: string | null, lastReview: string | null, stale: boolean, moves: { big: number, attributed: number, share: number } | null }>, removed: Array<{ symbol: string, by: string, at: string, note: string, reasons: Array<string> }>, macroUnknown: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null } | null };
 
 export type EventCalendarQueryVariables = Exact<{
   instrumentIds: Array<string> | string;
@@ -2038,6 +2038,7 @@ export const EventScopeDocument = new TypedDocumentString(`
   eventScope {
     session
     staleDays
+    staleCount
     names {
       instrumentId
       symbol
