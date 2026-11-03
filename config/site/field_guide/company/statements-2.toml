@@ -497,3 +497,21 @@ for = "a positive cash operating profit"
 op = "gt"
 value = 0
 mode = "hard"
+
+[[field]]
+name = "feature.cash_to_assets"
+theme = "statements"
+reads = "Cash on each dollar of assets: cash and equivalents over total assets at the latest balance sheet, 0.20 is 20 cents of cash per dollar. Palazzo links high cash to higher average returns and to cash-flow risk; the options research uses it as a stock characteristic. Above 0.30 is a cash-heavy balance sheet, 0.05 to 0.30 is ordinary, and near 0 is a business that holds little cash."
+caveats = [
+  "Short-term investments are left out, so a company that holds its cash as securities reads lower than it is. Compare feature.net_debt, which has the same limit.",
+  "Null for banks, brokers and insurers, for an untagged cash line, and for a stale balance sheet. A missing value is a gap, not a pass.",
+  "A high value is not safety: a young cash-burning company can hold most of its assets as cash. Read it with rollup.mispricing@v1.ohlson_o.",
+  "Statement figures enter from the session after SEC acceptance of the filing and can be four months old.",
+]
+sources = ["Palazzo (2012), Journal of Financial Economics 104(1), Cash holdings, risk, and expected returns"]
+[[field.use]]
+for = "a cash-heavy balance sheet"
+op = "gte"
+value = 0.3
+mode = "soft"
+tolerance = { relative = 0.3 }
