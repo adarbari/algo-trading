@@ -10,7 +10,11 @@ whose rank follows values the viewer's licences do not cover (``run_withheld``) 
 ``withheld`` and contributes nothing, so its ranking is never listed. Its ``picked`` count is
 over the whole run; its ``top`` are its first pool picks, built from the run's ``screen_picks``
 rows and the reference snapshot alone (no ``rule_screen`` / values read). Per-ticker facts
-(earnings, expiry, IV) are not here: the page asks ``Instrument.features(names)``.
+(earnings, expiry, IV) are catalogue ``columns`` the caller asks for: read for the page's ideas
+only, for exactly the session, columnar as a ``FeatureTable`` (``Ideas.rows[i][j]`` is
+``columns[j]`` for ``items[i]``, None exactly when ``unknown[i][j]`` says why; a value under a
+licence the viewer does not hold is never read), so the page draws them with the feature table's
+column factories and derives nothing (ADR 0038).
 
 An idea is served from its best pick only (no merging across picks): ``best`` with its stored
 values, the regime and size multiplier it was stamped with, the display ``metrics`` and the
@@ -56,6 +60,8 @@ from algotrade.config.ranking.ideas import IdeasRule, load_ideas_rule
 from algotrade.config.user import SITE_USER
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.model.predicates import FieldValue
+from algotrade.core.views.feature_view import FeatureValue as Scalar
+from algotrade.features.framework.feature import NullReason
 from algotrade.services.ideas.rule import (
     NOT_RUN,
     RAN,
@@ -70,14 +76,19 @@ from algotrade.services.ideas.rule import (
     rank_ideas,
     rank_paused,
 )
+from algotrade.services.read.availability.cause import UnavailableKind
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.filtering.definitions import ResolvedFilters
 from algotrade.services.read.filtering.facets import Facets, compute_facets
 from algotrade.services.read.filtering.masks import Cell, FilterInput, filter_hash
 from algotrade.services.read.filtering.served import load_list_filters
 from algotrade.services.read.ideas.setups import in_tab
-from algotrade.services.read.instruments.catalogue import UnknownFeatureError
-from algotrade.services.read.instruments.features import load_feature_values
+from algotrade.services.read.instruments.catalogue import (
+    FeatureInfo,
+    UnknownFeatureError,
+    feature_infos,
+)
+from algotrade.services.read.instruments.features import cell_codes, load_feature_values
 from algotrade.services.read.instruments.identity import Instrument, load_instruments
 from algotrade.services.read.screens.results import ScreenResult, load_results, run_withheld
 from algotrade.services.read.screens.runs import (
@@ -89,7 +100,7 @@ from algotrade.services.read.screens.runs import (
 )
 from algotrade.services.read.screens.screeners import Screener, load_screeners
 from algotrade.services.read.users.trader import load_watchlist_ids
-from algotrade.services.read.values import Unknown, to_scalar
+from algotrade.services.read.values import Unknown, UnknownCode, to_scalar
 from algotrade.services.screening.rule_results import PAUSED
 
 SURFACE = "ideas"  # config/site/filters/ideas.toml
@@ -195,6 +206,12 @@ class Ideas:
     rule_hash: str = ""
     facets: Facets | None = None  # None only for a caller that built the object itself
     watchlist: int | None = None
+    # The catalogue columns asked for, columnar over ``items`` (as ``FeatureTable``).
+    columns: tuple[FeatureInfo, ...] = ()
+    rows: tuple[tuple[Scalar, ...], ...] = ()
+    unknown: tuple[tuple[UnknownCode | None, ...], ...] = ()
+    reasons: tuple[tuple[NullReason | None, ...], ...] = ()  # the NullReason of an EXPLAINED cell
+    kinds: tuple[tuple[UnavailableKind | None, ...], ...] = ()  # the public kind of an UNKNOWN cell
 
 
 def _pool(
@@ -380,12 +397,17 @@ def load_ideas(
     after: str | None = None,
     filters: Sequence[FilterInput] = (),
     tab: str | None = None,
+    columns: Sequence[str] = (),
 ) -> Ideas:
     """``limit`` ideas of the viewer's screeners' runs for ``ctx.session`` that pass ``filters``,
     best first, from the ``after`` cursor (none: the first page); ``Ideas.next_cursor`` is the
     next page's. ``tab``: only the screeners of that tab (the Unproven section of a tab,
     ``ideas.setups.in_tab``, ADR 0083 amendment (a)); None: every screener of the viewer's.
-    ``FilterRefusedError`` for a filter the viewer is not offered."""
+    ``columns``: catalogue names read for the page's ideas (in order, repeats dropped).
+    ``FilterRefusedError`` for a filter the viewer is not offered; ``UnknownFeatureError`` for a
+    column outside the viewer's catalogue (both before any read)."""
+    wanted_columns = list(dict.fromkeys(columns))
+    infos = feature_infos(ctx.features, wanted_columns)
     rule = load_ideas_rule(ctx.configs)
     resolved = load_list_filters(ctx, SURFACE, [i.id for i in filters]).resolved
     resolved.check(i.id for i in filters)  # before any read: a hidden filter is refused whole
@@ -464,6 +486,9 @@ def load_ideas(
         else sum(r.paused for r in runs if r.run_id in read)
     )  # every held row of a read run, the watched ones under a watchlist
     more = encode_cursor(stamp, end) if end < len(matched) and shown else None
+    ids = [i.instrument_id for i in items]
+    cells = load_feature_values(ctx, ids, wanted_columns) if wanted_columns and ids else {}
+    codes = cell_codes(cells, ids)
     return Ideas(
         ctx.session.date,
         listed,
@@ -475,4 +500,9 @@ def load_ideas(
         rule.hash,
         facets,
         before if watched else None,
+        columns=tuple(infos[n] for n in wanted_columns),
+        rows=tuple(tuple(v.value for v in cells.get(i, ())) for i in ids),
+        unknown=codes[0],
+        reasons=codes[1],
+        kinds=codes[2],
     )

@@ -31,11 +31,13 @@ LICENCE = UnavailableKind.LICENCE.value
 
 @dataclass(frozen=True)
 class Params:
-    """What a surface asks beyond the filters: ``screener`` (screener results: whose run) and
-    ``columns`` (catalogue names added after the surface's own columns)."""
+    """What a surface asks beyond the filters: ``screener`` (screener results: whose run),
+    ``columns`` (catalogue names added after the surface's own columns) and ``tab`` (ideas: the
+    tab whose Unproven list the page shows, so the file is that list; None: every screener)."""
 
     screener: str | None = None
     columns: tuple[str, ...] = ()
+    tab: str | None = None
 
 
 @dataclass(frozen=True)
@@ -92,12 +94,14 @@ IDEAS_HEADERS = (
 
 
 def ideas(ctx: ReadContext, filters: Sequence[FilterInput], params: Params) -> Exported:
-    """The Ideas list under ``filters``: ``load_ideas`` asked for one page of the cap."""
-    found = ideas_read.load_ideas(ctx, ROW_CAP, None, filters)
+    """The Ideas list under ``filters``: ``load_ideas`` asked for one page of the cap, for the
+    page's ``tab`` (its screeners and the viewer's watchlist), with the catalogue ``columns``."""
+    names = tuple(dict.fromkeys(params.columns))
+    found = ideas_read.load_ideas(ctx, ROW_CAP, None, filters, params.tab, names)
     runs = {s.run.run_id: s.run for s in found.screeners if s.run is not None}
     hidden = {run_id: results_read.run_withheld(ctx, run) for run_id, run in runs.items()}
     rows = []
-    for idea in found.items:
+    for i, idea in enumerate(found.items):
         gone = hidden.get(idea.best.run_id, frozenset())
         who, symbol, company = _identity(idea.best)
         rows.append(
@@ -106,9 +110,10 @@ def ideas(ctx: ReadContext, filters: Sequence[FilterInput], params: Params) -> E
                 text(idea.regime), text(idea.size_multiplier),
                 ",".join(p.config_id for p in idea.picked_by), ",".join(idea.watch_out),
                 _metrics(idea.best, gone),
+                *(_kinded(v, k) for v, k in zip(found.rows[i], found.kinds[i], strict=True)),
             )
         )  # fmt: skip
-    return Exported(IDEAS_HEADERS, tuple(rows), found.total)
+    return Exported((*IDEAS_HEADERS, *names), tuple(rows), found.total)
 
 
 RESULT_HEADERS = (

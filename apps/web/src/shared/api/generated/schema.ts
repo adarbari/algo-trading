@@ -2775,7 +2775,7 @@ export interface operations {
     surface_csv_files__surface__csv_get: {
         parameters: {
             query?: {
-                /** @description catalogue columns to add (screener_results, universe) */
+                /** @description catalogue columns to add (screener_results, universe, ideas) */
                 columns?: string[] | null;
                 /** @description the session to read (default: the one pages show) */
                 date?: string | null;
@@ -2783,6 +2783,8 @@ export interface operations {
                 f?: string | null;
                 /** @description screener_results: the screener whose run to export */
                 screener?: string | null;
+                /** @description ideas: the tab whose Unproven list to export (none: every screener) */
+                tab?: ("stocks" | "premium") | null;
             };
             header?: never;
             path: {

@@ -82,6 +82,10 @@ name = "FeatureTable.rows"
 reason = "stored values of the table columns; an absent one is null with `unknown` saying why"
 
 [[fact]]
+name = "Ideas.rows"
+reason = "stored values of the catalogue columns asked for, over the page's ideas (as FeatureTable.rows); an absent one is null with `unknown` saying why, its cause only through `kinds` / `kindTexts`"
+
+[[fact]]
 name = "RegimeIndicator.value"
 reason = "the stored value of a regime indicator"
 
