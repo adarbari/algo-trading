@@ -73,6 +73,7 @@ def run_option_history_features(ctx: TaskContext, p: Params) -> RunRecord:
         start=p.get("start"),
         end=p.get("end"),
         force=bool(p.get("force")),
+        batch=int(p.get("batch") or 250),
     )
     return features.compute_history_features(ctx, session_of(p), options)
 
@@ -156,6 +157,7 @@ HISTORY_TASKS = (
             Param("url", ("--url",), str, "history store URL (default: the env variable)"),
             FROM,
             TO,
+            Param("batch", ("--batch",), int, "sessions per committed run (default 250)"),
             Param("force", ("--force",), None, "recompute sessions already stored"),
         ),
     ),

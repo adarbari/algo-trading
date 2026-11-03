@@ -15,15 +15,16 @@ Importable only by the cross-section harness and by the task that computes the g
 (``tasks/options_history``), which reads what it writes: an import-linter contract.
 """
 
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from datetime import date, datetime, timedelta
+from typing import NoReturn
 
 import pandas as pd
 
 from algotrade.core.model.fields import rollup_table
 from algotrade.data.chains import FIRST_CBOE_CHAIN_SESSION
 from algotrade.storage.tables.interfaces import Backend
-from algotrade.storage.tables.readers import RecordingReader, StoreReader
+from algotrade.storage.tables.readers import RecordingReader, RollingRead, StoreReader
 
 CHAIN_GROUPS = (
     "iv30@v1",
@@ -69,10 +70,21 @@ class SplicedReader(StoreReader):
         return self._clone(run_id, self._pin)
 
     def pinned(self, seq: int) -> "SplicedReader":
-        return self._clone(self.own_run, seq)
+        self._unspliced("pinned")  # a pin is a main-store commit sequence: the history has its own
 
     def recording(self) -> RecordingReader:
         raise NotImplementedError("the splice does not record reads for leg reuse yet; see reads")
+
+    def _unspliced(self, what: str) -> NoReturn:
+        raise NotImplementedError(
+            f"SplicedReader.{what} would read the main store only: it is not spliced yet"
+        )
+
+    def with_runs_frozen(self, jobs: Collection[str]) -> StoreReader:
+        self._unspliced("with_runs_frozen")
+
+    def table_range_rolling(self, memo: RollingRead, start: date, end: date) -> pd.DataFrame | None:
+        self._unspliced("table_range_rolling")
 
     def serves(self, table: str, day: date) -> bool:
         """Whether the history root answers a read of ``table`` on ``day``."""

@@ -44,12 +44,13 @@ from algotrade.data.option_history.splice import CHAIN_GROUPS, PERSONAL, Spliced
 from algotrade.data.option_history.store import open_history
 from algotrade.features.framework.runner import compute_sessions, rollup_params
 from algotrade.features.site import site_features
-from algotrade.services.jobs.exclusive import exclusive_run
-from algotrade.storage.runs import RunRecord
+from algotrade.services.jobs.exclusive import INGEST_TREE_LOCK, exclusive_run
+from algotrade.storage.runs import RunRecord, RunStatus, published, start_run
 from algotrade.storage.tables.interfaces import Backend
 from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.tasks.derived.paths.option_outcomes import SITE
 from algotrade_ingestion.tasks.framework.run import IngestRun, TaskContext, recover_unpublished
+from algotrade_ingestion.tasks.options_history.outcomes import Pacing, locked
 
 TASK = "option-history-features"
 SOURCE = "option_history_features"
@@ -63,6 +64,7 @@ class HistoryFeatureOptions:
     start: date | None = None
     end: date | None = None
     force: bool = False
+    batch: int = 250  # sessions per committed run (about a year)
 
 
 class HistoryChainReader(SplicedReader):
@@ -119,54 +121,109 @@ def history_sessions(history: StoreReader, options: HistoryFeatureOptions) -> li
     return found
 
 
+def stored_imports(writer: StoreWriter, key: str) -> dict[str, str]:
+    """Session (ISO) -> the import run its stored ``key`` partition was computed from."""
+    found: dict[str, str] = {}
+    for record in writer.runs_for(f"{TASK}:{key}"):
+        if published(record):
+            found.update(record.stats.get(key, {}).get("import_runs", {}))
+    return found
+
+
 def compute_history_features(
     ctx: TaskContext,
     today: date,
     options: HistoryFeatureOptions,
     open_store: Callable[[str | None], Backend] = open_history,
+    pacing: Pacing | None = None,
 ) -> RunRecord:
-    """Each chain group over the range, one committed run per group in the history store ->
-    the last group's record (a group that raised FAILs its run and stops the rest: a later group
-    would read its missing rows)."""
+    """Each chain group over the range in batches of ``options.batch`` sessions, one committed run
+    per (group, batch) in the history store, in group order -> the last batch's record. A batch
+    that raised FAILs its run and stops the rest (a later group would read its missing rows); what
+    committed before it stays, and a re-run resumes after it."""
+    pacing = pacing or Pacing()
     backend = open_store(options.url)
     writer, history = StoreWriter(backend), StoreReader(backend)
     sessions = history_sessions(history, options)
+    imports = {s.isoformat(): reading.session_run(history, s) for s in sessions}
     configs = ctx.configs or SITE
     groups = site_features(configs).groups
     params = rollup_params(configs, list(groups.values()))
     record: RunRecord | None = None
-    carried: dict[str, Any] = {}  # each run's record holds the groups computed before it too
-    with exclusive_run(backend, wait=False):
-        recover_unpublished(writer, ctx.clock())
-        for key in CHAIN_GROUPS:
-            group = groups[key]
-            todo = [
-                s for s in sessions if options.force or not history.has_partition(group.table, s)
-            ]
+    carried: dict[str, Any] = {"no_id_rows": _no_id_rows(history, imports)}
+    for key in CHAIN_GROUPS:
+        group = groups[key]
+        held = stored_imports(writer, key)
+        todo = [
+            s
+            for s in sessions
+            if options.force or not _current(history, group.table, s, held, imports)
+        ]
+        stats: dict[str, Any] = {
+            "sessions": 0,
+            "rows": 0,
+            "no_input": 0,
+            "no_input_sessions": [],
+            "seconds": 0.0,
+        }
+        stats.update(skipped=len(sessions) - len(todo), licence=PERSONAL, history_partitions_read=0)
+        for i in range(0, len(todo), options.batch):
+            chunk = todo[i : i + options.batch]
+            open_store(options.url)  # the drive is still mounted and marked (HistoryUnavailable)
             reader = HistoryChainReader(ctx.writer.backend, history)
             hctx = replace(ctx, writer=writer, reader=reader)
             started = time.monotonic()
-            with IngestRun(hctx, TASK, today) as run:
-                run.stats.update(carried)
-                rows = written = 0
-                missing: list[str] = []
-                for result in compute_sessions(run.reader, group, todo, params[key]):
-                    if result.frame is None:
-                        missing.append(result.session.isoformat())
-                        continue
-                    run.write(group.table, result.frame, SOURCE, session=result.session)
-                    rows, written = rows + len(result.frame), written + 1
-                run.stats[key] = {
-                    "sessions": written,
-                    "rows": rows,
-                    "skipped": len(sessions) - len(todo),
-                    "no_input": len(missing),
-                    "no_input_sessions": missing[:SHOWN],
-                    "seconds": round(time.monotonic() - started, 2),
-                    "licence": PERSONAL,
-                    "history_partitions_read": len(reader.reads),
-                }
-            carried = dict(run.stats)
+            with locked(ctx.writer.backend, INGEST_TREE_LOCK, pacing), exclusive_run(backend):
+                recover_unpublished(writer, ctx.clock())
+                with IngestRun(hctx, f"{TASK}:{key}", chunk[-1]) as run:
+                    run.stats.update(carried)
+                    rows = written = 0
+                    missing: list[str] = []
+                    for result in compute_sessions(run.reader, group, chunk, params[key]):
+                        if result.frame is None:
+                            missing.append(result.session.isoformat())
+                            continue
+                        run.write(group.table, result.frame, SOURCE, session=result.session)
+                        rows, written = rows + len(result.frame), written + 1
+                    stats["sessions"] += written
+                    stats["rows"] += rows
+                    stats["no_input"] += len(missing)
+                    stats["no_input_sessions"] = [*stats["no_input_sessions"], *missing][:SHOWN]
+                    stats["seconds"] = round(stats["seconds"] + time.monotonic() - started, 2)
+                    stats["history_partitions_read"] += len(reader.reads)
+                    run.stats[key] = {
+                        **stats,
+                        "import_runs": {s.isoformat(): imports[s.isoformat()] for s in chunk},
+                    }
             record = run.record
-    assert record is not None
+        carried[key] = dict(stats)
+        if record is not None:
+            record.stats.update(carried)
+    if record is None:  # nothing to compute: every session already current
+        record = start_run(TASK, today, ctx.clock())
+        record.status, record.finished_at = RunStatus.COMPLETE, ctx.clock()
+        record.stats.update(carried)
     return record
+
+
+def _current(
+    history: StoreReader,
+    table: str,
+    day: date,
+    held: dict[str, str],
+    imports: dict[str, str | None],
+) -> bool:
+    """Whether ``table`` holds ``day`` computed from the import now stored for it."""
+    return (
+        history.has_partition(table, day) and held.get(day.isoformat()) == imports[day.isoformat()]
+    )
+
+
+def _no_id_rows(history: StoreReader, imports: dict[str, str | None]) -> int:
+    """The option rows the importer left out for want of an ``underlying_id`` (its own counts):
+    names a feature row cannot exist for, so a single-name history is read with that in view."""
+    total = 0
+    for run_id in imports.values():
+        found = history.run(run_id) if run_id else None
+        total += int(found.stats.get("null_underlying_rows", 0)) if found else 0
+    return total

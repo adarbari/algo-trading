@@ -67,6 +67,7 @@ def chain_underlying_quotes(
                 symbol=("symbol", "first"),
                 ts=("ts", "min"),
                 underlying_price=("underlying_price", "median"),
+                **{c: (c, "first") for c in COMMON if c in spot.columns},
             )
             .reset_index()
         )
@@ -78,6 +79,7 @@ def chain_underlying_quotes(
                     "ts": first["ts"],
                     "price": first["underlying_price"],
                     "close": first["underlying_price"],
+                    **{c: first[c] for c in COMMON if c in first.columns},
                 }
             )
         )

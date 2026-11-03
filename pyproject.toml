@@ -221,7 +221,7 @@ type = "protected"
 protected_modules = ["algotrade.data.option_history.splice"]
 allowed_importers = [
     "algotrade.services.evaluation.cross_section",
-    "algotrade_ingestion.tasks.options_history",
+    "algotrade_ingestion.tasks.options_history.features",
 ]
 
 [[tool.importlinter.contracts]]

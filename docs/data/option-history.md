@@ -102,9 +102,10 @@ The nine chain groups (`iv30`, `iv_history`, `implied_move`, `option_liquidity`,
 `data/option_history/splice.py`, by the cross-section harness). Same pure computes as the nightly,
 same runner; the chain tables of a history session are built from the history's quotes and the
 vendor's IV and delta are never fed in. The Treasury curve, dividend yield and earnings come from
-the main store (the same D8 coverage as the outcomes). One year first, then everything (resumable: a
-session with the group's partition stored is skipped, `--force` recomputes; it takes the history
-store's own lock, the nightly keeps running):
+the main store (the same D8 coverage as the outcomes). One year first, then everything (batches of `--batch`, default 250 sessions, each a committed run
+under the history store's lock and the `ingest-tree` lock; resumable: a session whose partition
+was computed from the import now stored is skipped, a re-imported one recomputes, `--force`
+recomputes all; the nightly keeps running):
 
 ```bash
 algotrade-ingest run option-history-features --from 2008-01-02 --to 2008-12-31

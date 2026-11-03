@@ -21,7 +21,7 @@ from algotrade.data.option_history.chain_frames import (
     chain_status,
     chain_underlying_quotes,
 )
-from algotrade.data.option_history.splice import CHAIN_GROUPS, SplicedReader
+from algotrade.data.option_history.splice import CHAIN_GROUPS
 from algotrade.features.framework.declaration import FeatureGroup
 from algotrade.features.framework.runner import compute_sessions, rollup_params
 from algotrade.features.site import site_features
@@ -40,7 +40,6 @@ from tests.conftest import REPO_ROOT
 from tests.helpers.ingest_fakes import task_ctx
 from tests.helpers.option_history.store import write_history
 from tests.helpers.rollup_store import store, write_curve
-from tests.helpers.stored_frames import stamped
 
 END = date(2019, 8, 16)
 DAYS = sessions_ending(END, 25)
@@ -129,39 +128,6 @@ def test_a_rerun_skips_stored_sessions_and_force_recomputes_them() -> None:
     assert world.run(force=True).stats["iv30@v1"]["sessions"] == len(DAYS)
 
 
-def test_the_splice_routes_by_the_cutover_and_logs_the_partitions_it_read() -> None:
-    main_w, _ = store()
-    hist = MemoryBackend()
-    hist_w, hist_r = StoreWriter(hist), StoreReader(hist)
-    before, after = DAYS[-1], FIRST_CBOE_CHAIN_SESSION + timedelta(days=4)
-    table = "rollups/instrument/iv30@v1"
-    other = "rollups/instrument/short_premium@v1"
-
-    def rows(v: float) -> list[dict[str, object]]:
-        return [{"instrument_id": "EQ:A", "iv30": v}]
-
-    hist_w.write_table(table, before, "h", stamped(rows(0.1), before, "h"))
-    hist_w.write_table(other, before, "h2", stamped(rows(0.5), before, "h2"))
-    main_w.write_table(table, after, "m", stamped(rows(0.2), after, "m"))
-    main_w.write_table(other, before, "m2", stamped(rows(0.6), before, "m2"))
-    reader = SplicedReader(main_w.backend, hist_r)
-    assert not reader.reads  # nothing read yet: no licence
-    got = reader.table(table, before)
-    assert got is not None and got["iv30"].iloc[0] == 0.1  # the history root
-    got_after = reader.table(table, after)
-    assert got_after is not None and got_after["iv30"].iloc[0] == 0.2  # the main store
-    not_chain = reader.table(other, before)
-    assert not_chain is not None and not_chain["iv30"].iloc[0] == 0.6  # not a chain group
-    spanning = reader.table_range(table, before, after)
-    assert spanning is not None and list(spanning["iv30"]) == [0.1, 0.2]
-    assert reader.dates(table) == [before, after]
-    assert reader.has_partition(table, before) and not reader.has_partition(
-        table, FIRST_CBOE_CHAIN_SESSION
-    )
-    assert reader.licence == "personal" and (table, before) in reader.reads
-    assert reader.including("r").reads is reader.reads  # a view shares the log
-
-
 def test_the_task_needs_a_range_with_history_before_the_cutover() -> None:
     world = World()
     with pytest.raises(Exception, match="no history session"):
@@ -174,7 +140,41 @@ def test_the_task_needs_a_range_with_history_before_the_cutover() -> None:
     assert features.CHAIN_TABLES and CHAIN_GROUPS[0] == "iv30@v1"
 
 
-def test_the_splice_does_not_record_reads_for_leg_reuse_yet() -> None:
-    reader = SplicedReader(MemoryBackend(), StoreReader(MemoryBackend()))
-    with pytest.raises(NotImplementedError):
-        reader.recording()
+def test_a_re_imported_session_recomputes_its_features() -> None:
+    world = World()
+    world.run()
+    write_history(
+        world.history,
+        [DAYS[3]],
+        NAMES,
+        EXPIRY,
+        strikes=STRIKES,
+        clock=lambda d: NOW - timedelta(days=1),
+    )
+    again = world.run()
+    assert again.stats["iv30@v1"]["sessions"] == 1
+    assert again.stats["iv30@v1"]["skipped"] == len(DAYS) - 1
+    assert again.stats["no_id_rows"] == 0
+
+
+def test_batches_commit_apart_and_a_failed_group_keeps_the_ones_before_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    world = World()
+    real = compute_sessions
+
+    def failing(reader: Any, group: FeatureGroup, *a: Any, **k: Any) -> Any:
+        if group.key == "skew@v1":
+            raise RuntimeError("boom")
+        return real(reader, group, *a, **k)
+
+    monkeypatch.setattr(features, "compute_sessions", failing)
+    opts = HistoryFeatureOptions(start=DAYS[0], end=END, batch=10)
+    with pytest.raises(RuntimeError, match="boom"):
+        compute_history_features(world.ctx(), END, opts, open_store=lambda url: world.history)
+    hist = StoreReader(world.history)
+    assert hist.dates("rollups/instrument/iv30@v1") == DAYS  # three committed batches
+    assert hist.dates("rollups/instrument/skew@v1") == []
+    runs = StoreWriter(world.history).runs_for("option-history-features:iv30@v1")
+    assert len(runs) == 3
+    assert all(r.status == RunStatus.COMPLETE for r in runs)
