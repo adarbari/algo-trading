@@ -305,14 +305,24 @@ def test_skip_report_in_life_skips_a_report_inside_the_life_and_writes_one_outsi
     assert rows.at[B, "outcome_status"] != "UNMEASURED"
 
 
-def test_skip_report_in_life_is_unknown_when_a_reporting_type_has_no_date_and_never_no_report() -> (
-    None
-):
-    """No expected date for a stock (or none at all stored) is REPORT_UNKNOWN, not 'no report';
-    a fund files no report and passes (N3)."""
-    rows = _skip_run({}, {A: "COMMON_STOCK", B: "ETF"})
+def test_skip_report_in_life_is_unknown_for_a_reporting_type_with_no_date_never_no_report() -> None:
+    """A stock the partition at D holds no date for is REPORT_UNKNOWN, not 'no report'; a fund
+    files no report and passes (N3)."""
+    rows = _skip_run({C: EXPIRY + timedelta(days=30)}, {A: "COMMON_STOCK", B: "ETF"})
     assert str(rows.at[A, "outcome_reason"]).startswith("REPORT_UNKNOWN")
     assert rows.at[B, "outcome_status"] != "UNMEASURED"
+
+
+def test_skip_report_in_life_without_the_date_table_at_d_is_refused_not_unknown() -> None:
+    """No earnings_expected partition at D: the window is refused (the check fails), never run
+    as if every stock had no report."""
+    writer, reader = _chains()
+    _reference(writer, {A: "COMMON_STOCK", B: "COMMON_STOCK"})
+    ctx = _ctx(writer, _configs(skip_report_in_life=True, position="short_put"))
+    record = compute_option_outcomes(ctx, END)
+    (key,) = (w.key for w in _wanted(_configs(skip_report_in_life=True)))
+    assert record.items[key].startswith("REFUSED: ") and "earnings_expected" in record.items[key]
+    assert check_option_outcomes(reader, END, ctx.settings)[0].status == "FAIL"
 
 
 def test_skip_report_in_life_reads_the_date_known_at_the_decision_session_only() -> None:
@@ -321,6 +331,7 @@ def test_skip_report_in_life_reads_the_date_known_at_the_decision_session_only()
     writer, reader = _chains()
     _reference(writer, {A: "COMMON_STOCK", B: "COMMON_STOCK"})
     _expected(writer, sessions_ending(END, 3)[0], {A: EXPIRY - timedelta(days=3)})  # at S, not D
+    _expected(writer, sessions_ending(END, 4)[0], {C: EXPIRY})  # D holds a partition, not A's row
     configs = _configs(skip_report_in_life=True, position="short_put")
     compute_option_outcomes(_ctx(writer, configs), END)
     rows = _rows(reader)

@@ -33,7 +33,7 @@ refused position FAILs.
 """
 
 from collections.abc import Collection, Mapping
-from datetime import date
+from datetime import date, datetime
 
 import pandas as pd
 
@@ -187,12 +187,14 @@ def trade_rows(
     selected = select_window(
         entry, spec.legs, int(w.outcome.tenor_days or 0), spec.expiry_cycle, sessions[-1]
     )
+    known = entry.known
     if spec.skip_report_in_life:
-        selected = skip_reports(selected, entry.day, fields)
+        selected, read = skip_reports(selected, entry.day, fields)
+        known = max((x for x in (known, read) if x is not None), default=None)
     held = {c.instrument_id for sel in selected.values() for c in sel.legs}
     days = [entry, *(loader(d, held) for d in sessions[1:])]
     names = sorted(n for n, sel in selected.items() if sel.reason is None)
-    catalogue, stamps = [], [entry.known]
+    catalogue, stamps = [], [known]
     for day in days[1:]:
         values, field_known = fields(day.day, w.fields, names)
         catalogue.append(values)
@@ -210,15 +212,16 @@ EXPECTED_DATE = "rollup.earnings_expected@v1.expected_report_date"
 
 def skip_reports(
     selected: Mapping[str, LegSelection], entry: date, fields: FieldLoader
-) -> dict[str, LegSelection]:
-    """``selected`` with each name whose selected expiry holds a report left unselectable
+) -> tuple[dict[str, LegSelection], datetime | None]:
+    """``selected`` (and the ``knowledge_ts`` of the partition read, which the row must not
+    precede) with each name whose selected expiry holds a report left unselectable
     (``REPORT_IN_LIFE``), or ``REPORT_UNKNOWN`` when its report date is not known: the expected
     date and the security type are read as of the decision session D (the session before the
     entry ``entry``; a report on D itself, after the close, reacts inside the life, so the life
     starts at D). Names without legs keep their own reason."""
     names = sorted(n for n, sel in selected.items() if sel.legs)
     decision = previous_session(entry)
-    expected, _ = fields(decision, [EXPECTED_DATE], names)
+    expected, read = fields(decision, [EXPECTED_DATE], names)
     types: dict[str, object] = {}
     if names:
         reference = instruments(fields.reader, decision, names)
@@ -228,7 +231,7 @@ def skip_reports(
     out = dict(selected)
     for name in names:
         raw = expected.get(name, {}).get(EXPECTED_DATE)
-        due = date.fromisoformat(str(raw)[:10]) if raw is not None else None
+        due = None if raw is None or pd.isna(raw) else date.fromisoformat(str(raw)[:10])
         kind = types.get(name)
         expiry = max(c.expiry for c in selected[name].legs)
         inside = report_in_life(None if kind is None else str(kind), due, decision, expiry)
@@ -236,7 +239,7 @@ def skip_reports(
             out[name] = LegSelection(reason="REPORT_UNKNOWN")
         elif inside:
             out[name] = LegSelection(reason="REPORT_IN_LIFE")
-    return out
+    return out, read
 
 
 def _one(
@@ -287,6 +290,9 @@ def _one(
 def _refusal(reader: StoreReader, w: Wanted, sessions: list[date]) -> str:
     """Why position ``w`` is not written for the window ``sessions`` ('' when it is)."""
     problems = refuse_unstored(reader, w.fields, sessions[1:])
+    spec = w.outcome.position
+    if spec is not None and spec.skip_report_in_life:  # the date read at D: no partition, no run
+        problems += refuse_unstored(reader, [EXPECTED_DATE], [previous_session(sessions[0])])
     return "; ".join(problems[:SHOWN])
 
 
