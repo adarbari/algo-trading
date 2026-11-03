@@ -82,11 +82,11 @@ E4 = (*E4_OPTION, *E4_FUNDS)
 RETIRED = (
     "c12_vrp_cross_section_iv_hv", "c13_iv_term_structure_straddles",
     "c14_delta_hedged_characteristics", "c16_pre_earnings_straddle_buy",  # X6
+    "c17_earnings_iv_crush_sell",  # re-filed as c17_earnings_straddle_sell (ADR 0088, X5)
     "c18_iv_rank_conditional_selling",  # re-filed as setups (ADR 0088, X2 / X3)
 )  # fmt: skip
 E4_EDGES = {e.id: e for e in load_edges(STORE) if e.id in E4}
 BLOCKED = {
-    "c17_earnings_iv_crush_sell": "tenor_sessions",
     "cef_distribution_trap": "earned-income split",
 }  # the keyword each blocked document's reason names
 
@@ -378,3 +378,22 @@ def test_an_x6_setup_is_blocked_on_the_history_and_its_old_version_retired(new: 
         assert (
             edge.schedule == "on_event:earnings_expected" and edge.outcome.start_offset_sessions < 0
         )
+
+
+def test_the_conditional_earnings_sale_waits_on_the_history_and_pauses_in_stress() -> None:
+    """X5 (ADR 0088, plan C2): c17's new version is blocked with the import named, sells the
+    short straddle (the iron fly as its variant) the close before the report, and its gate keeps
+    STRESS and CRISIS out (an unknown label never passes)."""
+    edge = next(e for e in load_edges(STORE) if e.id == "c17_earnings_straddle_sell")
+    assert (
+        edge.status == "blocked" and "E5" in edge.rejection_reason and "F7" in edge.rejection_reason
+    )
+    assert edge.outcome.kind == "option_pnl" and edge.outcome.position is not None
+    assert edge.outcome.position.template == "short_straddle"
+    assert (
+        edge.outcome.start_offset_sessions == -1 and edge.schedule == "on_event:earnings_expected"
+    )
+    assert {v.id for v in edge.variants} == {"iron_fly", "after_hours"}
+    rule = edge.gate.rules()[0]  # type: ignore[union-attr]
+    assert (rule.field, rule.op) == ("market.regime@v3.label", "in")
+    assert set(rule.value) == {"CALM", "CAUTION"} and "earnings_move_rich" in edge.screeners

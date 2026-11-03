@@ -50,12 +50,13 @@ Each edge's full section is on its family page (docs/edges/).
 | Implied-volatility term structure and straddles (`c13_iv_term_structure_straddles`) | retired | [family C](edges/c.md) |
 | Delta-hedged selling on speculative names (`c14_delta_hedged_characteristics`) | retired | [family C](edges/c.md) |
 | Pre-earnings straddle purchase (`c16_pre_earnings_straddle_buy`) | retired | [family C](edges/c.md) |
+| Earnings implied-volatility crush (`c17_earnings_iv_crush_sell`) | retired | [family C](edges/c.md) |
 | Premium selling when implied volatility is high for the name (`c18_iv_rank_conditional_selling`) | retired | [family C](edges/c.md) |
 | Per-name volatility premium, ranked: short straddle (`c12_vrp_straddle_ranked`) | blocked | [family C](edges/c.md) |
 | Implied-volatility term slope: long straddle (`c13_term_slope_straddle_buy`) | blocked | [family C](edges/c.md) |
 | Speculative names, short straddle (`c14_speculative_straddle_sell`) | blocked | [family C](edges/c.md) |
 | Pre-earnings straddle purchase, cheap names (`c16_pre_earnings_cheap_straddle_buy`) | blocked | [family C](edges/c.md) |
-| Earnings implied-volatility crush (`c17_earnings_iv_crush_sell`) | blocked | [family C](edges/c.md) |
+| Earnings straddle sale, paused in stress (`c17_earnings_straddle_sell`) | blocked | [family C](edges/c.md) |
 | Closed-end fund discount reversion (`closed_end_fund_discounts`) | candidate | [family D](edges/d.md) |
 | December losers rebound (`december_losers_reversal`) | candidate | [family D](edges/d.md) |
 | ETF flow pressure (`etf_flow_pressure`) | candidate | [family D](edges/d.md) |
