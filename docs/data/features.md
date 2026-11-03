@@ -86,7 +86,7 @@ Close, moving averages, returns, 52-week range, realised vol and dollar volume. 
 
 ## `price_history@v1`
 
-Whether the instrument traded on the session, and its high / low over the history it has. Stored as `rollups/instrument/price_history@v1`; reads `bars/1d`, `events/bar_flag` (optional).
+Whether the instrument traded on the session, and its high / low over the history it has. Stored as `rollups/instrument/price_history@v1`; reads `bars/1d`, `bars/flagged` (optional).
 
 | Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
 |---|---|---|---|---|---|---|---|---|

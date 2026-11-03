@@ -48,6 +48,9 @@ in its owner here in ``algotrade.data``; ``INPUTS`` maps the table to it:
                        whatever the session: a read made after a session still says that CIK's
                        filings known on it are complete (the same on every later run); ``None``
                        when there is none
+- ``bars/flagged``     ``prices.flagged_bars``: the FLAGGED bars (``events/bar_flag``, latest row
+                       per bar) with an event date from ``lookback`` sessions before the session
+                       up to it, with ``event_date``; an empty frame when there are none (ADR 0061)
 - ``chains/*``         ``chains``: the session's own partition, read per session (chains are
                        large; a lookback is not supported)
 - ``events/dividend_declared``
@@ -56,8 +59,7 @@ in its owner here in ``algotrade.data``; ``INPUTS`` maps the table to it:
                        known then, including a declared future ex-date), with an ex-date on or
                        after the chunk's first session; ``None`` when there is none. The same
                        table as ``events/dividend``, a second read of it
-- ``events/dividend``, ``events/split``, ``events/index_change``,
-                       ``events/bar_flag``
+- ``events/dividend``, ``events/split``, ``events/index_change``
                        ``events.events_by_event_date``: events with an event date from
                        ``lookback`` sessions before the session up to the session (never a
                        later one, e.g. a declared future ex-date), with ``event_date``; an
@@ -214,7 +216,13 @@ from algotrade.data.insiders.reading import buyer_histories
 from algotrade.data.listings.etf_launches import etf_launches
 from algotrade.data.macro.series import TABLE as MACRO_SERIES
 from algotrade.data.macro.series import first_alfred_vintages, known_window, stored_vintages
-from algotrade.data.prices import DateWindow, SessionBars, session_bars, window_closes
+from algotrade.data.prices import (
+    DateWindow,
+    SessionBars,
+    flagged_bars,
+    session_bars,
+    window_closes,
+)
 from algotrade.data.rates import TABLE as TREASURY
 from algotrade.data.rates import curve_as_rows, tenor_history
 from algotrade.data.reference import (
@@ -289,6 +297,7 @@ class _Bars:
 
 
 BARS = "bars/1d"
+FLAGGED_BARS = "bars/flagged"
 
 
 def first_stored_session(reader: StoreReader, table: str) -> date | None:
@@ -622,6 +631,11 @@ def _events_by_date(table: str) -> Loader:
     return load
 
 
+def _flagged_bars(reader: StoreReader, sessions: Sequence[date], lookback: int) -> Loaded:
+    frame = flagged_bars(reader, sessions_before(sessions[0], lookback), sessions[-1])
+    return _Window(frame, _days(frame["event_date"]), need_session=False)
+
+
 def _filings(reader: StoreReader, sessions: Sequence[date], lookback: int) -> Loaded:
     first = sessions_before(sessions[0], lookback)
     frame = events_by_acceptance(reader, "events/filing", first, sessions[-1])
@@ -731,7 +745,7 @@ INPUTS: Mapping[str, Loader] = {
     "events/dividend": _events_by_date("events/dividend"),
     "events/dividend_declared": _event_snapshots("events/dividend", from_first_session=True),
     "events/split": _events_by_date("events/split"),
-    "events/bar_flag": _events_by_date("events/bar_flag"),
+    FLAGGED_BARS: _flagged_bars,
     "events/index_change": _events_by_date("events/index_change"),
     IPO_LOCKUPS: _ipo_lockups,
     ETF_LAUNCHES: _etf_launches,

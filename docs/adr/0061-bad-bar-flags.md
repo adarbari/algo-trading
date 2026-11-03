@@ -57,7 +57,7 @@ forward outcomes above +300% at h = 60 since 2018, which the edge harness would 
 - Rollups: a dropped bar is a missing bar, so a window needing it is null by each group's gap
   rule; groups that tolerate a few missing bars (52-week range, volume profile) use the others.
   `price_history.bar_status` says `BAD_BAR` (not `NO_TRADE`) for a name whose bar on the session
-  was flagged and dropped (follow-up, 2026-11-02): `price_history` reads `events/bar_flag` as an
+  was flagged and dropped (follow-up, 2026-11-02): `price_history` reads `bars/flagged` (`prices.flagged_bars`, over `events/bar_flag`) as an
   optional input (the session's flagged bars; a later `CLEARED` row retracts), the status is not
   in `price_stats.close`'s `explained_statuses`, so the close reads UNKNOWN (`NO_ROW`, public kind
   not stored; the table and the status are the admin-only cause chain, ADR 0056) and coverage
