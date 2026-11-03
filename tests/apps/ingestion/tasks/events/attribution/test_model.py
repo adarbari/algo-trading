@@ -2,6 +2,7 @@
 model (no network, no real model): rows with the cited headline, the cap, the skips with their
 reasons, a restricted provider never used, and the filing rows untouched."""
 
+from datetime import UTC, date, datetime
 from typing import Any
 
 import pandas as pd
@@ -13,6 +14,7 @@ from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.tasks.events.attribution.run import TABLE, ingest_attribution
 from algotrade_ingestion.tasks.framework.registry import task
+from algotrade_sources.framework.http import HttpError
 from algotrade_sources.vendors.massive.news import MassiveNews
 from tests.apps.ingestion.tasks.events.attribution.test_run import BARE, BIG, NEWS, SESSION, _store
 from tests.conftest import REPO_ROOT
@@ -51,9 +53,15 @@ def _writer_with_symbols() -> StoreWriter:
     return writer
 
 
-def _ctx(writer: StoreWriter, model: object | None, per_night: int = 40, news: bool = True) -> Any:
+def _ctx(
+    writer: StoreWriter,
+    model: object | None,
+    per_night: int = 40,
+    news: bool = True,
+    clock: Any = None,
+) -> Any:
     configs = MemoryConfigStore({("site", "events", "attribution"): {"news_per_night": per_night}})
-    ctx = task_ctx(writer)
+    ctx = task_ctx(writer, clock=clock) if clock else task_ctx(writer)
     ctx.configs = configs
     if news:
         ctx.sources = {"massive_news": MassiveNews(http_for(lambda url: PAYLOAD))}
@@ -118,3 +126,32 @@ def test_answers_that_fail_the_check_store_nothing_and_a_spent_budget_stops_the_
 
 def test_the_task_builds_the_news_source_it_declares() -> None:
     assert "massive_news" in task("attribution").optional_sources
+
+
+def test_a_news_refusal_costs_a_mover_not_the_night_and_the_filing_rows_stay() -> None:
+    def refused(url: str) -> bytes:
+        raise HttpError(403)
+
+    writer, model = _writer_with_symbols(), Scripted()
+    ctx = _ctx(writer, model)
+    ctx.sources = {"massive_news": MassiveNews(http_for(refused))}
+    record = ingest_attribution(ctx, SESSION)
+    assert record.stats["model"]["dropped"] == {"news: GaveUpError": 2}  # type: ignore[index]
+    assert list(_stored(writer)["source"]) == ["filing"] and not model.calls
+
+
+def test_a_backfill_is_known_from_the_day_the_model_ran_not_the_reaction_session() -> None:
+    later = datetime(2026, 10, 9, 22, 0, tzinfo=UTC)  # the Friday after the Monday session
+    writer = _writer_with_symbols()
+    ingest_attribution(_ctx(writer, Scripted(ANSWER, ANSWER), clock=lambda: later), SESSION)
+    out = _stored(writer).set_index(["instrument_id", "source"])
+    assert pd.Timestamp(out.loc[(NEWS, "model"), "known_from"]).date() == date(2026, 10, 9)
+    assert pd.Timestamp(out.loc[(BIG, "filing"), "known_from"]).date() == SESSION  # a filing's
+
+
+def test_a_rerun_does_not_ask_again_for_a_mover_that_has_a_model_row() -> None:
+    writer = _writer_with_symbols()
+    ingest_attribution(_ctx(writer, Scripted(ANSWER, ANSWER)), SESSION)
+    again = Scripted(ANSWER)
+    record = ingest_attribution(_ctx(writer, again), SESSION)
+    assert not again.calls and record.stats["model"]["held"] == 2  # type: ignore[index]

@@ -19,13 +19,21 @@ from datetime import UTC, date
 from algotrade.config.site.events.attribution import load_attribution
 from algotrade.core.model.completion import CallTag
 from algotrade.core.model.errors import DailyLimitError, ModelUnavailableError, RateLimitedError
-from algotrade.core.time.calendar import close_time, previous_session
+from algotrade.core.time.calendar import (
+    EXCHANGE_TZ,
+    close_time,
+    previous_session,
+    session_on_or_before,
+)
+from algotrade.data.events import read_events
 from algotrade.services.attributing import headlines
 from algotrade.services.text_model.model import TextModel
+from algotrade.storage.tables.schemas import ATTRIBUTION_EVENTS
 from algotrade_ingestion.tasks.framework.run import IngestRun, NoResponseError, TaskContext
 from algotrade_sources.framework.series import NEWS_FRAME, NewsRequest
 
 SOURCE = "model"
+TABLE = ATTRIBUTION_EVENTS.name
 SOURCES_KEY = "massive_news"
 USE_CASE = "attributing"
 STOPS = (ModelUnavailableError, RateLimitedError, DailyLimitError)
@@ -33,6 +41,14 @@ STOPS = (ModelUnavailableError, RateLimitedError, DailyLimitError)
 
 def _instant(day: date) -> str:
     return close_time(day).astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def held_models(run: IngestRun, session: date) -> set[str]:
+    """The instruments that already have a model row for ``session`` (a rerun keeps them)."""
+    frame = read_events(run.reader, TABLE, session, session).frame
+    if frame.empty or "source" not in frame.columns:
+        return set()
+    return set(frame.loc[frame["source"] == SOURCE, "instrument_id"].astype(str))
 
 
 def skipped(ctx: TaskContext) -> str | None:
@@ -54,6 +70,7 @@ def classify(
     symbol: str,
     session: date,
     window: tuple[str, str],
+    known: date,
     dropped: Counter[str],
 ) -> tuple[dict[str, object] | None, bool, bool]:
     """``(row, asked, stop)`` of one mover: its headlines, the model's checked answer; ``stop``
@@ -71,6 +88,9 @@ def classify(
     except NoResponseError:
         dropped["no news response"] += 1
         return None, True, False
+    except Exception as error:
+        dropped[f"news: {type(error).__name__}"] += 1
+        return None, True, False
     shown = headlines.headlines_of(normalized.parsed[NEWS_FRAME] if normalized else None)
     if not shown:
         dropped["no headlines"] += 1
@@ -86,7 +106,7 @@ def classify(
         dropped[answer] += 1
         return None, True, False
     label = f"{done.provider}:{done.model}"
-    return headlines.attribution_row(iid, session, session, answer, label), True, False
+    return headlines.attribution_row(iid, session, known, answer, label), True, False
 
 
 def attribute_with_model(
@@ -104,6 +124,11 @@ def attribute_with_model(
         return [], {"skipped": why}
     names = run.resolver(session).symbols  # instrument id -> ticker (the reference snapshot)
     window = (_instant(previous_session(session)), _instant(session))
+    # known from the session the model ran on: a backfill of an old session is not hindsight
+    ran = ctx.clock().astimezone(EXCHANGE_TZ).date()
+    known = max(session, session_on_or_before(ran))
+    held = held_models(run, session)
+    movers = [m for m in movers if m not in held]  # a rerun does not ask again
     rows: list[dict[str, object]] = []
     dropped: Counter[str] = Counter()
     asked = 0
@@ -113,7 +138,7 @@ def attribute_with_model(
                 dropped["no symbol"] += 1
                 continue
             row, was_asked, stop = classify(
-                run, ctx, model, iid, str(names[iid]), session, window, dropped
+                run, ctx, model, iid, str(names[iid]), session, window, known, dropped
             )
             asked += was_asked
             if row is not None:
@@ -125,4 +150,11 @@ def attribute_with_model(
         if close is not None:
             close()  # flush the usage the ledger queued (usage/llm_calls)
     run.record_item("model", f"OK: {asked} asked, {len(rows)} attributed")
-    return rows, {"asked": asked, "stored": len(rows), "dropped": dict(dropped)}
+    stopped = any(k.startswith("model:") for k in dropped)  # one failed call ends the night
+    return rows, {
+        "asked": asked,
+        "stored": len(rows),
+        "held": len(held),
+        "stopped_early": stopped,
+        "dropped": dict(dropped),
+    }
