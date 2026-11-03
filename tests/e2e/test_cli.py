@@ -301,3 +301,7 @@ def test_study_winners_needs_the_stored_history_and_draft_edges_a_known_run(cli:
     assert study.returncode == 2 and "error:" in study.stderr
     draft = cli("draft-edges", "--run", "nope")
     assert draft.returncode == 2 and "not a winners study run" in draft.stderr
+    proposal = cli("--user", "alice", "draft-edges", "--run", "nope")
+    assert proposal.returncode == 2 and "not a winners study run" in proposal.stderr
+    both = cli("--user", "alice", "draft-edges", "--run", "nope", "--out-dir", "x")
+    assert both.returncode == 2 and "no --out-dir" in both.stderr

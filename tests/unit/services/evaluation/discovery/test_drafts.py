@@ -6,10 +6,17 @@ from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from algotrade.core.model.errors import ConfigurationError
-from algotrade.services.evaluation.discovery.drafts import DRAFT_HORIZON, write_draft
+from algotrade.services.evaluation.discovery.drafts import (
+    DRAFT_HORIZON,
+    MAX_RULES,
+    edge_proposal,
+    passed_stats,
+    write_draft,
+)
 from algotrade.services.evaluation.discovery.persist import write_winners_study
 from algotrade.services.evaluation.discovery.tells import find_tells
 from algotrade.storage.backends.memory import MemoryBackend
@@ -85,3 +92,30 @@ def test_draft_refuses_version_1_run(tmp_path: Path) -> None:
     with pytest.raises(ConfigurationError, match="version 1 winners study run"):
         write_draft(writer, run_id, out)
     assert not out.exists()
+
+
+def test_a_passing_run_proposes_one_ranked_screen_per_cluster_and_a_researching_edge() -> None:
+    """ED6 W5: the proposal the harness can judge. Catches: a screen ranked against the tell's
+    sign, a hold of the study's 504 sessions, an edge that sets its own status, and a proposal
+    that hides how many features were searched."""
+    writer, run_id = stored()
+    stats = passed_stats(writer, run_id)
+    p = edge_proposal(run_id, stats)
+    assert p.edge_id == run_id.lower()
+    assert p.tells_tested == len(independent(np.random.default_rng(0)))
+    assert 1 <= len(p.screens) <= MAX_RULES and p.edge["screeners"] == list(p.screens)
+    signs = {t["feature"]: t["sign"] for t in stats["tells"]}
+    for doc in p.screens.values():
+        field = doc["rank"]["tie_break"]
+        assert doc["criteria"]["tell"] == {"field": field, "op": "not_null"}
+        assert doc["rank"]["tie_break_order"] == ("desc" if signs[field] > 0 else "asc")
+    assert "status" not in p.edge and 504 not in p.edge["outcome"]["horizon_sessions"]
+    assert p.edge["frozen_from"].isoformat() == stats["frozen_from"]
+    assert f"{p.tells_tested} features with data searched" in p.edge["notes"]
+
+
+def test_a_run_without_the_w5_stats_is_not_proposed() -> None:
+    writer, run_id = stored()
+    stats = {k: v for k, v in passed_stats(writer, run_id).items() if k != "features_tested"}
+    with pytest.raises(ConfigurationError, match="re-run"):
+        edge_proposal(run_id, stats)

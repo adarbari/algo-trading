@@ -12,6 +12,7 @@ from typing import Any
 
 from algotrade.analytics.report import markdown_table
 from algotrade.config.edges.document import CLOSED
+from algotrade.config.edges.follow import PROPOSED_BY_STUDY
 from algotrade.config.edges.loading import load_all_edges
 from algotrade.config.env import config_dir, data_url
 from algotrade.config.site.regime.episodes import load_episodes
@@ -22,6 +23,8 @@ from algotrade.config.user import UserContext
 from algotrade.core.model.errors import AlgoTradeError, ConfigurationError
 from algotrade.data import StoreReader
 from algotrade.engines.backtest.engine import run_backtest
+from algotrade.services.authoring.proposals import save_proposal
+from algotrade.services.authoring.scope import open_writer
 from algotrade.services.configs import default_user, resolve_config
 from algotrade.services.datasets import list_datasets, load_dataset
 from algotrade.services.evaluation.baseline import (
@@ -35,9 +38,17 @@ from algotrade.services.evaluation.baseline import (
 )
 from algotrade.services.evaluation.cross_section.harness import stored_outcome_sessions
 from algotrade.services.evaluation.cross_section.reads.screens import ScreenCache, shared_screens
-from algotrade.services.evaluation.cross_section.reporting.report import render_edge_report
+from algotrade.services.evaluation.cross_section.reporting.report import (
+    proposed_line,
+    render_edge_report,
+)
 from algotrade.services.evaluation.cross_section.run.scopes import screen_uses
-from algotrade.services.evaluation.discovery.drafts import DEFAULT_DIR, write_draft
+from algotrade.services.evaluation.discovery.drafts import (
+    DEFAULT_DIR,
+    edge_proposal,
+    passed_stats,
+    write_draft,
+)
 from algotrade.services.evaluation.overlay import compare_overlay, overlay_report
 from algotrade.services.evaluation.regime_report import render
 from algotrade.services.evaluation.regime_scorecard import load_history
@@ -300,7 +311,8 @@ def cmd_evaluate_edges(args: argparse.Namespace) -> int:
     finally:
         if scratch is not None:
             shutil.rmtree(scratch, ignore_errors=True)
-    text = "\n".join(reports)
+    proposed = [proposed_line(e.id, e.notes) for e in edges if PROPOSED_BY_STUDY in e.audit.labels]
+    text = "\n".join([*proposed, *reports])
     print(text, end="")
     if args.report:
         args.report.write_text(text)
@@ -502,12 +514,31 @@ def cmd_study_winners(args: argparse.Namespace) -> int:
 
 
 def cmd_draft_edges(args: argparse.Namespace) -> int:
-    """Write the candidate edge draft of the winners study run ``--run`` to ``--out-dir``
-    (default ``var/edge_drafts``), only when the run passed the gate; the owner reviews it and
-    moves it into ``config/site/edges/`` by hand."""
+    """The winners study run ``--run``, only when it passed the gate: with ``--user``, its
+    proposal written as that user's configs (one finalised rule screen per cluster's strongest
+    tell and a ``researching`` edge listing them, labelled ``proposed_by_study``; ED6 W5) for
+    ``evaluate-edges`` to judge; else the candidate draft in ``--out-dir`` (default
+    ``var/edge_drafts``) that the owner reviews and moves into ``config/site/edges/`` by hand."""
     backend = open_backend(data_url(args.data_url))
-    path = write_draft(
-        ResultWriter(backend), args.run, args.out_dir or DEFAULT_DIR, config_dir(args.config_dir)
-    )
+    writer = ResultWriter(backend)
+    if args.user:
+        if args.out_dir:
+            raise ConfigurationError("draft-edges: --user writes the user's configs; no --out-dir")
+        proposal = edge_proposal(args.run, passed_stats(writer, args.run))
+        edge = save_proposal(
+            open_writer(config_dir(args.config_dir)),
+            args.user,
+            proposal.edge_id,
+            proposal.edge,
+            proposal.screens,
+            today=datetime.now(UTC).date(),
+        )
+        print(
+            f"wrote {args.user}'s edge {edge.id} ({edge.status}, proposed by the study) and its "
+            f"screens {', '.join(edge.screeners)}; judge it with "
+            f"`algotrade-backtest evaluate-edges --edge {edge.id}`"
+        )
+        return 0
+    path = write_draft(writer, args.run, args.out_dir or DEFAULT_DIR, config_dir(args.config_dir))
     print(f"wrote {path} (a draft: write the TODOs, review, then move it to config/site/edges/)")
     return 0
