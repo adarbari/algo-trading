@@ -1,7 +1,10 @@
 """The bought option history is quarantined (ADR 0084 decision 3): ``algotrade.data.option_history``
 is imported only by the ingestion app's import (``tasks/options_history``) and its verification
 checks (``tasks/verification``), and only ingestion asks the environment for its store URL. No
-evaluation, feature, screener, page read or API reaches a personal-licence history directly."""
+evaluation, feature, screener, page read or API reaches a personal-licence history directly. The
+one exception (ADR 0088 decision 11, F7): the cross-section harness imports the splice module only
+(``data/option_history/splice.py``, whose own contract keeps it there) and asks for the URL to
+open the root its history slice reads through it."""
 
 import ast
 import tomllib
@@ -18,7 +21,13 @@ ALLOWED = (
 SCANNED = ("src/algotrade", "apps/api", "apps/backtest", "apps/ingestion", "libs")
 CONTRACT = "Option history is quarantined: only ingestion reads it (ADR 0084)"
 GETTER = "option_history_url"
-GETTER_HOMES = ("src/algotrade/config/env.py", "apps/ingestion/")
+HARNESS = "src/algotrade/services/evaluation/cross_section/"
+SPLICE = f"{PROTECTED}.splice"
+GETTER_HOMES = (
+    "src/algotrade/config/env.py",
+    "apps/ingestion/",
+    "src/algotrade/services/evaluation/cross_section/harness.py",  # the history slice (F7)
+)
 
 
 def _imports(path: Path) -> set[str]:
@@ -32,7 +41,9 @@ def _imports(path: Path) -> set[str]:
     return out
 
 
-def _reaches(module: str) -> bool:
+def _reaches(module: str, rel: str = "") -> bool:
+    if rel.startswith(HARNESS) and (module == SPLICE or module.startswith(f"{SPLICE}.")):
+        return False  # the harness's one allowance: the splice
     return module == PROTECTED or module.startswith(f"{PROTECTED}.")
 
 
@@ -50,7 +61,7 @@ def test_only_the_ingestion_import_and_checks_read_the_history() -> None:
     offenders = [
         rel
         for rel, path in _files()
-        if not rel.startswith(ALLOWED) and any(_reaches(m) for m in _imports(path))
+        if not rel.startswith(ALLOWED) and any(_reaches(m, rel) for m in _imports(path))
     ]
     assert not offenders, f"only ingestion's import and checks may import {PROTECTED}: {offenders}"
 

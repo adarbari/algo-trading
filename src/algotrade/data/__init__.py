@@ -25,11 +25,21 @@ functions; they never import ``algotrade.storage.tables.readers`` (import-linter
 """
 
 from algotrade.storage.tables.readers import (
+    STAMPED,
     CapturedReads,
     ReadRecord,
     RecordingReader,
     StoreReader,
     dates_digest,
+    stamps_digest,
 )
 
-__all__ = ["CapturedReads", "ReadRecord", "RecordingReader", "StoreReader", "dates_digest"]
+__all__ = [
+    "STAMPED",
+    "CapturedReads",
+    "ReadRecord",
+    "RecordingReader",
+    "StoreReader",
+    "dates_digest",
+    "stamps_digest",
+]
