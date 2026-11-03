@@ -34,7 +34,8 @@ def test_committed_openapi_is_up_to_date() -> None:
 def test_openapi_is_served(client: TestClient) -> None:
     paths = client.get("/openapi.json").json()["paths"]
     assert "/health" in paths and "/chains/{underlying_id}/live" in paths
-    assert not [p for p in paths if p.startswith("/admin")]  # Admin reads are GraphQL
+    # Admin reads are GraphQL: an /admin path is a write (the event scope list, EV8), never a GET
+    assert not [p for p, ops in paths.items() if p.startswith("/admin") and "get" in ops]
 
 
 def test_no_route_takes_a_user_query_parameter(client: TestClient) -> None:
