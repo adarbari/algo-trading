@@ -171,7 +171,7 @@ purpose = "builders of the FINRA short-interest tests shared across suites: the 
 
 [[test_dir]]
 path = "tests/helpers/option_history"
-purpose = "builders of the option-history tests shared across suites: synthetic HistoricalOptionData zips in a folder (the vendor's file layouts, invented numbers) and a main store with the listings they resolve through"
+purpose = "builders of the option-history tests shared across suites: synthetic HistoricalOptionData zips in a folder (the vendor's file layouts, invented numbers), a main store with the listings they resolve through and a store of imported sessions priced by Black-Scholes (files.py, store.py)"
 
 [[test_dir]]
 path = "tests/helpers/payloads"
