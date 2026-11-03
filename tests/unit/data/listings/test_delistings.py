@@ -126,3 +126,17 @@ def test_a_delisted_and_relisted_id_has_a_row_per_gap() -> None:
     by = delisted_by(reader, date(2030, 1, 1))
     assert by == {"EQ:R": date(2018, 1, 2)}  # the outcomes' rule: only the last stretch
     assert delisted_by(reader, date(2016, 1, 4)) == {}  # R was open in 2016, S relisted
+
+
+def test_a_listing_nested_in_an_earlier_one_never_ends_the_stretch() -> None:
+    reader = _listing_store(
+        [
+            ("EQ:N", "AAA", "NASDAQ", "COMMON_STOCK", "0001", "2000-01-03", "2010-01-04"),
+            ("EQ:N", "AAB", "NYSE", "COMMON_STOCK", None, "2001-01-02", "2005-01-04"),  # nested
+        ]
+    )
+    gone, _ = delisted_listings(reader, date(2030, 1, 1))
+    assert [(r.last_day, r.exchange, r.final) for r in gone.itertuples()] == [
+        (date(2010, 1, 4), "NASDAQ", True)  # the one that ended last, not the nested one
+    ]
+    assert delisted_by(reader, date(2030, 1, 1)) == {"EQ:N": date(2010, 1, 4)}

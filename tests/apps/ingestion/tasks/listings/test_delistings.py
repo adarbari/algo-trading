@@ -227,3 +227,21 @@ def test_a_relisted_id_gets_a_row_for_each_gap() -> None:
     got = stored(reader)
     assert sorted(got["last_session"]) == [DAYS[5], DAY]
     assert record.stats["rows"] == 2 and record.stats["delisted"] == 2
+
+
+def test_a_run_uses_only_what_was_known_on_its_session() -> None:
+    early = DAYS[LAST + 5]
+    late_filing = filing("EQ:A", "8-K", "1.03", day=DAYS[LAST + 8])  # accepted after the run
+    writer = world(
+        {"EQ:A": closes(LAST, LAST + 7)},  # an OTC print on DAYS[LAST + 7], also after it
+        [listing("EQ:A", DAY)],
+        [late_filing],
+    )
+    _, reader = run(writer, early)
+    row = stored(reader, early).loc["EQ:A"]
+    assert row["reason"] == "UNKNOWN" and row["terminal_basis"] == "ZERO_UNKNOWN"
+    assert pd.isna(row["terminal_close"]) and row["known_from"] == DAYS[LAST + 1]
+    _, reader = run(writer, END)  # a later run knows both
+    row = stored(reader, END).loc["EQ:A"]
+    assert (row["reason"], row["terminal_basis"]) == ("BANKRUPTCY", "OTC_CLOSE")
+    assert row["terminal_session"] == DAYS[LAST + 7]

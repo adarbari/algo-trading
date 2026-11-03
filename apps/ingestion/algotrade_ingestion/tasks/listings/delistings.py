@@ -12,6 +12,8 @@ Per instrument: ``last_session`` is the last stored bar on or before the last tr
 its stored filings (``delisting_reason``); ``terminal_close`` is the first stored close in the
 ``OTC_SESSIONS`` sessions after ``last_session`` (Tiingo lists a delisted company's OTC prints
 under the same id: CRSP's rule), else the convention of ``data.listings.delistings.convention``.
+Only what was known on ``D`` is used: filings accepted into a session on or before it and bars up
+to it (an OTC print stored after ``D`` falls back to the convention until a later run).
 Closes are split-adjusted as of the terminal session (``SessionBars``, the outcomes task's basis),
 so the return is the one a holder had. ``knowledge_ts`` is the write time.
 
@@ -29,7 +31,7 @@ import pandas as pd
 
 from algotrade.core.model.errors import MissingDataError
 from algotrade.core.time.calendar import sessions_between
-from algotrade.data.events import ALL_TIME, read_events
+from algotrade.data.events import ALL_TIME, acceptance_sessions, read_events
 from algotrade.data.listings.delistings import (
     BASES,
     OTC_CLOSE,
@@ -59,10 +61,11 @@ def _chunks(frame: pd.DataFrame) -> Iterator[pd.DataFrame]:
         yield frame.iloc[i : i + CHUNK]
 
 
-def _bars(ctx: TaskContext, chunk: pd.DataFrame) -> SessionBars:
-    """The closes around the chunk's last days (an empty ``SessionBars`` when none are stored)."""
+def _bars(ctx: TaskContext, chunk: pd.DataFrame, session: date) -> SessionBars:
+    """The closes around the chunk's last days, none after ``session`` (an OTC print stored later
+    is not known to a run for it); an empty ``SessionBars`` when none are stored."""
     first = min(chunk["last_day"]) - timedelta(BAR_LOOKBACK_DAYS)
-    last = max(chunk["last_day"]) + timedelta(AFTER_DAYS)
+    last = min(max(chunk["last_day"]) + timedelta(AFTER_DAYS), session)
     try:
         return session_bars(
             ctx.reader, first, last, [str(i) for i in chunk["instrument_id"]], columns=("close",)
@@ -146,14 +149,14 @@ def _row(
 
 
 def build_rows(
-    ctx: TaskContext, gone: pd.DataFrame, filings: pd.DataFrame
+    ctx: TaskContext, gone: pd.DataFrame, filings: pd.DataFrame, session: date
 ) -> tuple[list[dict[str, object]], int]:
     """The rows of every delisted instrument with a last bar, and how many had none."""
     by_id = {str(i): rows for i, rows in filings.groupby("instrument_id")}
     empty = filings.iloc[0:0]
     out: list[dict[str, object]] = []
     for chunk in _chunks(gone.sort_values(["last_day", "instrument_id"], kind="stable")):
-        bars = _bars(ctx, chunk)
+        bars = _bars(ctx, chunk, session)
         closes = _closes(bars)
         for _, listing in chunk.iterrows():
             iid = str(listing["instrument_id"])
@@ -161,6 +164,16 @@ def build_rows(
             if row is not None:
                 out.append(row)
     return out, len(gone) - len(out)
+
+
+def _known_filings(ctx: TaskContext, ids: list[str], session: date) -> pd.DataFrame:
+    """The stored filings of ``ids`` known on ``session`` (``known_from <= session``, and accepted
+    into a session on or before it): a run for ``session`` uses only what was known then."""
+    frame = read_events(ctx.reader, FILINGS, *ALL_TIME, ids, through=session).frame
+    frame = frame.reindex(columns=FILING_COLUMNS)
+    if frame.empty:
+        return frame
+    return frame[acceptance_sessions(frame["ts"]) <= session]
 
 
 def _counts(values: Sequence[str], vocabulary: Sequence[str]) -> dict[str, int]:
@@ -179,10 +192,8 @@ def ingest_delistings(ctx: TaskContext, session: date) -> RunRecord:
             run.failed(f"listing history of {snapshot} was written after the session {session}")
             return run.record
         ids = sorted({str(i) for i in gone["instrument_id"]})
-        filings = read_events(ctx.reader, FILINGS, *ALL_TIME, ids).frame.reindex(
-            columns=FILING_COLUMNS
-        )
-        rows, no_last_bar = build_rows(ctx, gone, filings)
+        filings = _known_filings(ctx, ids, session)
+        rows, no_last_bar = build_rows(ctx, gone, filings, session)
         frame = pd.DataFrame(rows)
         if frame.empty:  # never leave an older snapshot as the latest silently
             run.failed("no delisting row: nothing delisted by the session, or no last bar stored")

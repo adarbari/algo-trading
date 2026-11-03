@@ -445,8 +445,9 @@ SHORT_VOLUME_EVENTS = fixed(
 # return of that step. A FULL snapshot per run session (every delisted instrument each run, so a
 # reason that changes when filings arrive is a new snapshot; the reader takes the latest on or
 # before a write session, ``data.listings.delistings``). ``ts`` is the last session at midnight
-# UTC; ``known_from`` the session the delisting was public from (the session after the Form 25
-# acceptance, else after the last session); ``knowledge_ts`` is the write time, never the
+# UTC; ``known_from`` the session the delisting was public from (the session after the later of the
+# earliest Form 25 / 25-NSE acceptance, else the last session, and the acceptance of the filing
+# that decided the reason); ``knowledge_ts`` is the write time, never the
 # delisting day. Quarantined like the outcomes: only ``data.listings`` reads it (a feature only
 # when ``known_from <= S``; the outcome label reads the delistings in (S, T] whatever their
 # ``known_from``).

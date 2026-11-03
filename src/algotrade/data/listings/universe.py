@@ -257,15 +257,22 @@ def delisted_listings(reader: StoreReader, session: date) -> tuple[pd.DataFrame,
         first_day=lambda f: pd.to_datetime(f["start_date"]),
     )
     rows = rows.sort_values(["instrument_id", "first_day", "last_day"], kind="stable")
+    rows = rows.reset_index(drop=True)
     by_id = rows.groupby("instrument_id")
     rows["next_start"] = by_id["first_day"].shift(-1)
     rows["cik"] = by_id["cik"].ffill()
     rows["cik"] = rows.groupby("instrument_id")["cik"].bfill()
-    open_ids = rows.loc[rows["last_day"].isna(), "instrument_id"].unique()
+    # An open listing reaches forever; a listing nested in an earlier one's span (A 2000-2010, B
+    # 2001-2005) never ends the id's stretch: only a row whose end is the running maximum does.
+    reach = rows["last_day"].fillna(pd.Timestamp.max).groupby(rows["instrument_id"]).cummax()
     ended = rows["last_day"] <= pd.Timestamp(session)
-    last_one = rows["next_start"].isna() & ~rows["instrument_id"].isin(open_ids) & ended
-    real_gap = rows["next_start"] > _gap_ends(rows)
-    rows = rows.assign(final=last_one)[ended & (last_one | real_gap)]
+    stretch_end = ended & (rows["last_day"] == reach)
+    open_ids = rows.loc[rows["last_day"].isna(), "instrument_id"].unique()
+    ended_on = rows["last_day"].fillna(pd.Timestamp.min)
+    latest = ended_on.groupby(rows["instrument_id"]).idxmax()  # the listing that ended last
+    final = rows.index.isin(latest[~latest.index.isin(open_ids)]) & ended
+    real_gap = stretch_end & (rows["next_start"] > _gap_ends(rows))
+    rows = rows.assign(final=final)[final | real_gap]
     out = rows[["instrument_id", "last_day", "exchange", "security_type", "cik", "final"]]
     out = out.assign(last_day=[d.date() for d in out["last_day"]])
     return out.sort_values(["instrument_id", "last_day"], kind="stable").reset_index(drop=True), (
