@@ -119,7 +119,7 @@ export function OptionsPanel(props: OptionsPanelProps) {
         void chain.refetch();
         void quotes.refetch();
       }}
-      footer={`${BAND_LABEL}: contracts whose |delta| is 0.08 to 0.15. Cboe delayed quotes for the session; IV and Greeks as the feed computes them.`}
+      footer={`${BAND_LABEL}: |delta| 0.08 to 0.15, Cboe delayed quotes.`}
     >
       <Stack gap={3}>
         {data?.status && data.status !== 'OK' ? (

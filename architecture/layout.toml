@@ -387,7 +387,7 @@ purpose = "use cases (the backend's interface for apps); shared helpers: configs
 
 [[dir]]
 path = "src/algotrade/services/authoring"
-purpose = "use case: author L4 user configs (ADR 0029): rule-screen drafts, immutable versions, preset copy / rebase, schedule switch, user features; the only config writer the API calls"
+purpose = "use case: author L4 user configs (ADR 0029): rule-screen drafts, immutable versions, preset copy / rebase, schedule switch, user features, onboarding a trader (ID5); the only config writer the API calls"
 contracts = [
     "Layout: use-case packages are independent (backtests, screening, authoring, drafting, explaining, events, feedback)",
     "Config writes go only through services.authoring (ADR 0029)",
@@ -462,7 +462,11 @@ purpose = "what an edge evaluation reports beyond its stored rows (ADR 0053): th
 
 [[dir]]
 path = "src/algotrade/services/evaluation/cross_section/run"
-purpose = "what one edge evaluation is set up from and returns (ADR 0053): its identity, the Edge fields that make a run (RUN_INPUTS) and the bookkeeping ones, the run hash, the effective split and the trials earlier runs logged (identity.py); the variants and the scopes it evaluates, a scope's universe, its event schedules and an implied-vol field's licence (scopes.py); the typed result, EdgeEvaluation with each VariantResult, LegDetail and RandomPicks (evaluation.py); split from harness.py, which plans and assembles the run"
+purpose = "what one edge evaluation is set up from and returns (ADR 0053): its identity, the Edge fields that make a run (RUN_INPUTS) and the bookkeeping ones, the run hash, the effective split and the trials earlier runs logged (identity.py); the variants and the scopes it evaluates, a scope's universe, its event schedules and an implied-vol field's licence (scopes.py); the typed result, EdgeEvaluation with each VariantResult, LegDetail and RandomPicks (evaluation.py); the price-source slices of an option edge's evaluation, open (Cboe) and history, and the open slice's licence check (sources.py, ADR 0088 d11); split from harness.py, which plans and assembles the run"
+
+[[dir]]
+path = "src/algotrade/services/evaluation/cross_section/scoring"
+purpose = "one decision session's statistic of a variant, scored for the measuring of the edge harness (ADR 0053): the names of a variant, the scored outcomes, the screener, ensemble and portfolio_return statistic (session_stat.py) and every pick of the session in rank order, counted or with its reason (pick_rows.py)"
 
 [[dir]]
 path = "src/algotrade/services/evaluation/discovery"
@@ -589,7 +593,7 @@ contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
 
 [[dir]]
 path = "src/algotrade/services/read/edge_ledger"
-purpose = "the ledger and the variant grid of an edge's verdict basis (ADR 0064, 0065): its picks paged and sorted by the server and as a CSV file, and every screen and holding period the official run tried"
+purpose = "which run ledgers the retention purge spares, open and history runs alike (keep.py); the ledger and the variant grid of an edge's verdict basis (ADR 0064, 0065): its picks paged and sorted by the server and as a CSV file, and every screen and holding period the official run tried"
 contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
 
 [[dir]]

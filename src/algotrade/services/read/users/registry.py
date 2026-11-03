@@ -1,12 +1,13 @@
 """``UserRegistry``: the people the site declares (``config/site/users.toml``) for the Admin Users
-page: id, display name, role and the data licences they hold. Admin only (``PermissionDeniedError``
-for anyone else, before anything is read). Never an email or a subject: identity stays on the
+page: id, display name, role, the data licences they hold and whether a user the onboarding form
+declared still has no provider account pinned. Admin only (``PermissionDeniedError`` for anyone
+else, before anything is read). Never an email or a subject: identity stays on the
 server (ADR 0040). What the site does not store (plan, last seen, brief delivery) is not a field."""
 
 from dataclasses import dataclass
 
 from algotrade.config.site.settings import load_users
-from algotrade.config.site.users import Role
+from algotrade.config.site.users import DECLARED_BY_IDENTITY, Role
 from algotrade.config.user import SITE_USER
 from algotrade.core.model.errors import PermissionDeniedError
 from algotrade.services.read.context import Stores
@@ -20,6 +21,7 @@ class Person:
     role: str  # "admin" or "trader"
     licences: tuple[str, ...]  # held beyond "open", sorted
     scheduled: bool  # the site's own scheduled-screens user, not a person who signs in
+    pending_provider: bool = False  # onboarded by the admin form, no provider subject pinned yet
 
 
 @dataclass(frozen=True)
@@ -34,7 +36,12 @@ def load_user_registry(ctx: Stores, viewer: Viewer) -> UserRegistry:
     return UserRegistry(
         tuple(
             Person(
-                u.user_id, u.name, u.role.value, tuple(sorted(u.licences)), u.user_id == SITE_USER
+                u.user_id,
+                u.name,
+                u.role.value,
+                tuple(sorted(u.licences)),
+                u.user_id == SITE_USER,
+                u.declared == DECLARED_BY_IDENTITY and u.subject is None,
             )
             for u in load_users(ctx.configs).users
         )

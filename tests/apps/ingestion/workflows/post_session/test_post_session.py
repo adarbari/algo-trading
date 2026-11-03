@@ -280,8 +280,36 @@ def test_a_long_run_is_a_duration_warning() -> None:
         return Outcome(StepStatus.SUCCEEDED)
 
     ctx = task_ctx(writer_with_nightly(D), clock=lambda: now[0])
-    summary = run_post_session(ctx, D, NightlySettings(post_max_duration_minutes=60), slow)
+    settings = NightlySettings(post_max_duration_minutes=60, edge_eval_target_s=1e9)
+    summary = run_post_session(ctx, D, settings, slow)
     assert [w["check"] for w in summary["warnings"]] == ["post_duration"]
+
+
+def test_the_edge_eval_duration_is_reported_against_its_target() -> None:
+    """ADR 0063's target (a minute once the legs are stored): the summary says how long the
+    step took and a WARN names it when it is over; a skipped step reports none."""
+    now = [START]
+
+    def eval_took(seconds: float) -> Callable[[date], Outcome]:
+        def run(session: date) -> Outcome:
+            now[0] += timedelta(seconds=seconds)
+            return Outcome(StepStatus.SUCCEEDED)
+
+        return run
+
+    settings = NightlySettings(edge_eval_target_s=60)
+    for seconds, within in ((45.0, True), (90.0, False)):
+        ctx = task_ctx(writer_with_nightly(D), clock=lambda: now[0])
+        summary = run_post_session(ctx, D, settings, eval_took(seconds))
+        found = summary["edge_eval"]
+        assert (found["duration_s"], found["target_s"], found["within_target"]) == (
+            seconds, 60, within,
+        )  # fmt: skip
+        checks = [w["check"] for w in summary["warnings"]]
+        assert checks == ([] if within else ["edge_eval_duration"])
+        assert within or "90 s (target 60 s)" in summary["warnings"][0]["detail"]
+    skipped = run_post_session(task_ctx(writer_with_nightly(D)), D, settings)
+    assert skipped["edge_eval"] is None  # no job runner: the step is SKIPPED, nothing to time
 
 
 def test_the_report_gets_a_post_session_section_from_the_stored_record(

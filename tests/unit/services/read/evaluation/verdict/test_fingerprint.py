@@ -61,10 +61,18 @@ NOT_HEADLINE = {
 # What the verdict package imports from outside itself and the headline never runs: the full
 # verdict's pieces (outlook, evidence, decay, robustness, haircut), the loaders, and the
 # constants that only feed the JudgeCall (which is hashed whole).
+HISTORY = "the owner-only history runs (ADR 0088 d11), never judged"
 NOT_JUDGED = {
     "algotrade.config.site.settings:load_users": "gate on who sees a setup",
     "algotrade.services.licences:held_by": "gate on who sees a setup",
     "algotrade.services.read.evaluation.runs:load_edge_runs": "gate on who sees a setup",
+    "algotrade.config.edges.document:job_name": HISTORY,
+    "algotrade.config.edges.positions.chain:OPTION_HISTORY": HISTORY,
+    "algotrade.config.user:SITE_USER": HISTORY,
+    "algotrade.services.read.evaluation.runs:run_of_record": HISTORY,
+    "algotrade.storage.runs:RunStatus": HISTORY,
+    "algotrade.services.read.evaluation.runs:has_hidden_run": "gate on who sees a setup",
+    "algotrade.services.read.evaluation.edges:held_licences": "gate on who sees a setup",
     "algotrade.config.edges.positions.chain:OPTION_KINDS": "feeds the call's option flag",
     "algotrade.services.read.evaluation.runs:SeriesRow": "the type of the call's holdout input",
     "algotrade.services.read.evaluation.runs:load_run_series": "reads the call's holdout input",

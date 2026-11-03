@@ -163,6 +163,7 @@ def test_every_write_moves_the_users_generation_to_the_next_even_value(writer: A
         lambda: writer.add_version("alice", "mine", 1, DOC | {"version": 1}),
         lambda: writer.save_features("alice", "theme", {"features": {}}),
         lambda: writer.save_preferences("alice", {"ideas": {"priority": []}}),
+        lambda: writer.save_identity("alice", {"email": "a@example.com"}),
         lambda: writer.save_user_document("alice", "edges", "e1", {"id": "e1"}),
         lambda: writer.archive_user_document("alice", "edges", "e1", at),
         lambda: writer.discard_draft("alice", "mine"),
@@ -194,3 +195,30 @@ def test_the_generation_is_odd_during_a_write_and_a_crash_leaves_it_odd(tmp_path
     assert not is_stable(writer.generation("alice"))  # nothing is cached under it
     writer.save_preferences("alice", {"x": 1})
     assert writer.generation("alice") == 10  # the next write repairs it, to an even value
+
+
+def test_an_identity_is_replaced_whole_read_back_and_scoped_to_its_user(writer: Any) -> None:
+    at = datetime(2026, 11, 2, 9, 30, tzinfo=UTC)
+    document = {
+        "email": "a@example.com",
+        "name": "Alice",
+        "declared_by": "local",
+        "declared_at": at,
+    }
+    assert writer.load("alice", "identity", "identity") is None
+    writer.save_identity("alice", document)
+    assert writer.load("alice", "identity", "identity") == document
+    writer.save_identity("alice", {"email": "b@example.com"})
+    assert writer.load("alice", "identity", "identity") == {"email": "b@example.com"}
+    assert writer.load("bob", "identity", "identity") is None and "alice" in writer.users()
+    with pytest.raises(ConfigurationError, match="site"):
+        writer.save_identity("site", document)  # site configs change by PR only
+    with pytest.raises(ConfigurationError, match="invalid user id"):
+        writer.save_identity("../x", document)
+
+
+def test_an_exclusive_identity_write_never_replaces_one(writer: Any) -> None:
+    writer.save_identity("alice", {"email": "a@example.com"}, exclusive=True)
+    with pytest.raises(FileExistsError):
+        writer.save_identity("alice", {"email": "b@example.com"}, exclusive=True)
+    assert writer.load("alice", "identity", "identity") == {"email": "a@example.com"}

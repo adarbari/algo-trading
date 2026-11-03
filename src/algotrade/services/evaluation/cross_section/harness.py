@@ -285,6 +285,7 @@ def evaluate_edge(
     random_draws: int = DEFAULT_DRAWS,
     full: bool = False,
     screens: ScreenCache | None = None,
+    job_source: str = "",
 ) -> EdgeEvaluation:
     """``edge`` and its ``[[variants]]`` over the decision sessions in ``start..end`` for every
     horizon, its screeners and baselines, with outcomes known by ``as_of``. ``iv_field``: the
@@ -296,10 +297,21 @@ def evaluate_edge(
     ``ConfigurationError`` for an event class with no declared field and
     ``MissingDataError`` when no outcome is stored for a horizon. An edge with ``base =
     "out_of_window"`` or ``"delta_equivalent"`` is measured by ``time_series/``
-    (``_time_series``)."""
+    (``_time_series``). ``job_source``: the history slice's run-job suffix, whose trial log the
+    trial count reads (``prior_trials``, ADR 0088 d11)."""
     if edge.base in TIME_SERIES:
         return _time_series(
-            reader, writer, configs, user, edge, start, end, as_of, split_from, random_draws
+            reader,
+            writer,
+            configs,
+            user,
+            edge,
+            start,
+            end,
+            as_of,
+            split_from,
+            random_draws,
+            job_source,
         )
     variants = edge_variants(configs, user, edge)
     split, exploratory = effective_split(split_from, edge)
@@ -400,7 +412,12 @@ def evaluate_edge(
                 plan, variant, stats, (closed, kept, exits), start, projected
             )
             legs = stats.randoms.get((plan.key, variant.id), {})
-            found = tagged(stats.legs.get((plan.key, variant.id), {}), scope.edge, session)
+            found = tagged(
+                stats.legs.get((plan.key, variant.id), {}),
+                scope.edge,
+                session,
+                stats.gates.get((plan.key, variant.id)),
+            )
             every, blocks_open, block_stats = pooled_blocks(scope.edge, found, vkept, vclosed)
             pooled = [
                 pool_random([legs[leg.decision] for leg in block if leg.decision in legs])
@@ -496,7 +513,7 @@ def evaluate_edge(
     tried = {
         (r.edge_variant, r.variant, r.config_hash, r.horizon) for r in results if r.role == SCREENER
     }
-    trials = len(tried | prior_trials(writer, edge.id, user.user_id))
+    trials = len(tried | prior_trials(writer, edge.id, user.user_id, job_source))
     snapshot = min(session.snapshots(), default=None)
     return EdgeEvaluation(
         edge_id=edge.id,
@@ -543,6 +560,7 @@ def _time_series(
     as_of: datetime,
     split_from: date | None,
     random_draws: int,
+    job_source: str = "",
 ) -> EdgeEvaluation:
     """A time-series edge (ADR 0073) or named option sleeve (ADR 0088) as an ``EdgeEvaluation``:
     one trial per named instrument (``variant`` its symbol, ``horizon`` the window's length or the
@@ -576,7 +594,7 @@ def _time_series(
     }
     trial_rows = [r for r in run.results if r.role == SCREENER]  # baselines are never trials
     tried = {(r.edge_variant, r.symbol, keys[r.identity], r.horizon) for r in trial_rows}
-    trials = len(tried | prior_trials(writer, edge.id, user.user_id))
+    trials = len(tried | prior_trials(writer, edge.id, user.user_id, job_source))
     measured = deflated_measures(run.results, trials)
     ran = _as_ran(edge, sleeved)
     results = [

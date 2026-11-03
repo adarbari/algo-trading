@@ -205,7 +205,7 @@ export function ScreenerResults({
         ),
         state,
         emptyMessage: screener
-          ? `No run stored for this screener on ${results.data?.session?.date ?? 'the latest session'}. Run it now to see what it picks.`
+          ? `No run stored for this screener on ${results.data?.session?.date ?? 'the latest session'}; run it now.`
           : 'No such screener.',
         errorMessage: 'The results failed to load.',
         onRetry: () => void results.refetch(),

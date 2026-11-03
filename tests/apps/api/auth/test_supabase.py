@@ -227,3 +227,18 @@ def test_without_a_pinned_subject_the_email_decides(
     pinned: SupabaseAuthenticator, tokens: Tokens
 ) -> None:
     assert pinned.authenticate(bearer(tokens.mint(email="tom@example.com"))).user_id == "tom"
+
+
+def test_a_registry_function_is_read_on_every_request(
+    users: UsersSettings, fetch: Fetch, tokens: Tokens
+) -> None:
+    """ID5: the onboarding write swaps the registry; the authenticator follows it, no restart."""
+    keys = KeySet(fetch)
+    keys.refresh()
+    current = [users]
+    auth = SupabaseAuthenticator(SUPABASE_URL, lambda: current[0], keys, tokens.secret)
+    token = tokens.mint("HS256", kid=None, email="zoe@example.com")
+    with pytest.raises(ForbiddenError):
+        auth.authenticate(bearer(token))
+    current[0] = users.with_identities({"tom": Identity("zoe@example.com")})
+    assert auth.authenticate(bearer(token)).user_id == "tom"

@@ -10,7 +10,8 @@ from algotrade.services.read.users import registry
 @strawberry.type(
     description="One declared user (`config/site/users.toml`): `role` admin or trader, "
     "`licences` the data licences held beyond open, `scheduled` the site's own scheduled-screens "
-    "user (never signs in). No email or subject: identity stays on the server"
+    "user (never signs in), `pendingProvider` a user the onboarding form declared whose provider "
+    "account is not pinned yet (ID5). No email or subject: identity stays on the server"
 )
 class Person:
     user_id: str = strawberry.field(name="id")
@@ -18,6 +19,7 @@ class Person:
     role: str
     licences: list[str]
     scheduled: bool
+    pending_provider: bool
 
     @classmethod
     def of(cls, d: registry.Person) -> Self:
@@ -27,6 +29,7 @@ class Person:
             role=d.role,
             licences=list(d.licences),
             scheduled=d.scheduled,
+            pending_provider=d.pending_provider,
         )
 
 

@@ -18,6 +18,7 @@ max_duration_minutes = 150       # a nightly run (the market-daily path only) lo
 
 [post]                           # the post-session workflow (ADR 0070): descriptions, verify, edge-eval after the nightly
 max_duration_minutes = 360       # a post-session run longer than this is recorded as a WARN (the weekly audit takes ~3 h)
+edge_eval_target_s = 60          # the edge-eval step's target (ADR 0063): its duration is reported in the summary, a WARN above it
 
 [notify]                         # after every run (desktop: only when the status is not COMPLETE)
 enabled = true                   # false: no desktop notification and no email (the summary file is still written)

@@ -26,12 +26,14 @@ describe('UserList', () => {
   it('counts people without the scheduled user and lists every declared user with its help', async () => {
     const { container } = render(<UserList />);
     const strip = screen.getByLabelText('People summary');
-    expect(within(strip).getByText('People').parentElement).toHaveTextContent('2');
+    expect(within(strip).getByText('People').parentElement).toHaveTextContent('3');
     expect(within(strip).getByText('Admins').parentElement).toHaveTextContent('1');
     const table = screen.getByRole('grid', { name: 'People' });
     expect(within(table).getByRole('row', { name: /ana/ })).toHaveTextContent('Admin');
     expect(within(table).getByRole('row', { name: /tom/ })).toHaveTextContent('Trader');
     expect(within(table).getByRole('row', { name: /site/ })).toBeInTheDocument();
+    expect(within(table).getByRole('row', { name: /eva/ })).toHaveTextContent('Pending provider');
+    expect(within(table).getByRole('row', { name: /tom/ })).not.toHaveTextContent('Pending');
     expect(screen.getByText('help user_licences')).toBeInTheDocument();
     await expectNoA11yViolations(container);
   });

@@ -18,9 +18,9 @@ from algotrade.services.evaluation.cross_section.detail import trades
 from algotrade.services.evaluation.cross_section.detail.trades import trades_frame
 from algotrade.services.evaluation.cross_section.harness import evaluate_edge
 from algotrade.services.evaluation.cross_section.measures import Pick
-from algotrade.services.evaluation.cross_section.measuring import NO_ENTRY_BAR
 from algotrade.services.evaluation.cross_section.results import write_edge_eval
 from algotrade.services.evaluation.cross_section.run.evaluation import EdgeEvaluation
+from algotrade.services.evaluation.cross_section.scoring.pick_rows import NO_ENTRY_BAR
 from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade.storage.tables.edge_schemas import EDGE_TRADES
 from tests.unit.services.evaluation.cross_section.conftest import (
