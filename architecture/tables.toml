@@ -172,7 +172,18 @@ note = "ADR 0050: the macro release calendar (FRED release dates, ISM by rule), 
 [[table]]
 name = "events/attribution"
 owner = "apps/ingestion/algotrade_ingestion/tasks/events/attribution/run.py"
-note = "ADR 0050 EV4: the cause of a big move (cause class, text, confidence, evidence) per instrument, reaction session and source (filing now, model and analyst_review later); known_from = the session the attribution was knowable on (a filing row: its reaction session); the read takes the highest source, then the latest"
+also_written_by = ["apps/ingestion/algotrade_ingestion/tasks/events/dossier/run.py"]
+note = "ADR 0050 EV4: the cause of a big move (cause class, text, confidence, evidence) per instrument, reaction session and source (filing, model; analyst_review from a dossier import, EV5); known_from = the session the attribution was knowable on (a filing row: its reaction session); the read takes the highest source, then the latest"
+
+[[table]]
+name = "instruments/factors"
+owner = "apps/ingestion/algotrade_ingestion/tasks/events/dossier/run.py"
+note = "ADR 0050 EV5: the factors (drivers) of a name from its reviewed deep-dive dossier (kind, description, status active | retired, review date); every import writes the whole dossier, a reader takes, per instrument, the latest import run (newest knowledge_ts) among rows with known_from on or before its session; known_from = the import's session"
+
+[[table]]
+name = "events/factor_occurrence"
+owner = "apps/ingestion/algotrade_ingestion/tasks/events/dossier/run.py"
+note = "ADR 0050 EV5: dated occurrences (past instances, next dates) and undated watch items (an expected window) of a dossier's factors; same whole-dossier, latest-run rule as instruments/factors; known_from = the import's session"
 
 [[table]]
 name = "events/filing"

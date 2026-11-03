@@ -256,6 +256,11 @@ purpose = "the attribution task (ADR 0050, EV4): why each big mover of a session
 kind = "task-domain"
 
 [[dir]]
+path = "apps/ingestion/algotrade_ingestion/tasks/events/dossier"
+purpose = "the dossier-import task (ADR 0050, EV5): the owner-reviewed deep-dive dossiers (TOML) validated whole and stored as instruments/factors, events/factor_occurrence and analyst_review rows of events/attribution; run.py"
+kind = "task-domain"
+
+[[dir]]
 path = "apps/ingestion/algotrade_ingestion/tasks/framework"
 purpose = "task machinery: the ingest run loop (IngestRun, TaskContext), the task registry and refresh scheduling (slot days for incremental tasks)"
 

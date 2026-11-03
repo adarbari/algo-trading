@@ -90,9 +90,8 @@ def test_a_rerun_stores_the_same_rows() -> None:
 
 
 def test_the_table_merges_on_source_so_a_model_row_never_overwrites_a_filing_row() -> None:
-    assert table_key(ATTRIBUTION_EVENTS, ["instrument_id", "ts", "source"]) == [
-        "instrument_id", "ts", "source"
-    ]  # fmt: skip
+    key = ["instrument_id", "ts", "source", "known_from"]  # a later review never overwrites one
+    assert table_key(ATTRIBUTION_EVENTS, key) == key
 
 
 def test_an_earlier_sessions_late_filing_is_attributed_by_the_lookback() -> None:

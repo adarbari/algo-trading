@@ -50,6 +50,7 @@ TIMELINE_KINDS: tuple[str, ...] = (
 NOT_TIMELINE: dict[str, str] = {
     "attribution": "the cause of a big move (EV4): the Events tab's history reads it with EV7",
     "bar_flag": "bars the quality check rejected (ADR 0061); applied to prices, not a dated event",
+    "factor_occurrence": "dossier factor dates (EV5): read by the forward calendar (EV8)",
     "filing": "8-K and other filings: read by the event study (``event_study``), no detail line",
     "filing_text": "10-K / 10-Q item text by CIK (``NO_INSTRUMENT_ROWS``): none per instrument",
     "fund_nav": "a closed-end fund's NAV per day: a series (``cef_nav`` features), not an event",
