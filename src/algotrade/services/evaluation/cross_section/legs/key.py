@@ -18,7 +18,7 @@ from algotrade.config.strategy.schema import Selection
 from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.services.evaluation.cross_section.random_picks import SEED_VERSION
 
-LEG_VERSION = 5  # bump when a change to code (not config) changes what a leg holds
+LEG_VERSION = 6  # bump when a change to code (not config) changes what a leg holds
 # 2 (ADR 0064 decision 4): every pick with its rank, score, reason, gross value, dip, ADV at D;
 # hits at each cost level
 # 3 (ADR 0053 amendment 2026-10-18): a screener out of sample also holds its sector-stratified
@@ -28,6 +28,8 @@ LEG_VERSION = 5  # bump when a change to code (not config) changes what a leg ho
 # 5 (ADR 0088, E6a): every pick's trade-contract fields (exit, exit kind, capital, return on
 # capital gross and net, max adverse, price source, outcome licence); every leg is recomputed once
 # (one full re-run)
+# 6 (ADR 0087 decision 5, PR6b): every pick also holds its delisting basis and the value and hit
+# with the delisting return taken out (the zero-convention figure); every leg is recomputed once
 DRAW_LEG_VERSION = 4  # FROZEN: the draws' seed reads this, not LEG_VERSION, so a leg bump keeps
 # every out-of-sample draw (and every stored verdict) as is; only ``SEED_VERSION`` re-seeds them
 HARNESS_VERSION = 2  # 2: the run hash is an allowlist of ``RUN_INPUTS``, not the whole Edge

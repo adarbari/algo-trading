@@ -506,3 +506,26 @@ def test_an_entry_conditions_counts_and_each_picks_own_s_round_trip_and_older_ro
     assert (plain["pick_entry"], plain["not_triggered"], plain["entry_unknown"]) == (None,) * 3
     assert plain["case_unknown"] is None
     assert decode_leg(plain).stat.not_triggered == 0
+
+
+def test_the_delisting_figures_of_a_pick_round_trip_and_older_legs_hold_none() -> None:
+    """Leg v6 (ADR 0087 decision 5): each pick's delisting basis and zero-convention value (its
+    hit a bit of ``pick_flags``) as aligned lists, null where unknown; a leg of picks none of which
+    was delisted stores nothing new; a v5 row decodes with None on every pick."""
+    gone = Pick(
+        "EQ:G", 1, "", -0.5, False, delisted=True, delisting_basis="REPLACEMENT",
+        zero_value=0.09, zero_hit=True,
+    )  # fmt: skip
+    kept = Pick("EQ:H", 2, "", 0.02, True, zero_value=0.02, zero_hit=True)
+    held = leg(stat=stat(pick_values=(-0.5, 0.02), pick_hits=1, picks=(gone, kept)))
+    row = encode_leg(held, "site", "drift")
+    assert row["pick_delisting_basis"] == ["REPLACEMENT", None]
+    assert row["pick_zero_values"] == [0.09, 0.02]
+    assert decode_leg(row).stat.picks == (gone, kept)
+    plain = encode_leg(leg(), "site", "drift")
+    assert plain["pick_delisting_basis"] is None and plain["pick_zero_values"] is None
+    v5 = {k: v for k, v in row.items() if k not in ("pick_delisting_basis", "pick_zero_values")}
+    old = decode_leg(v5).stat.picks
+    assert all((p.delisting_basis, p.zero_value, p.zero_hit) == (None,) * 3 for p in old)
+    names = {c.name for c in EDGE_LEGS.columns}
+    assert {"pick_delisting_basis", "pick_zero_values"} <= names

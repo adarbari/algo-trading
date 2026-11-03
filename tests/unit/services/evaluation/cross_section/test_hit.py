@@ -26,6 +26,7 @@ from algotrade.services.evaluation.cross_section.hit import (
     needs_pairs,
     own_keys,
     short_view,
+    zero_view,
 )
 from algotrade.storage.tables.schemas import RESIDUAL_RETURNS
 from tests.helpers.stored_frames import stamped
@@ -722,3 +723,95 @@ def test_a_share_path_whose_exit_rule_was_unknown_on_a_close_is_unmeasured() -> 
 def test_a_share_path_row_with_no_benchmark_return_is_excluded_not_a_miss() -> None:
     out = apply_outcome(path_edge(), path_rows(2, fwd_excess_return=[0.05, NAN]))
     assert list(out["excluded"]) == ["", "missing_value"] and not out["hit"].iloc[1]
+
+
+def _excess_edge(**over: object) -> Any:
+    return edge(
+        outcome={
+            "kind": "excess_return", "horizon_sessions": [2], "benchmark": "SPY",
+            "start_offset_sessions": 1, **over,
+        }
+    )  # fmt: skip
+
+
+def test_a_v2_frame_has_the_zero_figure_equal_to_the_value() -> None:
+    out = apply_outcome(_excess_edge(), rows(fwd_excess_return=[0.02, -0.01]))
+    assert list(out["zero_value"]) == list(out["oriented"])
+    assert list(out["zero_hit"]) == list(out["hit"]) == [True, False]
+    assert out["delisting_basis"].isna().all()
+
+
+def test_a_delisting_return_is_in_the_value_and_taken_out_of_the_zero_figure() -> None:
+    last, dr = 0.10, -0.55
+    full = (1 + last) * (1 + dr) - 1  # -0.505
+    frame = rows(
+        fwd_excess_return=[full - 0.01, 0.02],
+        outcome_status=["DELISTED", "COMPLETE"],
+        fwd_return=[full, 0.03],
+        delisting_return=[dr, None],
+        delisting_basis=["REPLACEMENT", None],
+    )
+    out = apply_outcome(_excess_edge(), frame)
+    assert out.at[0, "oriented"] == pytest.approx(full - 0.01) and not out.at[0, "hit"]
+    assert out.at[0, "zero_value"] == pytest.approx(last - 0.01) and out.at[0, "zero_hit"]
+    assert out.at[0, "delisting_basis"] == "REPLACEMENT" and pd.isna(out.at[1, "delisting_basis"])
+    assert (out.at[1, "zero_value"], out.at[1, "zero_hit"]) == (0.02, True)  # not delisted: same
+
+
+def test_the_short_view_carries_the_zero_figure_of_the_short() -> None:
+    frame = rows(
+        fwd_excess_return=[-0.505 - 0.01],
+        outcome_status=["DELISTED"],
+        fwd_return=[-0.505],
+        delisting_return=[-0.55],
+        delisting_basis=["REPLACEMENT"],
+        horizon_sessions=[2],
+    )
+    short = short_view(apply_outcome(_excess_edge(side="short"), frame))
+    assert short.at[0, "hit"]  # the short wins on the -50% return ...
+    assert short.at[0, "zero_value"] == pytest.approx(-(0.10 - 0.01))  # ... and loses without it
+    assert not short.at[0, "zero_hit"]
+
+
+def test_an_excluded_row_has_no_zero_figure() -> None:
+    out = apply_outcome(_excess_edge(), rows(fwd_excess_return=[NAN, 0.02]))
+    assert np.isnan(out.at[0, "zero_value"]) and not out.at[0, "zero_hit"]
+
+
+# ---- zero_view: the delisting return taken back out of a v3 frame (ADR 0087 decision 5)
+
+
+def _v3() -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "instrument_id": ["EQ:A", "EQ:B", "EQ:C"],
+            "fwd_return": [(1.10) * (1 - 0.55) - 1, 0.04, 0.02],
+            "fwd_excess_return": [(1.10) * (1 - 0.55) - 1 - 0.01, 0.03, 0.01],
+            "fwd_max_drawdown": [0.2, 0.1, 0.0],
+            "delisting_return": [-0.55, None, None],
+            "delisting_basis": ["REPLACEMENT", None, "NO_EVENT"],
+        }
+    )
+
+
+def test_the_zero_figure_is_one_plus_f_over_one_plus_dr_minus_one() -> None:
+    out = zero_view(_v3())
+    assert out.at[0, "fwd_return"] == pytest.approx(0.10)  # (1 + f) / (1 + dr) - 1 = r_last
+    assert out.at[0, "fwd_excess_return"] == pytest.approx(0.09)  # the benchmark's 0.01 stays
+    assert out.at[0, "fwd_max_drawdown"] == 0.2  # to the last bar already: untouched
+
+
+def test_rows_with_no_delisting_return_are_unchanged() -> None:
+    frame, out = _v3(), zero_view(_v3())
+    assert list(out["fwd_return"][1:]) == list(frame["fwd_return"][1:])  # incl. NO_EVENT: null
+    assert list(out["fwd_excess_return"][1:]) == list(frame["fwd_excess_return"][1:])
+
+
+def test_the_input_is_not_changed_and_a_v2_frame_is_returned_as_is() -> None:
+    frame = _v3()
+    zero_view(frame)
+    assert frame.at[0, "fwd_return"] == pytest.approx(-0.505)
+    v2 = frame.drop(columns=["delisting_return", "delisting_basis"])
+    assert zero_view(v2) is v2
+    none = frame.assign(delisting_return=None)
+    assert zero_view(none) is none

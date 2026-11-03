@@ -31,8 +31,13 @@ from algotrade.services.evaluation.cross_section.measures import (
 )
 from algotrade.services.evaluation.cross_section.random_picks import RANDOM
 from algotrade.services.evaluation.cross_section.reporting.decoys import decoy_overlaps
+from algotrade.services.evaluation.cross_section.reporting.delistings import delistings
 from algotrade.services.evaluation.cross_section.run.evaluation import EdgeEvaluation, VariantResult
 from algotrade.services.evaluation.cross_section.run.sources import ALL, SourceSlice
+from algotrade.services.evaluation.cross_section.run.universe_basis import (
+    SURVIVORS,
+    UniverseBasis,
+)
 from algotrade.services.evaluation.evidence.measures import TailMeasures
 from algotrade.services.read.context import Stores
 from algotrade.storage.runs import RunRecord, start_run
@@ -324,6 +329,12 @@ def historical_identity(evaluation: EdgeEvaluation) -> dict[str, Any] | None:
     return None if evaluation.historical is None else evaluation.historical.as_dict()
 
 
+def universe_basis_of(evaluation: EdgeEvaluation) -> UniverseBasis:
+    """The run's stamp (ADR 0087 decision 6); a run that never counted the listing history (a
+    time-series run) is ``survivors`` with its one gap named."""
+    return evaluation.universe_basis or UniverseBasis(SURVIVORS, ("listing_counts_unread",))
+
+
 def _verdict_headline(
     stores: Stores | None,
     evaluation: EdgeEvaluation,
@@ -403,6 +414,11 @@ def write_edge_eval(
         "event_unknown": dict(evaluation.event_unknown),
         "universe_snapshot": evaluation.snapshot.isoformat() if evaluation.snapshot else None,
         "historical_identity": historical_identity(evaluation),
+        "universe_basis": universe_basis_of(evaluation).basis,  # survivors | free (ADR 0087 d6)
+        "universe_basis_gaps": list(
+            universe_basis_of(evaluation).gaps
+        ),  # sorted: the failed conditions
+        "delistings": delistings(evaluation),  # by reason and basis, the zero-convention figure
         "mode": evaluation.mode,  # full | incremental (ADR 0063): how the run got its legs
         "legs_reused": evaluation.legs_reused,
         "legs_computed": evaluation.legs_computed,

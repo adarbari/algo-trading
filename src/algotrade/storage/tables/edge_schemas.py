@@ -251,6 +251,11 @@ EDGE_LEGS = fixed(
     # held in the wait (``not_triggered``) or was UNKNOWN first (``entry_unknown``); null for an
     # edge without one and in older legs.
     "pick_entry date[]",
+    # Leg v6 (ADR 0087 decision 5; nullable): each pick's ``delisting_basis`` and its oriented
+    # value with the delisting return taken out (``pick_zero_values``; its hit is a bit of
+    # ``pick_flags``), aligned to ``pick_ids``; null in older legs and where no pick was delisted.
+    "pick_delisting_basis string[]",
+    "pick_zero_values float64[]",
     "not_triggered int64",
     "entry_unknown int64",
     "case_unknown int64",  # E13b: base names a case value could not be resolved for at D

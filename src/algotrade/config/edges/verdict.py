@@ -43,6 +43,7 @@ KEYS = (
     "exit_rule",  # typed apart (positions/exit_rule.py); never a judge input
     "tails_verdict",  # TailsVerdict: the ``tails`` profile (ADR 0088, design 2.6)
     "option_costs",  # OptionCosts: the option cost levels (E6b-2 reads them)
+    "universe_basis",  # typed apart (universe_basis.py): stamps a run, never a judge input
     "option_quotes",  # typed apart (positions/quotes.py); sets outcome rows, never a judge input
 )
 TAILS_KEYS = (
