@@ -71,6 +71,7 @@ NOT_JUDGED = {
     "algotrade.config.user:SITE_USER": HISTORY,
     "algotrade.services.read.evaluation.runs:run_of_record": HISTORY,
     "algotrade.storage.runs:RunStatus": HISTORY,
+    "algotrade.services.read.evaluation.runs:has_hidden_run": "gate on who sees a setup",
     "algotrade.services.read.evaluation.edges:held_licences": "gate on who sees a setup",
     "algotrade.config.edges.positions.chain:OPTION_KINDS": "feeds the call's option flag",
     "algotrade.services.read.evaluation.runs:SeriesRow": "the type of the call's holdout input",

@@ -27,17 +27,15 @@ from algotrade.config.edges.document import (
     LEGACY_SITE_OWNERS,
     job_name,
 )
-from algotrade.config.edges.loading import load_all_edges
+from algotrade.config.edges.positions.chain import CHAIN_KIND
 from algotrade.config.site.settings import load_users
 from algotrade.config.user import SITE_USER
-from algotrade.data import StoreReader
 from algotrade.features.framework.feature import LICENCES, strictest
 from algotrade.quant.edges.statistics import window_weights
 from algotrade.services.read.availability.cause import run_cause, table_cause
 from algotrade.services.read.context import ReadContext, Stores, once_per_request, run_partition
 from algotrade.services.read.evaluation.edges import Edge, held_licences, load_edges, parsed_edges
 from algotrade.services.read.values import Unknown, UnknownCode, to_scalar
-from algotrade.storage.configs.store import ConfigStore
 from algotrade.storage.runs import RunRecord, RunStatus
 from algotrade.storage.tables.interfaces import RowFilter
 from algotrade.storage.tables.schemas import result_table
@@ -98,7 +96,7 @@ class EdgeRun:
     screener_hashes: tuple[tuple[str, str], ...] = ()
     evidence_licence: str = "open"  # its outcome rows' and rules' strictest licence (E1)
     exits_digest: str | None = None  # the declared exits it tested (None: none, or an older run)
-    pre_split: bool = False  # an option edge's run with no ``price_source`` (ADR 0088 d11)
+    pre_split: bool = False  # an option edge's licensed run with no ``price_source`` (d11)
 
 
 @dataclass(frozen=True)
@@ -259,7 +257,7 @@ def run_of_record(
     committed = record.finished_at or record.started_at
     split = _day(stats.get("split_from"))
     start = (stats.get("range") or [None])[0]
-    exploratory = _exploratory(stats, frozen_from)
+    exploratory = is_exploratory(stats, frozen_from)
     return EdgeRun(
         run_id=record.run_id,
         edge_id=edge.id,
@@ -280,11 +278,14 @@ def run_of_record(
         screener_hashes=tuple(sorted((stats.get("screener_hashes") or {}).items())),
         evidence_licence=str(stats.get("evidence_licence") or "open"),
         exits_digest=stats.get("exits_digest"),
-        pre_split="price_source" not in stats and edge.reads_chain,
+        pre_split="price_source"
+        not in stats  # an option edge's run from before the split, if licensed
+        and getattr(edge.settings, "kind", None) == CHAIN_KIND
+        and stats.get("evidence_licence", "open") != "open",
     )
 
 
-def _exploratory(stats: Mapping[str, Any], frozen_from: date | None) -> bool:
+def is_exploratory(stats: Mapping[str, Any], frozen_from: date | None) -> bool:
     """A run whose split is not the edge's ``frozen_from``, or that says it is exploratory."""
     return _day(stats.get("split_from")) != frozen_from or bool(stats.get("exploratory"))
 
@@ -336,15 +337,27 @@ def _read_committed(ctx: Stores, edge: Edge, owner: str) -> list[EdgeRun]:
     return [_run(ctx, r, edge, owner, legacy) for r, legacy in ordered]
 
 
+def viewable(ctx: Stores, runs: Sequence[EdgeRun]) -> list[EdgeRun]:
+    """``runs`` without a pre-split run (it may hold history rows, ADR 0088 d11) whose licence the
+    viewer lacks."""
+    if not any(r.pre_split for r in runs):
+        return list(runs)
+    held = held_licences(ctx)
+    return [r for r in runs if not (r.pre_split and r.evidence_licence not in held)]
+
+
+def has_hidden_run(ctx: Stores, edge: Edge) -> bool:
+    """Whether a pre-split run exists that ``viewable`` drops for this viewer."""
+    found = [r for o in (ctx.user.user_id, SITE_USER) for r in _committed(ctx, edge, o)]
+    return len(viewable(ctx, found)) < len(found)
+
+
 def load_edge_runs(ctx: Stores, edge: Edge) -> tuple[EdgeRun, ...]:
     """Every committed run of ``edge`` the user sees (theirs, then the site's), newest first."""
-    held = held_licences(ctx)
     owners = dict.fromkeys([ctx.user.user_id, SITE_USER])
     runs: dict[str, EdgeRun] = {}
     for o in owners:  # a legacy ``local`` run is the viewer's own record too: the site's copy wins
-        for r in _committed(ctx, edge, o):
-            if r.pre_split and r.evidence_licence not in held:  # may hold history rows (d11)
-                continue
+        for r in viewable(ctx, _committed(ctx, edge, o)):
             if r.run_id not in runs or r.legacy_owner is not None:
                 runs[r.run_id] = r
     return tuple(sorted(runs.values(), key=lambda r: r.knowledge_ts, reverse=True))
@@ -374,7 +387,7 @@ def load_canonical_run(ctx: Stores, edge: Edge, bounded: bool = False) -> Canoni
     else:
         found = [
             r
-            for r in _committed(ctx, edge, SITE_USER)
+            for r in viewable(ctx, _committed(ctx, edge, SITE_USER))
             if not r.exploratory and not (bounded and r.after_session)
         ]
         if found:
@@ -965,36 +978,3 @@ def _load_run_trades(
     licences = {str(v) for v in found["licence"].dropna()} if "licence" in found else set()
     licence = strictest(licences) if licences else None
     return RunTrades(None, rows, len(found), licence)
-
-
-def ledger_keep(reader: StoreReader, configs: ConfigStore, since: date) -> frozenset[date]:
-    """The ``results/edge_trades`` partitions the retention purge spares (ADR 0064 decision 2):
-    those of every run that finished on or after ``since`` (the retention cutoff: a partition is
-    dated by its run's range end, so an old range run yesterday is still recent), of every edge's
-    canonical run (the latest committed site run at its frozen split), of the latest committed run
-    of each edge and user (the declared users and those with config files) and of every run an
-    edge's ``[evidence]`` cites."""
-    declared = [u.user_id for u in load_users(configs).users]
-    users = list(dict.fromkeys([SITE_USER, *declared, *configs.users()]))
-    keep: set[date] = set()
-    for edge in load_all_edges(configs):
-        for user in users:
-            done = sorted(
-                (r for r in reader.runs(job_name(edge.id, user)) if r.status is RunStatus.COMPLETE),
-                key=lambda r: r.finished_at or r.started_at,
-                reverse=True,
-            )
-            keep.update(
-                r.session_date for r in done if (r.finished_at or r.started_at).date() >= since
-            )
-            if done:
-                keep.add(done[0].session_date)
-            if user == SITE_USER and edge.frozen_from is not None:
-                canon = next((r for r in done if not _exploratory(r.stats, edge.frozen_from)), None)
-                if canon is not None:
-                    keep.add(canon.session_date)
-        if edge.evidence is not None:
-            cited = reader.run(edge.evidence.run_id)
-            if cited is not None:
-                keep.add(cited.session_date)
-    return frozenset(keep)

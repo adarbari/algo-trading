@@ -210,6 +210,7 @@ def edge_eval_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, An
             random_draws=int(params.get("random_draws") or DEFAULT_DRAWS),
             full=_edge_eval_mode(params) != "incremental",  # an audit recomputes every leg
             screens=ctx.resources.get("screens"),  # the CLI's multi-edge run (ADR 0059 amendment)
+            job_source=part.job_suffix,
         )
         check_open(evaluation, part)  # before the publish: an open run never joins licensed rows
         # ``mode`` ``audit`` (the nightly's run on a week's first session, ADR 0063): the run above

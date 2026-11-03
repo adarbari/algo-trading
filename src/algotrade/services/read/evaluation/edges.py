@@ -165,12 +165,6 @@ class Edge:
         return self.followed or (self.mine and self.status in loading.RECORDING)
 
     @property
-    def reads_chain(self) -> bool:
-        """It reads option trade rows: its outcome, or (no templates here) a position baseline."""
-        kind = getattr(self.settings, "kind", None)
-        return kind == "option_pnl" or bool(self.position_baselines)
-
-    @property
     def paper_since(self) -> date | None:
         """The session the user's interest began: the bookmark's, else the status's."""
         return self.followed_since if self.followed else self.status_since

@@ -103,3 +103,24 @@ def test_an_empty_in_sample_slice_does_not_crash_the_measures() -> None:
     in_sample = Slice("in_sample", "in_sample", lambda s: s.session < date(2025, 1, 1))
     (m,) = slice_measures([A, B], [in_sample])
     assert (m.sessions, m.picks) == (0, 0) and m.lift is None and m.sharpe is None
+
+
+def test_a_history_run_counts_history_trials_and_the_open_count_ignores_them() -> None:
+    from datetime import UTC, datetime  # noqa: PLC0415
+
+    from algotrade.services.evaluation.cross_section.run.identity import prior_trials  # noqa: PLC0415
+    from algotrade.storage.backends.memory import MemoryBackend  # noqa: PLC0415
+    from algotrade.storage.runs import RunRecord  # noqa: PLC0415
+    from algotrade.storage.tables.result_writer import ResultWriter  # noqa: PLC0415
+
+    writer, now = ResultWriter(MemoryBackend()), datetime(2026, 11, 2, tzinfo=UTC)
+
+    def trial(variant: str) -> dict:
+        return {"variant": variant, "config_hash": "h", "horizon": 2, "edge_variant": "main"}
+
+    for job, variant in (("edge-eval:e:site", "open"), ("edge-eval:e:site:option_history", "hist")):
+        record = RunRecord(f"r-{variant}", job, CUT, now)
+        record.finish(now, complete=True, stats={"trials": [trial(variant)]})
+        writer.save_run(record)
+    assert {t[1] for t in prior_trials(writer, "e", "site")} == {"open"}
+    assert {t[1] for t in prior_trials(writer, "e", "site", OPTION_HISTORY)} == {"hist"}

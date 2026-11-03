@@ -21,13 +21,13 @@ from algotrade.storage.runs import RunStatus
 
 def evidence_visible(ctx: Stores, edge: Edge) -> bool:
     """Whether the viewer holds the licence of every committed open run's outcome rows of ``edge``.
-    A run from before the price-source split (``EdgeRun.pre_split``: it may have joined history
-    rows beside Cboe's) is ignored: the open verdict is the Cboe-only run's (ADR 0088 d11); the
-    history slice is a separate run job ``edge_runs`` never lists."""
+    A pre-split run the viewer lacks the licence of is not listed (``runs.viewable``); an edge
+    left with no run for that reason is hidden, not visible for want of one (ADR 0088 d11)."""
     held = held_licences(ctx)
-    return all(
-        r.evidence_licence in held for r in runs.load_edge_runs(ctx, edge) if not r.pre_split
-    )
+    shown = runs.load_edge_runs(ctx, edge)
+    if not shown and runs.has_hidden_run(ctx, edge):
+        return False
+    return all(r.evidence_licence in held for r in shown)
 
 
 def load_history_runs(ctx: Stores, edge: Edge) -> tuple[runs.EdgeRun, ...]:

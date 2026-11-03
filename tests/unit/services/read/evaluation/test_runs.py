@@ -731,6 +731,7 @@ class _Committed:
 
     def __init__(self, run_id: str, after_session: bool) -> None:
         self.run_id, self.exploratory, self.after_session = run_id, False, after_session
+        self.pre_split = False
 
 
 def test_bounded_canonical_run_skips_a_run_committed_after_the_session(
@@ -749,8 +750,12 @@ def test_bounded_canonical_run_skips_a_run_committed_after_the_session(
 
 
 def _option_stores(backend: MemoryBackend, user: str = "trader") -> Any:
-    """Stores of a setup that reads option rows (a position baseline), a trader or the owner."""
-    edge = {**EDGE, "baselines": ["position:long_shares"]}
+    """Stores of a setup that reads option rows (``option_pnl``) for a trader or the owner."""
+    option = {
+        "kind": "option_pnl", "horizon_sessions": [20], "benchmark": "none", "tenor_days": 30,
+        "position": "short_put", "strike_delta": 0.25, "start_offset_sessions": 1,
+    }  # fmt: skip
+    edge = {**EDGE, "outcome": option}
     users = {"user": [{"id": "owner", "role": "admin", "licences": ["personal"]},
                       {"id": "trader", "role": "trader"}]}  # fmt: skip
     site = FileConfigStore(REPO_ROOT / "config", local=False)
@@ -789,3 +794,26 @@ def test_a_pre_split_option_run_is_dropped_for_a_viewer_without_its_licence(
     runs = {r.run_id: r for r in load_edge_runs(owner, edge)}
     assert set(runs) == {"combined", "split"}
     assert (runs["combined"].pre_split, runs["split"].pre_split) == (True, False)
+
+
+def test_a_lone_personal_pre_split_run_hides_the_setup_and_is_no_canonical_run(
+    backend: MemoryBackend,
+) -> None:
+    write_run(backend, "combined", FROZEN, 0.6, evidence_licence="personal")  # no price_source
+    trader = _option_stores(backend, "trader")
+    (edge,) = load_edges(trader, gated=False)  # the setup itself, ungated
+    assert load_edge_runs(trader, edge) == ()
+    assert load_canonical_run(trader, edge).run is None  # no leak through the canonical run
+    assert not evidence_visible(trader, edge)
+    owner = _option_stores(backend, "owner")
+    assert load_canonical_run(owner, edge).run is not None and evidence_visible(owner, edge)
+
+
+def test_a_run_recording_its_price_source_is_never_pre_split(backend: MemoryBackend) -> None:
+    """A share edge's run (``all``) with a personal rule field is not flagged: it joined no
+    history rows, and its licence gate is the ordinary one."""
+    write_run(backend, "share", FROZEN, 0.6, evidence_licence="personal", source="all")
+    owner = _option_stores(backend, "owner")
+    (edge,) = load_edges(owner)
+    (run,) = load_edge_runs(owner, edge)
+    assert run.pre_split is False
