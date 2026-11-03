@@ -33,7 +33,8 @@ import secrets
 import shutil
 import threading
 from collections import OrderedDict
-from collections.abc import Collection, Sequence
+from collections.abc import Callable, Collection, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -405,11 +406,18 @@ class LocalTables:
                         by_year[year] = rows
             parts: dict[int, list[pa.Table]] = {y: [t] for y, t in by_year.items() if t.num_rows}
             if any(y not in by_year for y in range(start.year, end.year + 1)):
-                for d in self._stored_days(table, start, end, own_run):
-                    if d.year not in by_year:
-                        data = self._partition(table, d, as_of, instruments, own_run, seq, columns)
-                        if data is not None:
-                            parts.setdefault(d.year, []).append(data)
+                days = [
+                    d
+                    for d in self._stored_days(table, start, end, own_run)
+                    if d.year not in by_year
+                ]
+
+                def one(d: date) -> pa.Table | None:
+                    return self._partition(table, d, as_of, instruments, own_run, seq, columns)
+
+                for d, data in zip(days, _map_days(one, days), strict=True):
+                    if data is not None:
+                        parts.setdefault(d.year, []).append(data)
             return [t for year in sorted(parts) for t in parts[year]]
 
         parts = read_at(at, self.commits.published, self.commits.no_commits, upto)
@@ -716,6 +724,21 @@ class LocalTables:
             with held(index_lock(day)):  # no write or commit is mid-way in the partition
                 (day / INDEX).unlink(missing_ok=True)  # unindexed first: readers see nothing
             shutil.rmtree(day)
+
+
+READ_WORKERS = min(8, os.cpu_count() or 1)
+PARALLEL_FROM = 64  # fewer days than this read serially: a pool costs more than it saves
+
+
+def _map_days[T](read: Callable[[date], T], days: Sequence[date]) -> list[T]:
+    """``read`` of each day, in ``days`` order, on a bounded pool for a long range (the work is
+    file opens and Arrow decoding, both off the GIL). Each read is pinned to the caller's commit
+    sequence and touches no shared state, so order and results equal the serial loop; the first
+    failure (a ``StaleSnapshotError``) propagates after the pool drains."""
+    if len(days) < PARALLEL_FROM or READ_WORKERS < 2:
+        return [read(d) for d in days]
+    with ThreadPoolExecutor(READ_WORKERS, thread_name_prefix="partition-read") as pool:
+        return list(pool.map(read, days, chunksize=1))
 
 
 def _read_file(

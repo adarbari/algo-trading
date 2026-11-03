@@ -125,7 +125,9 @@ test('an indicator opens its history and a market fall sets the range of every c
   await openFirstCard(slow);
   await slow.getByRole('button', { name: 'Show history' }).first().click();
   await expect(slow.getByRole('radiogroup', { name: 'Chart range' }).first()).toBeVisible();
-  await expect(slow.getByText(/Colors as in the legend above/).first()).toBeVisible();
+  await expect(
+    slow.getByText(/A gap in the line is a period with no stored value/).first(),
+  ).toBeVisible();
   await page
     .getByRole('grid', { name: 'Market falls' })
     .getByText('Covid crash, early 2020')

@@ -114,7 +114,7 @@ describe('IndicatorHistory', () => {
     expect(props.referenceLines).toEqual([
       { value: 0.5, label: 'on', tone: 'warning', dash: true },
     ]);
-    expect(screen.getByText(/Colors as in the legend above/)).toBeVisible();
+    expect(screen.getByText(/A gap in the line is a period with no stored value/)).toBeVisible();
   });
 
   it('draws no threshold line for a card with no rule, and renders the toolbar it is given', () => {
