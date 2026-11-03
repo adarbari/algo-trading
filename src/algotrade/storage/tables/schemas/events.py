@@ -78,6 +78,31 @@ MACRO_RELEASE_EVENTS = fixed(
     runs="merge",
 )
 
+# L1: the cause of a big move (ADR 0050 decision 4, EV4): one row per instrument, reaction session
+# and source (``source``: filing, model, analyst_review). ``ts`` is the reaction session's midnight
+# UTC; ``known_from`` the session the attribution was produced on (a model or dossier row is not
+# known before it ran: no past session sees it). ``cause_class`` is the closed taxonomy
+# (``services.attributing.taxonomy``), ``confidence`` 0..1, ``evidence`` the filing (accession and
+# items) or the quoted headline. Runs merge: the read takes per (instrument, session) the highest
+# source, then the latest.
+ATTRIBUTION_EVENTS = fixed(
+    "events/attribution",
+    "event",
+    ("instrument_id", "ts", KNOWN_FROM, "cause_class"),
+    "instrument_id string!",
+    "ts timestamp_utc!",
+    f"{KNOWN_FROM} date!",
+    "cause_class string!",
+    "cause_text string!",
+    "confidence float64!",
+    "evidence string!",
+    "evidence_ref string",
+    "model string",  # a model row: the provider and model that answered
+    "prompt_version string",
+    runs="merge",
+    key=("instrument_id", "ts", "source"),  # a model row never overwrites a filing row
+)
+
 # L1: the 8-K and 8-K/A filings of the scoped companies (ADR 0050), one row per instrument and
 # filing (a CIK's share classes each get the row). ``ts`` is SEC's acceptance instant in UTC;
 # ``filing_date`` is the date SEC files it under (an evening acceptance is dated the next

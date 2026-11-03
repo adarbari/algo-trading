@@ -3,7 +3,7 @@ and a toy market-entity group (``MARKET_COUNTS``, ADR 0047) that task tests run 
 the site's market groups (``only_market_counts``)."""
 
 from collections.abc import Mapping, Sequence
-from datetime import date
+from datetime import UTC, date, datetime, time
 
 import numpy as np
 import pandas as pd
@@ -12,6 +12,7 @@ import pytest
 from algotrade.core.model.instruments import market_id
 from algotrade.core.time.calendar import sessions_ending
 from algotrade.data import StoreReader
+from algotrade.data.reference import KNOWN_BY_SESSION
 from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs
 from algotrade.features.framework.feature import Feature
@@ -233,11 +234,20 @@ def write_chains(
 
 
 def write_rows(
-    writer: StoreWriter, table: str, day: date, rows: Sequence[Mapping[str, object]]
+    writer: StoreWriter,
+    table: str,
+    day: date,
+    rows: Sequence[Mapping[str, object]],
+    knowledge: datetime | None = None,
 ) -> None:
-    """Stored rows of a group table (e.g. a rollup's output) for one session."""
+    """Stored rows of a group table (e.g. a rollup's output) for one session. ``knowledge``:
+    when they became known (default ``T0``, but the end of ``day`` for a ``KNOWN_BY_SESSION``
+    snapshot table: a session reads only what was known by then)."""
+    if knowledge is None and table in KNOWN_BY_SESSION:
+        knowledge = datetime.combine(day, time(23, 59), UTC)
     run = f"{table.rsplit('/', 1)[-1]}-{day}"
-    writer.write_table(table, day, run, stamped([dict(r) for r in rows], day, run))
+    frame = stamped([dict(r) for r in rows], day, run, *([knowledge] if knowledge else []))
+    writer.write_table(table, day, run, frame)
 
 
 def features(columns: Mapping[str, str]) -> tuple[Feature, ...]:

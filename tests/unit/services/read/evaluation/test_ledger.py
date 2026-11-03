@@ -12,11 +12,11 @@ import pytest
 from algotrade.config.user import UserContext
 from algotrade.data import StoreReader
 from algotrade.services.read.context import open_stores
+from algotrade.services.read.edge_ledger.keep import ledger_keep
 from algotrade.services.read.evaluation import runs
 from algotrade.services.read.evaluation.edges import load_edge
 from algotrade.services.read.evaluation.runs import (
     EdgeRun,
-    ledger_keep,
     load_canonical_run,
     load_run_trades,
 )
@@ -210,3 +210,17 @@ def test_the_ledger_is_read_once_per_request_and_again_in_the_next(
     later = viewer(backend, "owner")
     load_run_trades(later, canonical(later), horizon=2)
     assert len(reads) == 3  # the next request reads it again
+
+
+def test_the_purge_spares_the_latest_history_run_too(backend: MemoryBackend) -> None:
+    """A history run is its own run job (ADR 0088 d11): its ledger is kept like an open run's."""
+    day = date(2026, 6, 1)
+    write_ledger(backend, "open", ROWS, end=date(2026, 6, 8), minutes=1)
+    record = RunRecord("hist", "edge-eval:drift:site:option_history", day, T)
+    record.finish(T, complete=True, stats={"price_source": "option_history"})
+    ResultWriter(backend).save_run(record)
+    configs = MemoryConfigStore(
+        {**DOCS, ("site", "settings", "users"): {"user": [{"id": "site", "role": "admin"}]}}
+    )
+    since = (T + timedelta(days=1)).date()  # nothing finished within the window
+    assert day in ledger_keep(StoreReader(backend), configs, since)

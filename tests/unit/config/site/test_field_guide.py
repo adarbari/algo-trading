@@ -162,6 +162,7 @@ def test_the_shipped_guide_is_complete() -> None:
         "cohort",
         "events",
         "events-2",
+        "events-3",
         "fundamentals",
         "fundamentals-2",
         "instrument",

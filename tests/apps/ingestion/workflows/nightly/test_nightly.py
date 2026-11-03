@@ -187,17 +187,17 @@ def test_every_recorded_step_names_the_tables_its_task_writes(fake: Callable[...
 
 
 def test_an_optional_step_failing_is_a_warning(fake: Callable[..., Calls]) -> None:
-    fake(fail=("shares", "etf-holdings"))
+    fake(fail=("insider", "etf-holdings"))
     writer = store()
     summary = run_nightly(task_ctx(writer), Plan([D]))
-    assert statuses(summary)["shares"] == "FAILED"
+    assert statuses(summary)["insider"] == "FAILED"
     assert summary["status"] == "SUCCEEDED"
     record = writer.runs_for("nightly", D)[-1]
     assert record.status is RunStatus.COMPLETE and last_done(writer) == D
-    assert record.items["shares"] == "WARN: FAILED (optional step)"
+    assert record.items["insider"] == "WARN: FAILED (optional step)"
     details = [w["detail"] for w in summary["warnings"] if w["check"] == "optional_step"]
     assert details == [
-        f"{D} shares: RuntimeError: shares broke",
+        f"{D} insider: RuntimeError: insider broke",
         f"{D} etf-holdings: RuntimeError: etf-holdings broke",
     ]
 
@@ -330,13 +330,13 @@ def test_a_critical_step_without_its_source_fails(
     fake: Callable[..., Calls], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     fake()
-    for name in ("bars", "shares"):
+    for name in ("bars", "insider"):
         spec = replace(registry.TASKS[name], sources=("massive_bars",))
         monkeypatch.setitem(registry.TASKS, name, spec)
     summary = run_nightly(task_ctx(store()), Plan([D]))
     assert steps_of(summary)["bars"]["status"] == "FAILED"
     assert steps_of(summary)["bars"]["reason"] == "massive_bars is not configured"
-    assert steps_of(summary)["shares"]["status"] == "SKIPPED"  # optional: not applicable
+    assert steps_of(summary)["insider"]["status"] == "SKIPPED"  # optional: not applicable
 
 
 def test_duration_warning(fake: Callable[..., Calls]) -> None:
@@ -540,15 +540,15 @@ def test_a_dependent_that_failed_on_refetched_data_is_not_taken_from_before(
 def test_a_need_skipped_every_attempt_does_not_rerun_its_dependents(
     fake: Callable[..., Calls],
 ) -> None:
-    calls, screens = fake(skip=("ibkr-contracts",)), Screens()  # IB Gateway down all night
+    calls, screens = fake(skip=("bar-quality",)), Screens()  # a source down all night
     writer = store()
     first = run_nightly(task_ctx(writer), Plan([D]), screens=screens)
     assert (
-        statuses(first)["ibkr-contracts"] == "SKIPPED" and statuses(first)["ibkr-iv"] == "SUCCEEDED"
+        statuses(first)["bar-quality"] == "SKIPPED" and statuses(first)["outcomes"] == "SUCCEEDED"
     )
     second = run_nightly(task_ctx(writer), Plan([D]), screens=screens)
-    assert calls.sessions("ibkr-contracts") == [D, D]  # SKIPPED is never carried
-    assert calls.sessions("ibkr-iv") == [D] and statuses(second)["ibkr-iv"] == "SUCCEEDED"
+    assert calls.sessions("bar-quality") == [D, D]  # SKIPPED is never carried
+    assert calls.sessions("outcomes") == [D] and statuses(second)["outcomes"] == "SUCCEEDED"
 
 
 def test_rollups_rerun_when_ibkr_iv_succeeds_in_a_later_attempt(
@@ -900,7 +900,7 @@ def test_notifies_on_failure_and_always_writes_the_summary(
     # The notice carries the full report (the email body): subject, text and HTML.
     (note,) = notifier.notices
     assert (
-        note.subject == f"[algotrade] {D} nightly: FAILED · 11 steps with failures"
+        note.subject == f"[algotrade] {D} nightly: FAILED · 12 steps with failures"
     )  # bar-quality, outcomes, share-outcomes, residual-returns, edge-signals... need bars
     assert "bars FAILED: RuntimeError: bars broke" in note.text
     assert note.html.startswith("<!doctype html>") and "bars broke" in note.html

@@ -3,11 +3,13 @@ series only the open ones; an ungated edge passes through unchanged."""
 
 from dataclasses import replace
 from datetime import date
+from types import SimpleNamespace
 
 from algotrade.services.evaluation.cross_section.detail.gating import (
     open_blocks,
     open_only,
     pooled_blocks,
+    tagged,
     turned,
 )
 from algotrade.services.evaluation.cross_section.sessions import Leg
@@ -53,3 +55,13 @@ def test_the_slices_read_the_turned_over_series_of_an_ungated_edge_too() -> None
     own = every[:1]  # a gated edge turns both series, apart
     out_every, out_own = turned(every, own, turn)
     assert len(out_every) == 3 and len(out_own) == 1 and all(s.pick_hits == 9 for s in out_every)
+
+
+def test_a_decided_state_is_used_and_the_session_gate_is_not_asked_again() -> None:
+
+    asked: list[date] = []
+    session = SimpleNamespace(gate=lambda _g, d: asked.append(d) or "open")
+    seen = found("", "", "")
+    got = tagged(seen, edge(gate=GATE), session, {D[0]: "closed", D[1]: "unknown"})  # type: ignore[arg-type]
+    assert [s.gate for s in got.values()] == ["closed", "unknown", "open"]
+    assert asked == [D[2]]  # only the session nobody decided

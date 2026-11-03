@@ -16,6 +16,7 @@ import pandas as pd
 from algotrade.config.edges.document import Edge, Outcome
 from algotrade.config.edges.positions.cases import CaseValue, Scalar
 from algotrade.config.edges.positions.chain import CHAIN_KIND
+from algotrade.config.strategy.levels import is_computed
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.model.fields import (
     FEATURE_FIELD_PREFIX,
@@ -83,9 +84,13 @@ def read_cases(
     ids: Collection[str],
     decision: date,
     domains: Mapping[str, Sequence[str]] | None = None,
+    extra: Mapping[str, FieldValue] | None = None,
 ) -> Resolved:
-    """Each of ``ids``' case values at D (``decision``), from D's partition only."""
+    """Each of ``ids``' case values at D (``decision``), from D's partition only. The fields of a
+    computed level (``portfolio.*``) are taken from ``extra``, missing: None."""
     names = case_fields(cases)
+    given = {n: (extra or {}).get(n) for n in names if is_computed(n)}
+    names = [n for n in names if n not in given]
     own = [n for n in names if not n.startswith(MARKET_HEAD)]
     market = [n for n in names if n.startswith(MARKET_HEAD)]
     shared = session_market(reader, market, decision)
@@ -98,7 +103,7 @@ def read_cases(
         rows = {i: {n: view.get(i, n) for n in own} for i in wanted}
     out = Resolved()
     for i in wanted:
-        found = [resolve_case(c, {**rows[i], **shared}, domains) for c in cases]
+        found = [resolve_case(c, {**rows[i], **shared, **given}, domains) for c in cases]
         if all(r.selectable for r in found):
             out.chosen[i] = tuple(r.value for r in found if r.value is not None)
         else:
@@ -152,7 +157,10 @@ def check_cases(
 
 
 def session_tables(features: FeatureSet, name: str) -> list[str]:
-    """The session-grain feature tables ``name`` is read from (a snapshot field: none)."""
+    """The session-grain feature tables ``name`` is read from (a snapshot field or a computed
+    level's field: none)."""
+    if is_computed(name):
+        return []
     if is_feature_field(name):
         return sorted(features.stored_columns([name.removeprefix(FEATURE_FIELD_PREFIX)]))
     table, _ = field_source(name)

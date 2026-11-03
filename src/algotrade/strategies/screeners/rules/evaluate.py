@@ -15,6 +15,7 @@ from typing import Any
 from algotrade.core.model.predicates import FieldValue, evaluate_group, is_missing
 from algotrade.core.model.screen_spec import Criterion, ScreenSpec
 from algotrade.core.views.feature_view import FeatureView
+from algotrade.strategies.screeners.rules.batch import evaluate_column
 from algotrade.strategies.screeners.rules.criteria import CriterionResult, evaluate_criterion
 from algotrade.strategies.screeners.rules.decision import decide, score
 from algotrade.strategies.screeners.rules.groups import Gate, Plan, evaluate_gates, plan
@@ -125,9 +126,12 @@ def _row(
     row: Mapping[str, FieldValue],
     known: list[dict[str, Any]] | None,
     memo: ScreenMemo | None,
+    results: tuple[CriterionResult, ...] | None = None,
 ) -> RuleRow:
-    """``known``: memo tables, one per criterion then one for the display (or ``None``)."""
-    results = _results(spec, instrument, row, known)
+    """``known``: memo tables, one per criterion then one for the display (or ``None``);
+    ``results``: the criterion results when a whole column was evaluated at once."""
+    if results is None:
+        results = _results(spec, instrument, row, known)
     gates = _gates(spec, shape, instrument, row, results, memo) if shape.grouped else None
     decision, reasons = decide(results if gates is None else gates)
     tie_break, flags, columns = _shown(spec, instrument, row, known)
@@ -171,8 +175,27 @@ def evaluate_screen(
     keys: list[Hashable] = [*spec.criteria, _display_key(spec)]
     known = None if memo is None else [memo.setdefault(k, {}) for k in keys]
     shape = plan(spec)
+    ids = list(view)
+    columns = None
+    if known is None:  # no memo: every criterion over the whole column at once (batch.py)
+        columns = (
+            list(
+                zip(
+                    *(
+                        evaluate_column(c, [view.get(i, c.field) for i in ids])
+                        for c in spec.criteria
+                    ),
+                    strict=True,
+                )
+            )
+            if spec.criteria
+            else [()] * len(ids)
+        )
     rows = sorted(
-        (_row(spec, shape, i, view.row(i), known, memo) for i in view),
+        (
+            _row(spec, shape, i, view.row(i), known, memo, None if columns is None else columns[n])
+            for n, i in enumerate(ids)
+        ),
         key=lambda r: _order(spec, r),
     )
     ranked = tuple(_ranked(r, n) for n, r in enumerate(rows, start=1))

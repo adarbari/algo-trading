@@ -22,20 +22,21 @@ from algotrade_ingestion.tasks.framework.run import (
     recover_unpublished,
     stamp,
 )
+from algotrade_ingestion.workflows.nightly.notify import notify_workflow
 from algotrade_ingestion.workflows.nightly.records import stored_post_session
 from algotrade_ingestion.workflows.nightly.render import render_html, render_text
 from algotrade_ingestion.workflows.nightly.report import build_report
 from algotrade_ingestion.workflows.nightly.sessions import POST_STEPS
-from algotrade_ingestion.workflows.nightly.steps import Outcome, StepStatus
+from algotrade_ingestion.workflows.nightly.steps import BUSY, Outcome, StepStatus
 from algotrade_ingestion.workflows.post_session import post_session as post_module
 from algotrade_ingestion.workflows.post_session.post_session import (
-    BUSY,
     EDGE_EVAL,
     EDGE_VERDICTS,
     LOCKED,
     POST_SESSION,
     pending_session,
     post_done,
+    post_notice,
     run_post_session,
     target_session,
 )
@@ -47,14 +48,14 @@ D1, D = date(2026, 10, 1), date(2026, 10, 2)
 START = datetime(2026, 10, 2, 22, tzinfo=UTC)
 
 
-def test_the_steps_are_the_four_that_do_not_decide_the_session_all_optional() -> None:
+def test_the_steps_are_the_five_that_do_not_decide_the_session_all_optional() -> None:
     assert (
         [s.name for s in POST_SESSION]
         == list(POST_STEPS)
-        == ["descriptions", "verify", EDGE_EVAL, EDGE_VERDICTS]
+        == ["descriptions", "verify", "ibkr-iv-history", EDGE_EVAL, EDGE_VERDICTS]
     )
     assert not any(s.critical for s in POST_SESSION)
-    assert LOCKED == ("descriptions", "verify")  # the tasks that write tables
+    assert LOCKED == ("descriptions", "verify", "ibkr-iv-history")  # the tasks that write tables
     assert EDGE_VERDICTS in registry.TASKS and EDGE_VERDICTS not in LOCKED  # after edge-eval
     assert EDGE_EVAL not in registry.TASKS  # a job step, claimed per owner, not the ingest lock
 
@@ -127,7 +128,8 @@ def test_locked_steps_run_under_the_hold_and_edge_eval_after_it_is_released(
 
     summary = run_post_session(task_ctx(writer), D, NightlySettings(), FakeEvals(events), hold=hold)
     assert events == [
-        "lock", "descriptions", "verify", "unlock", EDGE_EVAL, "lock", EDGE_VERDICTS, "unlock",
+        "lock", "descriptions", "verify", "ibkr-iv-history", "unlock",
+        EDGE_EVAL, "lock", EDGE_VERDICTS, "unlock",
     ]  # fmt: skip
     assert summary["status"] == "SUCCEEDED" and list(summary["steps"]) == [
         s.name for s in POST_SESSION
@@ -145,7 +147,7 @@ def test_the_run_leaves_a_published_record_and_is_then_a_no_op(
     record = writer.load_run(summary["run_id"])
     assert record is not None and record.job == "post-session" and record.session_date == D
     assert record.status is RunStatus.COMPLETE and set(record.stats["steps"]) == {
-        "descriptions", "verify", EDGE_EVAL, EDGE_VERDICTS
+        "descriptions", "verify", "ibkr-iv-history", EDGE_EVAL, EDGE_VERDICTS
     }  # fmt: skip
     assert post_done(writer, D) and pending_session(writer) is None  # nothing left to do
 
@@ -280,8 +282,36 @@ def test_a_long_run_is_a_duration_warning() -> None:
         return Outcome(StepStatus.SUCCEEDED)
 
     ctx = task_ctx(writer_with_nightly(D), clock=lambda: now[0])
-    summary = run_post_session(ctx, D, NightlySettings(post_max_duration_minutes=60), slow)
+    settings = NightlySettings(post_max_duration_minutes=60, edge_eval_target_s=1e9)
+    summary = run_post_session(ctx, D, settings, slow)
     assert [w["check"] for w in summary["warnings"]] == ["post_duration"]
+
+
+def test_the_edge_eval_duration_is_reported_against_its_target() -> None:
+    """ADR 0063's target (a minute once the legs are stored): the summary says how long the
+    step took and a WARN names it when it is over; a skipped step reports none."""
+    now = [START]
+
+    def eval_took(seconds: float) -> Callable[[date], Outcome]:
+        def run(session: date) -> Outcome:
+            now[0] += timedelta(seconds=seconds)
+            return Outcome(StepStatus.SUCCEEDED)
+
+        return run
+
+    settings = NightlySettings(edge_eval_target_s=60)
+    for seconds, within in ((45.0, True), (90.0, False)):
+        ctx = task_ctx(writer_with_nightly(D), clock=lambda: now[0])
+        summary = run_post_session(ctx, D, settings, eval_took(seconds))
+        found = summary["edge_eval"]
+        assert (found["duration_s"], found["target_s"], found["within_target"]) == (
+            seconds, 60, within,
+        )  # fmt: skip
+        checks = [w["check"] for w in summary["warnings"]]
+        assert checks == ([] if within else ["edge_eval_duration"])
+        assert within or "90 s (target 60 s)" in summary["warnings"][0]["detail"]
+    skipped = run_post_session(task_ctx(writer_with_nightly(D)), D, settings)
+    assert skipped["edge_eval"] is None  # no job runner: the step is SKIPPED, nothing to time
 
 
 def test_the_report_gets_a_post_session_section_from_the_stored_record(
@@ -301,6 +331,7 @@ def test_the_report_gets_a_post_session_section_from_the_stored_record(
     assert [s.step for s in report.post_steps] == [
         "descriptions",
         "verify",
+        "ibkr-iv-history",
         EDGE_EVAL,
         EDGE_VERDICTS,
     ]
@@ -384,9 +415,9 @@ def test_a_failed_post_session_step_or_a_blown_budget_alerts_like_a_failed_night
     assert not ok.alert
     sent, summary = Recorder(), {"session": "2026-10-02", "status": "SUCCEEDED", **{"steps": steps}}
     summary["warnings"] = []
-    post_module._notify(summary, sent, NightlySettings())
+    notify_workflow(summary, post_notice, sent, NightlySettings())
     assert [n.alert for n in sent.notices] == [True]
     quiet = Recorder()
-    post_module._notify(summary, quiet, NightlySettings(notify_enabled=False))
-    post_module._notify({**summary, "status": BUSY}, quiet, NightlySettings())
+    notify_workflow(summary, post_notice, quiet, NightlySettings(notify_enabled=False))
+    notify_workflow({**summary, "status": BUSY}, post_notice, quiet, NightlySettings())
     assert quiet.notices == []

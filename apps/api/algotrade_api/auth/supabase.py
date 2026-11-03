@@ -13,7 +13,7 @@ anonymous sign-ins, tokens without an email (the project's anon and service-role
 here logs a token, a claim or an email."""
 
 import uuid
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from typing import Any
 
 import jwt
@@ -41,18 +41,19 @@ def bearer_token(header: str | None) -> str:
 
 
 class SupabaseAuthenticator:
-    """Resolves a request's caller from its Supabase access token and the user registry."""
+    """Resolves a request's caller from its Supabase access token and the user registry (a
+    registry, or a function giving the current one: the onboarding write swaps it, ID5)."""
 
     def __init__(
         self,
         url: str,
-        users: UsersSettings,
+        users: UsersSettings | Callable[[], UsersSettings],
         keys: KeySet,
         secret: str | None = None,
         leeway: float = LEEWAY_S,
     ) -> None:
         self._issuer = f"{url.rstrip('/')}/auth/v1"
-        self._users = users
+        self._users = users if callable(users) else (lambda: users)  # the current registry
         self._keys = keys
         self._secret = secret
         self._leeway = leeway
@@ -101,7 +102,7 @@ class SupabaseAuthenticator:
         email = claims.get("email")
         if not isinstance(email, str) or not email.strip():
             raise ForbiddenError("the token carries no email")
-        user = self._users.by_email(email)
+        user = self._users().by_email(email)
         if user is None:
             raise ForbiddenError("no registered user has this email")
         if user.subject is not None and _subject(claims.get("sub")) != user.subject:

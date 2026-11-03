@@ -162,6 +162,27 @@ Overlapping positions share most of their days, so they are not separate tests: 
 see_also = ["option_rule_decides", "setup_tested_again", "idea_cash_set_aside"]
 
 [[term]]
+id = "option_wheel"
+term = "Wheel"
+short = "A setup that sells a cash-secured put, and if assigned sells covered calls on the shares until they are called away."
+body = """
+One cycle runs in turns. A put is sold, and if it expires worthless another is sold. If it ends in assignment, the shares arrive at the strike and a covered call is sold on them. A call that expires is sold again. A call that ends in assignment sells the shares, and the cycle starts over with a put.
+An assignment is only known after the close, so the next position is opened the next session, and the shares' move in between counts. The cash set aside is the first put's, held for the whole cycle: the setup never borrows more.
+A cycle with a missing price or quote ends there and the cash sits idle until the next put, never filled with a guess. Dividends the shares pay are not counted yet, so the share part is a little understated.
+"""
+see_also = ["option_ladder", "wheel_stock_share", "option_rule_decides", "idea_cash_set_aside"]
+
+[[term]]
+id = "wheel_stock_share"
+term = "Stock share of the return"
+short = "How much of a wheel's return came from the shares rather than from the options it sold."
+body = """
+A wheel earns on two things: the premiums of the options, and the move of the shares it holds between a put's assignment and the call's exit. The stock part and the option part add up to the whole return.
+A large stock share means the result depends on the market rising, which anyone can get by holding the shares. Read it beside the comparison with holding the same shares. It is left empty when the whole return is not positive, because a share of a loss or of nothing says nothing.
+"""
+see_also = ["option_wheel", "option_how_sure"]
+
+[[term]]
 id = "setup_tested_again"
 term = "Tested again"
 short = "A setup testing another setup's idea with a different rule, read beside it and never as separate proof."

@@ -409,7 +409,8 @@ HINTS: tuple[tuple[re.Pattern[str], str], ...] = tuple(
         ),
         (
             r"IB Gateway not reachable|\[ibkr\] is disabled",
-            "IBKR steps (verify, ibkr-contracts, ibkr-iv) skipped: start IB Gateway (Read-Only "
+            "IBKR steps (ibkr-iv; post-session: verify, ibkr-iv-history; reference: "
+            "ibkr-contracts) skipped: start IB Gateway (Read-Only "
             "API ticked, port as in .env ALGOTRADE_IBKR_PORT) and set [ibkr] enabled = true; "
             "README, Live verification. iv_rank falls back to ours (iv_rank_source = ours).",
         ),

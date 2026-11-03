@@ -8,15 +8,16 @@ Back to the [index of every edge](../edges.md).
 | Option-to-stock volume ratio (`c04_option_stock_volume_ratio`) | candidate | every session | excess return, over 5, 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `option_stock_volume` |
 | Per-name volatility premium, ranked (`c12_vrp_cross_section_iv_hv`) | candidate | month end | option model pnl, over 21 sessions, entered 1 session after the decision session, modelled P&L of an atm straddle short (basis model, not a quote), costs 35 bps | `vrp_cross_section` |
 | Delta-hedged selling on speculative names (`c14_delta_hedged_characteristics`) | candidate | month end | option model pnl, over 21 sessions, entered 1 session after the decision session, modelled P&L of an delta hedged atm short (basis model, not a quote), costs 35 bps | `ivol_high` |
-| Premium selling when implied volatility is high for the name (`c18_iv_rank_conditional_selling`) | candidate | every session | option model pnl, over 15, 21, 31 sessions, entered 1 session after the decision session, modelled P&L of an atm straddle short (basis model, not a quote), costs 35 bps | `iv_rank_high` |
 | Lottery stocks, avoid list (`c31_lottery_options_short`) | candidate | month end | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `lottery_max` |
 | Covered calls on index, sector, gold and bond ETFs (`covered_call_strike_tenor`) | candidate | every session | option pnl, over 21 sessions, entered 1 session after the decision session, P&L of a covered call from the stored chains (basis chain, quoted prices, 45-day tenor, forward-only from 2026-10-02), costs 35 bps | none yet |
 | Covered calls on high idiosyncratic volatility (`high_vol_call_write`) | candidate | every session | option pnl, over 15, 21 sessions, entered 1 session after the decision session, P&L of a covered call from the stored chains (basis chain, quoted prices, 30-day tenor, forward-only from 2026-10-02) | `ivol_high` |
 | Index put write, every-session ladder (`index_put_ladder`) | candidate | every session ladder | option pnl, over 17 sessions, entered 1 session after the decision session, P&L of a short put from the stored chains (basis chain, quoted prices, 21-day tenor, forward-only from 2026-10-02) | none yet |
+| Index wheel: cash-secured puts, then covered calls (`index_put_wheel`) | candidate | calendar:after monthly expiry | option pnl, over 16, 17, 18, 19, 20, 21, 22, 23, 24, 25 sessions, entered 1 session after the decision session, P&L of a short put from the stored chains (basis chain, quoted prices, 14-day tenor, forward-only from 2026-10-02) | none yet |
 | Index put write (`index_put_write`) | candidate | calendar:after monthly expiry | option pnl, over 17 sessions, entered 1 session after the decision session, P&L of a short put from the stored chains (basis chain, quoted prices, 21-day tenor, forward-only from 2026-10-02) | none yet |
 | Short puts on low-volatility names (`low_vol_put_write`) | candidate | every session | option pnl, over 15, 21 sessions, entered 1 session after the decision session, P&L of a short put from the stored chains (basis chain, quoted prices, 30-day tenor, forward-only from 2026-10-02) | `low_volatility` |
 | Option-implied signals (`option_cp_iv_signals`) | candidate | every session | excess return, over 5, 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `cp_iv_spread`, `iv_smirk`, `iv_change_call`, `iv_change_ibkr` |
 | Short volatility fund with a term-structure filter (`vix_roll_yield`) | candidate | month end | portfolio return, over 21 sessions, vs a blend of 100% SVXY, entered 1 session after the decision session, costs 10 bps | `etf_priced` |
+| Premium selling when implied volatility is high for the name (`c18_iv_rank_conditional_selling`) | retired | every session | option model pnl, over 15, 21, 31 sessions, entered 1 session after the decision session, modelled P&L of an atm straddle short (basis model, not a quote), costs 35 bps | `iv_rank_high` |
 | Implied-volatility term structure and straddles (`c13_iv_term_structure_straddles`) | blocked | month end | option model pnl, over 21 sessions, entered 1 session after the decision session, modelled P&L of an atm straddle long (basis model, not a quote), costs 35 bps | none yet |
 | Pre-earnings straddle purchase (`c16_pre_earnings_straddle_buy`) | blocked | on each `earnings_expected` | option model pnl, over 10 sessions, starting -3 sessions from the event, modelled P&L of an atm straddle long (basis model, not a quote), costs 50 bps | none yet |
 | Earnings implied-volatility crush (`c17_earnings_iv_crush_sell`) | blocked | on each `earnings_expected` | option model pnl, over 10 sessions, starting -1 sessions from the event, modelled P&L of an atm straddle short (basis model, not a quote), costs 50 bps | none yet |
@@ -119,39 +120,6 @@ Back to the [index of every edge](../edges.md).
 - CXO Advisory, Option Strategies Based on Factor Sorts (summary) <https://www.cxoadvisory.com/equity-options/option-strategies-based-on-factor-sorts>
 - Bali, T., Beckmeyer, H., Moerke, M. and Weigert, F. (2021), Option Return Predictability with Machine Learning and Big Data, CFR working paper 21-08 (Review of Financial Studies 2023) <https://www.cfr-cologne.de/download/workingpaper/cfr-21-08.pdf>
 - Goyal, A. and Saretto, A. (2009), Cross-section of option returns and volatility, Journal of Financial Economics <https://ideas.repec.org/a/eee/jfinec/v94y2009i2p310-326.html>
-
-## Premium selling when implied volatility is high for the name (`c18_iv_rank_conditional_selling`)
-
-**Status:** candidate. **Family:** C. **Thesis:** Selling at-the-money straddles only on names whose implied volatility rank is at least 0.5 earns more than selling on every liquid name.
-
-- **Outcome:** option model pnl, over 15, 21, 31 sessions, entered 1 session after the decision session, modelled P&L of an atm straddle short (basis model, not a quote), costs 35 bps
-- **Schedule:** every session
-- **Universe:** preset `liquid_optionable_floored`
-- **Top K:** all qualified names
-- **Screeners:** `iv_rank_high`
-- **Baselines:** `vrp_iv_hv`, `vrp_cross_section`
-- **Frozen period:** from 2026-04-01
-- **Notes:** The P&L is a model, not a quote (basis model; ADR 0053 amendment 2026-10-17, EB H8). No historical option chains are stored (owner decision O3), so the position is one at-the-money straddle priced by Black-Scholes (r = q = 0) from the IBKR IV30 read at D, held to the horizon's close, as a fraction of the entry close, short; it assumes constant volatility, no skew, and no spread, hedge or margin beyond cost_bps (35 bps). The practitioner position is a 45-day 16-delta strangle managed at 50% of the credit or 21 days; a straddle held to the horizon is a proxy for it, and the delta-hedged variant is a second reading of the same volatility. IV30 prices 15, 21 and 31 sessions (the parser's range is 10 to 42). The real-chain P&L (H13) accrues from 2026-10-02 and will replace the model; IBKR's IV30 history (personal licence) is 502 sessions. Every picked name qualifies, so the base is every liquid optionable name (the default for a plain schedule): the lift reads whether the rank gate beats selling on all of them, which is the edge's whole claim. feature.iv_rank is IBKR's 252-session rank where IBKR has one and ours otherwise (iv_rank_source says which); a new rank needs 60 sessions.
-
-**Quality bar**
-
-1. **Mechanism:** Implied volatility mean-reverts, so a high rank for the name's own year means it is more likely to fall than a low one; practitioners treat "sell when IV rank is above 50" as doctrine (tastylive).
-2. **Persistence:** The conditional edge over unconditional selling is probably small: high rank clusters in crashes and before earnings, when realised volatility is highest too, and no peer-reviewed study shows that IV rank adds anything beyond implied minus realised volatility (not verified). It is free and widely taught, which is the case against it.
-3. **Outcome:** The model P&L of one short at-the-money straddle held 15, 21 or 31 sessions from the entry close, as a fraction of the entry price, net of 35 bps. The mean P&L of the names with a rank of at least 0.5 is read against the mean of every liquid optionable name: the same position without the gate.
-4. **Trigger timing:** IV30 and its 252-session rank are stored after the close of the decision session D, so the first fill is the next session's close: S = D + 1 (start_offset_sessions = 1). The rank and the straddle's implied volatility are read at D, the outcome at S.
-5. **Faithful replication:** The practitioner rule: IV rank = (IV - 1-year low) / (1-year high - 1-year low); sell a 45-day 16-delta strangle when it exceeds 50 and manage at 50% of the credit or 21 days (tastylive, practitioner, no published return). Here iv_rank_high v1 passes the liquid optionable names with a rank of at least 0.5 and the harness holds all of them short as straddles.
-6. **Expected size and sample:** No peer-reviewed figure. Practitioner backtests (tastylive, ORATS, Spintwig) report a modest Sharpe improvement and larger drawdowns in high-rank periods, not verified here. 502 IV30 sessions give about 24 independent 21-session windows, under the 40 the bar asks: the edge waits for a verdict.
-7. **Capacity and costs:** Single-name option spreads of 5 to 10% of premium, which the 35 bps cost approximates; undefined risk needs margin. An individual sells a few positions, far below the open interest of names trading $50M a day. The flat cost is a fraction of the stock price, not of the premium: it is about 5% of an at-the-money straddle's premium only at 30% implied volatility, so it flatters high-implied-volatility picks, whose premium and spread are larger (at 60% the same 35 bps is about 2.5% of premium).
-8. **Failure modes and retirement:** High rank clusters in crashes: the sale is short volatility into a spike, so the mean P&L and the drawdown decide, not the hit rate. Retire if the frozen-period mean P&L of the gated names is not above the mean of every liquid optionable name, or the gate does not beat vrp_iv_hv on the same sessions.
-9. **Decoys:** High rank before earnings (a known event) and after a shock (the year's range reset by one spike): compare with vrp_iv_hv and vrp_cross_section, the premium over realised volatility, which has the academic evidence; the practitioner expects the premium measure to dominate the rank.
-
-**Sources**
-
-- tastylive research on IV rank for premium selling (practitioner, not peer reviewed)
-- Goyal, A. and Saretto, A., Cross-section of option returns and volatility, Journal of Financial Economics, 2009 <https://ideas.repec.org/a/eee/jfinec/v94y2009i2p310-326.html>
-- Santa-Clara, P. and Saretto, A. (2009), Option strategies: Good deals and margin calls, Journal of Financial Markets <https://ideas.repec.org/a/eee/finmar/v12y2009i3p391-417.html>
-- Carr, P. and Wu, L. (2009), Variance Risk Premiums, Review of Financial Studies <https://ideas.repec.org/a/oup/rfinst/v22y2009i3p1311-1341.html>
-- Coval, J. and Shumway, T. (2001), Expected Option Returns, Journal of Finance <https://ideas.repec.org/a/bla/jfinan/v56y2001i3p983-1009.html>
 
 ## Lottery stocks, avoid list (`c31_lottery_options_short`)
 
@@ -267,6 +235,37 @@ Back to the [index of every edge](../edges.md).
 
 1. **Mechanism:** Investors pay for index protection (insurance mandates, portfolio overlays), and dealers who sell it charge for carrying the short-gamma risk; index implied volatility sits above the realised volatility that follows (Driessen, Maenhout and Vilkov: 24.7% against 20.8%, 1996-2003).
 2. **Persistence:** The demand for protection is structural and the seller is paid for a tail few hold through, but most of a put writer's return is its equity beta (Israelov and Nielsen), so the claim tested here is the part beyond the delta-equivalent stock, on the same collateral and cost. Entering every session spreads the entry date over the month, so the result does not rest on the roll day.
+3. **Outcome:** The option position's return on its cash-secured collateral (strike x 100) from the entry close to the close 17 sessions later (or its declared exit), net of the site's option cost levels, against the delta-equivalent stock held over the same sessions on the same collateral and cost (base delta_equivalent); the T-bill on the collateral is set beside it.
+4. **Trigger timing:** Every session is a decision session D and S the session after it; the gate reads market_conditions@v2 at D (the VIX curve, implied against realised volatility, trend), and the expiry is chosen from S's chain by the exchange calendar, so nothing beyond D is read to place an entry.
+5. **Faithful replication:** The Cboe PUT index sells a one-month at-the-money SPX put each month at the roll and holds it to expiry, collateralised in T-bills. Here: SPY, QQQ and IWM puts at 20 delta on the first monthly expiry 21 or more days out, a new one every session, each held 17 sessions, a setup gate on top. index_put_write is the same position entered once a month after the roll.
+6. **Expected size and sample:** PUT has matched the S&P 500 total return over 1986-2024 with about two thirds of its volatility (Cboe-commissioned study; not a harness figure); against beta-matched equity the excess is about 1 to 2% a year before costs (practitioner estimates, not verified). Expect about index_put_write's excess with a smoother book, and losses in sharp sell-offs (2008, 2020, 2022).
+7. **Capacity and costs:** SPY, QQQ and IWM options are among the most liquid listed; a cash-secured put needs the strike x 100 in cash, split over 17 open puts per symbol. About 250 entries a year per symbol, so 17 times index_put_write's round trips; each pays the option cost levels and commission in verdict.toml [option_costs].
+8. **Failure modes and retirement:** A crash inside the hold hits every open put at once (the ladder spreads the entry date, not the market risk); a regime where implied volatility no longer exceeds realised; the gate keeping the sleeve out of the best-paid sessions; the extra round trips eating the premium. Retire if the frozen-period return on collateral over the delta-equivalent stock is not above zero after costs, or its tail (CVaR) is worse than the stock's on the same collateral.
+9. **Decoys:** Equity beta (the delta-equivalent stock on the same collateral is the base), the T-bill on the collateral, the Cboe PUT index's own return over each window (the tracking figure), and index_put_write, the same position entered monthly.
+
+**Sources**
+
+- Israelov, R. and Nielsen, L., Covered Calls Uncovered, Financial Analysts Journal, 2015 <https://rpc.cfainstitute.org/research/financial-analysts-journal/2015/covered-calls-uncovered>
+- Driessen, J., Maenhout, P. and Vilkov, G., The Price of Correlation Risk, Journal of Finance, 2009
+- Cboe S&P 500 PutWrite Index (PUT) methodology <https://www.cboe.com/us/indices/dashboard/put/>
+
+## Index wheel: cash-secured puts, then covered calls (`index_put_wheel`)
+
+**Status:** candidate. **Family:** C. **Thesis:** Selling a cash-secured put on SPY, QQQ or IWM each month and, if assigned, selling covered calls on the shares until they are called away earns more on its collateral than holding the same share delta, because index options are priced above the moves that follow.
+
+- **Outcome:** option pnl, over 16, 17, 18, 19, 20, 21, 22, 23, 24, 25 sessions, entered 1 session after the decision session, P&L of a short put from the stored chains (basis chain, quoted prices, 14-day tenor, forward-only from 2026-10-02)
+- **Schedule:** calendar:after monthly expiry
+- **Universe:** `instrument.symbol in ('SPY', 'QQQ', 'IWM')`
+- **Top K:** all qualified names
+- **Screeners:** none yet
+- **Baselines:** none yet
+- **Frozen period:** from 2026-04-01
+- **Notes:** The wheel as a book over stored option rows, not a new grain (backend-plan 2.11). Each placement S is the monthly expiry session (the Cboe PUT roll); a phase after an assignment enters the session after it. Put phase: a 20-delta put on the next monthly expiry, held to that expiry, so it is EXPIRED (another put) or ASSIGNED (the shares are the holder's from the expiry's close). Call phase, entered the session after the assignment (it is learned after the close; the shares are held overnight and that gap is booked): a 30-delta covered call on the next monthly expiry, EXPIRED (another call) or ASSIGNED (called away: back to a put). The stored rows hold every gap to the next monthly expiry as a hold (horizon_sessions: the calendar's gaps, checked by tests/architecture/options/test_wheel_holds.py), and the book takes the one row held to its own expiry, chosen from its legs and window, never from how it ended. A cycle's capital is the opening put's collateral (strike x 100). The shares' move between the put's last close and the call's entry is booked once, to the call phase; the put's own loss to the strike is in its option leg, so a cycle sums to premium - strike + the last share price. A phase with no row, an UNMEASURED one or a missing spot ends the cycle: the slot is cash and a fresh put starts at the next placement, never a filled value. Book (E8b slots, X7 cycle): one slot per symbol, no overlap, never levered; the figures are its drawdown over realised exits, worst month, the cycles' count, the stock and option parts of the return and `lost`. Not measured, and said so on the page: dividends (the shares' dividends and an early assignment before one are not stored: the share leg is understated), splits (a missing spot breaks the cycle), single names, rolls (refused), and a verdict trial or baseline (this edge is a candidate whose book is the evidence; the per-symbol trial rows beside it are the first put phase only and are not the wheel's evidence). NO VERDICT before a 3-month unseen holdout (ADR 0088): the holdout starts at 2026-11-03, so the earliest verdict is on cycles closed after 2027-02-03, and the judge enforces it. Built on the Cboe-era store only (chains from 2026-10-02): the history range waits on the HistoricalOptionData purchase (build rows E5, F7), and evidence from it would be owner-only (personal). Not paper traded (the record refuses a setup with no screener).
+
+**Quality bar**
+
+1. **Mechanism:** Investors pay for index protection and dealers who sell it charge for carrying the short-gamma risk, so index implied volatility sits above the realised volatility that follows (Driessen, Maenhout and Vilkov: 24.7% against 20.8%, 1996-2003). The wheel collects that premium in both phases: the put's, and after assignment the covered call's, which keeps selling the same premium against the shares the put delivered.
+2. **Persistence:** The demand for protection is structural and the seller is paid for a tail few hold through, but most of a wheel's return is equity beta (the shares are held for much of the cycle), so the claim tested here is the part beyond the delta-equivalent stock on the same collateral and cost. Whether the stock leg or the option legs earned the return is reported beside it.
 3. **Outcome:** The option position's return on its cash-secured collateral (strike x 100) from the entry close to the close 17 sessions later (or its declared exit), net of the site's option cost levels, against the delta-equivalent stock held over the same sessions on the same collateral and cost (base delta_equivalent); the T-bill on the collateral is set beside it.
 4. **Trigger timing:** Every session is a decision session D and S the session after it; the gate reads market_conditions@v2 at D (the VIX curve, implied against realised volatility, trend), and the expiry is chosen from S's chain by the exchange calendar, so nothing beyond D is read to place an entry.
 5. **Faithful replication:** The Cboe PUT index sells a one-month at-the-money SPX put each month at the roll and holds it to expiry, collateralised in T-bills. Here: SPY, QQQ and IWM puts at 20 delta on the first monthly expiry 21 or more days out, a new one every session, each held 17 sessions, a setup gate on top. index_put_write is the same position entered once a month after the roll.
@@ -409,6 +408,41 @@ Back to the [index of every edge](../edges.md).
 - Simon, D. and Campasano, J., The VIX Futures Basis: Evidence and Trading Strategies, 2014
 - CXO Advisory, Timing VIX Futures with the Futures-Spot Ratio (summary of the source) <https://www.cxoadvisory.com/volatility-effects/timing-vix-futures-with-the-futures-spot-ratio/>
 - Quantpedia, Exploiting Term Structure of VIX Futures <https://quantpedia.com/strategies/exploiting-term-structure-of-vix-futures>
+
+## Premium selling when implied volatility is high for the name (`c18_iv_rank_conditional_selling`)
+
+**Status:** retired. **Family:** C. **Thesis:** Selling at-the-money straddles only on names whose implied volatility rank is at least 0.5 earns more than selling on every liquid name.
+
+**Why retired:** Retired 2026-11-02 (ADR 0088, plan G2; pulled forward from build row X6): iv_rank_high is now a screener of the setups iv_rank_short_put (X2, the put's own P&L on the stored chains) and covered_call_strike_tenor (X3), judged on real chain rows. This version's modelled straddle P&L stays on file with its runs and trials.
+
+- **Outcome:** option model pnl, over 15, 21, 31 sessions, entered 1 session after the decision session, modelled P&L of an atm straddle short (basis model, not a quote), costs 35 bps
+- **Schedule:** every session
+- **Universe:** preset `liquid_optionable_floored`
+- **Top K:** all qualified names
+- **Screeners:** `iv_rank_high`
+- **Baselines:** `vrp_iv_hv`, `vrp_cross_section`
+- **Frozen period:** from 2026-04-01
+- **Notes:** The P&L is a model, not a quote (basis model; ADR 0053 amendment 2026-10-17, EB H8). No historical option chains are stored (owner decision O3), so the position is one at-the-money straddle priced by Black-Scholes (r = q = 0) from the IBKR IV30 read at D, held to the horizon's close, as a fraction of the entry close, short; it assumes constant volatility, no skew, and no spread, hedge or margin beyond cost_bps (35 bps). The practitioner position is a 45-day 16-delta strangle managed at 50% of the credit or 21 days; a straddle held to the horizon is a proxy for it, and the delta-hedged variant is a second reading of the same volatility. IV30 prices 15, 21 and 31 sessions (the parser's range is 10 to 42). The real-chain P&L (H13) accrues from 2026-10-02 and will replace the model; IBKR's IV30 history (personal licence) is 502 sessions. Every picked name qualifies, so the base is every liquid optionable name (the default for a plain schedule): the lift reads whether the rank gate beats selling on all of them, which is the edge's whole claim. feature.iv_rank is IBKR's 252-session rank where IBKR has one and ours otherwise (iv_rank_source says which); a new rank needs 60 sessions.
+
+**Quality bar**
+
+1. **Mechanism:** Implied volatility mean-reverts, so a high rank for the name's own year means it is more likely to fall than a low one; practitioners treat "sell when IV rank is above 50" as doctrine (tastylive).
+2. **Persistence:** The conditional edge over unconditional selling is probably small: high rank clusters in crashes and before earnings, when realised volatility is highest too, and no peer-reviewed study shows that IV rank adds anything beyond implied minus realised volatility (not verified). It is free and widely taught, which is the case against it.
+3. **Outcome:** The model P&L of one short at-the-money straddle held 15, 21 or 31 sessions from the entry close, as a fraction of the entry price, net of 35 bps. The mean P&L of the names with a rank of at least 0.5 is read against the mean of every liquid optionable name: the same position without the gate.
+4. **Trigger timing:** IV30 and its 252-session rank are stored after the close of the decision session D, so the first fill is the next session's close: S = D + 1 (start_offset_sessions = 1). The rank and the straddle's implied volatility are read at D, the outcome at S.
+5. **Faithful replication:** The practitioner rule: IV rank = (IV - 1-year low) / (1-year high - 1-year low); sell a 45-day 16-delta strangle when it exceeds 50 and manage at 50% of the credit or 21 days (tastylive, practitioner, no published return). Here iv_rank_high v1 passes the liquid optionable names with a rank of at least 0.5 and the harness holds all of them short as straddles.
+6. **Expected size and sample:** No peer-reviewed figure. Practitioner backtests (tastylive, ORATS, Spintwig) report a modest Sharpe improvement and larger drawdowns in high-rank periods, not verified here. 502 IV30 sessions give about 24 independent 21-session windows, under the 40 the bar asks: the edge waits for a verdict.
+7. **Capacity and costs:** Single-name option spreads of 5 to 10% of premium, which the 35 bps cost approximates; undefined risk needs margin. An individual sells a few positions, far below the open interest of names trading $50M a day. The flat cost is a fraction of the stock price, not of the premium: it is about 5% of an at-the-money straddle's premium only at 30% implied volatility, so it flatters high-implied-volatility picks, whose premium and spread are larger (at 60% the same 35 bps is about 2.5% of premium).
+8. **Failure modes and retirement:** High rank clusters in crashes: the sale is short volatility into a spike, so the mean P&L and the drawdown decide, not the hit rate. Retire if the frozen-period mean P&L of the gated names is not above the mean of every liquid optionable name, or the gate does not beat vrp_iv_hv on the same sessions.
+9. **Decoys:** High rank before earnings (a known event) and after a shock (the year's range reset by one spike): compare with vrp_iv_hv and vrp_cross_section, the premium over realised volatility, which has the academic evidence; the practitioner expects the premium measure to dominate the rank.
+
+**Sources**
+
+- tastylive research on IV rank for premium selling (practitioner, not peer reviewed)
+- Goyal, A. and Saretto, A., Cross-section of option returns and volatility, Journal of Financial Economics, 2009 <https://ideas.repec.org/a/eee/jfinec/v94y2009i2p310-326.html>
+- Santa-Clara, P. and Saretto, A. (2009), Option strategies: Good deals and margin calls, Journal of Financial Markets <https://ideas.repec.org/a/eee/finmar/v12y2009i3p391-417.html>
+- Carr, P. and Wu, L. (2009), Variance Risk Premiums, Review of Financial Studies <https://ideas.repec.org/a/oup/rfinst/v22y2009i3p1311-1341.html>
+- Coval, J. and Shumway, T. (2001), Expected Option Returns, Journal of Finance <https://ideas.repec.org/a/bla/jfinan/v56y2001i3p983-1009.html>
 
 ## Implied-volatility term structure and straddles (`c13_iv_term_structure_straddles`)
 

@@ -4,6 +4,8 @@
  * fragility, which is context only and never changes the label). A score the server could not
  * give shows its reason. The meters' bands are display marks on the 0-100 scales.
  */
+import type { ReactNode } from 'react';
+
 import { Heading, ScoreMeter, Stack, StatusBadge, Text, type ScoreThreshold } from '@algotrade/ui';
 
 import { UnknownNote, unknownText } from '@/entities/availability';
@@ -18,32 +20,37 @@ const BANDS: readonly ScoreThreshold[] = [
 
 export interface RegimeHeadlineProps {
   regime: Regime;
+  /** Rendered under the macro-risk meter: the app's view of its two tiers (a widget supplies it). */
+  macroTiers?: ReactNode;
 }
 
-function Meter({
+/** One score as a meter on the 0-100 scale; `banded` marks caution and stress on it. */
+export function RegimeScoreMeter({
   label,
   caption,
   score,
   banded,
+  size = 'md',
 }: {
   label: string;
-  caption: string;
+  caption: ReactNode;
   score: RegimeScore;
   banded: boolean;
+  size?: 'sm' | 'md';
 }) {
   return (
     <ScoreMeter
       label={label}
       value={score.value}
       caption={caption}
-      size="md"
+      size={size}
       unknownReason={unknownText(score.unknown)}
       {...(banded ? { thresholds: BANDS, baseTone: 'positive', baseLabel: 'calm' } : {})}
     />
   );
 }
 
-export function RegimeHeadline({ regime }: RegimeHeadlineProps) {
+export function RegimeHeadline({ regime, macroTiers }: RegimeHeadlineProps) {
   const { scores } = regime;
   return (
     <Stack gap={3}>
@@ -58,21 +65,22 @@ export function RegimeHeadline({ regime }: RegimeHeadlineProps) {
         {regime.unknownReason && <UnknownNote unknown={regime.unknownReason} />}
       </Stack>
       <Stack gap={3}>
-        <Meter
+        <RegimeScoreMeter
           label="Slow-warning score"
           caption="Macro risk: credit, labour, the yield curve. Moves over weeks."
           score={scores.macroRisk}
           banded
         />
-        <Meter
+        {macroTiers}
+        <RegimeScoreMeter
           label="Market stress score"
           caption="Trend, volatility, breadth. Moves daily."
           score={scores.marketStress}
           banded
         />
-        <Meter
+        <RegimeScoreMeter
           label="Fragility"
-          caption="Context only: how deep a fall from here could be. Never changes the label."
+          caption="Context only; never changes the label."
           score={scores.fragility}
           banded={false}
         />

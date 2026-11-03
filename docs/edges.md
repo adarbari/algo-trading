@@ -39,15 +39,16 @@ Each edge's full section is on its family page (docs/edges/).
 | Option-to-stock volume ratio (`c04_option_stock_volume_ratio`) | candidate | [family C](edges/c.md) |
 | Per-name volatility premium, ranked (`c12_vrp_cross_section_iv_hv`) | candidate | [family C](edges/c.md) |
 | Delta-hedged selling on speculative names (`c14_delta_hedged_characteristics`) | candidate | [family C](edges/c.md) |
-| Premium selling when implied volatility is high for the name (`c18_iv_rank_conditional_selling`) | candidate | [family C](edges/c.md) |
 | Lottery stocks, avoid list (`c31_lottery_options_short`) | candidate | [family C](edges/c.md) |
 | Covered calls on index, sector, gold and bond ETFs (`covered_call_strike_tenor`) | candidate | [family C](edges/c.md) |
 | Covered calls on high idiosyncratic volatility (`high_vol_call_write`) | candidate | [family C](edges/c.md) |
 | Index put write, every-session ladder (`index_put_ladder`) | candidate | [family C](edges/c.md) |
+| Index wheel: cash-secured puts, then covered calls (`index_put_wheel`) | candidate | [family C](edges/c.md) |
 | Index put write (`index_put_write`) | candidate | [family C](edges/c.md) |
 | Short puts on low-volatility names (`low_vol_put_write`) | candidate | [family C](edges/c.md) |
 | Option-implied signals (`option_cp_iv_signals`) | candidate | [family C](edges/c.md) |
 | Short volatility fund with a term-structure filter (`vix_roll_yield`) | candidate | [family C](edges/c.md) |
+| Premium selling when implied volatility is high for the name (`c18_iv_rank_conditional_selling`) | retired | [family C](edges/c.md) |
 | Implied-volatility term structure and straddles (`c13_iv_term_structure_straddles`) | blocked | [family C](edges/c.md) |
 | Pre-earnings straddle purchase (`c16_pre_earnings_straddle_buy`) | blocked | [family C](edges/c.md) |
 | Earnings implied-volatility crush (`c17_earnings_iv_crush_sell`) | blocked | [family C](edges/c.md) |
@@ -75,6 +76,7 @@ Each edge's full section is on its family page (docs/edges/).
 | Above the earnings-anchored VWAP (capital-gains overhang proxy) (`anchored_vwap_reversion_retest`) | candidate | [family G](edges/g.md) |
 | Reversal into earnings (`earnings_neutral_reversal`) | candidate | [family G](edges/g.md) |
 | Index ETF weak-close reversal (`ibs_etf_mean_reversion`) | candidate | [family G](edges/g.md) |
+| Index ETF weak-close swing (`ibs_etf_swing_recovery`) | candidate | [family G](edges/g.md) |
 | Residual reversal on names with no news (`news_conditioned_reversal`) | candidate | [family G](edges/g.md) |
 | Momentum winners in a volatility squeeze (`volatility_contraction_expansion`) | candidate | [family G](edges/g.md) |
 | BDC price to NAV reversion (`bdc_price_to_nav_reversion`) | candidate | [family H](edges/h.md) |

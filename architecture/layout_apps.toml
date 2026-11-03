@@ -251,6 +251,11 @@ purpose = "event-sensitivity tasks (ADR 0050): the filings task (SEC 8-K filings
 kind = "task-domain"
 
 [[dir]]
+path = "apps/ingestion/algotrade_ingestion/tasks/events/attribution"
+purpose = "the attribution task (ADR 0050, EV4): why each big mover of a session moved, stored as events/attribution; run.py reads the movers (event_reaction@v1) and the 8-K filings and stores the filing causes, model.py asks Massive news and the text model for the movers without a filing"
+kind = "task-domain"
+
+[[dir]]
 path = "apps/ingestion/algotrade_ingestion/tasks/framework"
 purpose = "task machinery: the ingest run loop (IngestRun, TaskContext), the task registry and refresh scheduling (slot days for incremental tasks)"
 
@@ -330,6 +335,10 @@ purpose = "the nightly workflow: sessions, steps, screens, the summary report an
 [[dir]]
 path = "apps/ingestion/algotrade_ingestion/workflows/post_session"
 purpose = "the post-session workflow (ADR 0070): descriptions, verify and edge-eval after a session's nightly is done, with its own run record"
+
+[[dir]]
+path = "apps/ingestion/algotrade_ingestion/workflows/reference"
+purpose = "the weekly reference workflow (ADR 0039, WF4): company details, shares, the macro calendar, IBKR contracts and the ETF holdings slots, with its own run record, lock and due rule"
 
 [[dir]]
 path = "apps/ingestion/algotrade_ingestion/workflows/serve_release"

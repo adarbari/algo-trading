@@ -220,9 +220,7 @@ describe('DraftBar', () => {
     state.builder = untouched();
     const { container } = setup();
     expect(screen.getAllByText('Site preset')).toHaveLength(2); // the badge and the banner title
-    expect(
-      screen.getByText(/This is the site preset v3 with its live preview/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/The site preset v3, live/)).toBeInTheDocument();
     expect(screen.queryByText(/Your copy of/)).toBeNull();
     expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
     expect(screen.queryByRole('button', { name: 'Copy to my screeners' })).toBeNull();

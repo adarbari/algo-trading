@@ -61,7 +61,7 @@ from algotrade.config.site.nightly import (
     NightlySettings as NightlySettings,  # noqa: PLC0414 - re-export
 )
 from algotrade.config.site.universe.etf_category import EtfCategoryRules, etf_overrides
-from algotrade.config.site.users import IDENTITY, identity
+from algotrade.config.site.users import IDENTITY
 from algotrade.config.site.users import UsersSettings as UsersSettings  # noqa: PLC0414 - re-export
 from algotrade.config.site.vendors import sec_pace
 from algotrade.config.site.vendors.yahoo import YAHOO_KEYS, YahooSettings, parse_yahoo
@@ -191,6 +191,8 @@ class SiteDocuments(Protocol):
     def load(self, scope: str, kind: str, name: str) -> Mapping[str, Any] | None: ...
 
     def names(self, scope: str, kind: str) -> list[str]: ...
+
+    def users(self) -> list[str]: ...
 
     def overrides(self, name: str) -> list[dict[str, str]]: ...
 
@@ -905,13 +907,10 @@ def load_verdict(configs: SiteDocuments) -> VerdictSettings:
 def load_users(configs: SiteDocuments) -> UsersSettings:
     """The declared users and roles (``config/site/users.toml``, ADR 0040; the single-user
     defaults without it), each with the email (and pinned subject) of its git-ignored
-    ``config/users/<id>/identity.toml`` when there is one."""
+    ``config/users/<id>/identity.toml``; a user folder with an identity email and no entry
+    joins as a trader (the onboarding write, ID5)."""
     users = UsersSettings.from_document(site_document(configs.load, "users"))
-    found = {
-        u.user_id: identity(configs.load(u.user_id, IDENTITY, IDENTITY), u.user_id)
-        for u in users.users
-        if u.user_id != SITE_USER
-    }
+    found = users.read_identities(lambda u: configs.load(u, IDENTITY, IDENTITY), configs.users())
     return users.with_identities(found)
 
 

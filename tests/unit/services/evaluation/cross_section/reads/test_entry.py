@@ -25,9 +25,11 @@ from algotrade.services.evaluation.cross_section.harness import evaluate_edge
 from algotrade.services.evaluation.cross_section.reads import entry as entry_reads
 from algotrade.services.evaluation.cross_section.reads.entry import (
     Entered,
+    check_entries,
     check_entry,
     entered_rows,
     read_entries,
+    split_fields,
 )
 from algotrade.services.evaluation.cross_section.run.evaluation import EdgeEvaluation
 from algotrade.services.features import site_features
@@ -279,3 +281,33 @@ def test_a_full_run_still_refuses_what_an_entry_condition_cannot_measure() -> No
     w = build_world()  # no signal stored: the rule would be UNKNOWN everywhere (G9-M4)
     with pytest.raises(ConfigurationError, match=r"G9-M4"):
         run(w, 2, full=True)
+
+
+BOOK_RULE = EntrySpec(
+    parse_group({"all": [{"field": "portfolio.open_positions", "op": "lt", "value": 3}]}, "e")
+)
+
+
+def test_a_computed_levels_field_is_taken_from_extra_not_read() -> None:
+
+    assert split_fields(BOOK_RULE) == ([], [])  # dropped from the instrument and market reads
+    w = build_world()
+    ids = IDS[:2]
+    open_book = read_entries(w.reader, BOOK_RULE, 1, ids, D, extra={"portfolio.open_positions": 2})
+    assert set(open_book.at) == set(ids)
+    full = read_entries(w.reader, BOOK_RULE, 1, ids, D, extra={"portfolio.open_positions": 3})
+    assert full.reasons == dict.fromkeys(ids, NOT_TRIGGERED)
+    missing = read_entries(w.reader, BOOK_RULE, 1, ids, D)
+    assert missing.reasons == dict.fromkeys(ids, ENTRY_UNKNOWN)
+
+
+def test_an_edge_that_reads_the_portfolio_level_never_reuses_a_stored_leg() -> None:
+
+    w = build_world()
+    gate = {"all": [{"field": "portfolio.open_positions", "op": "lt", "value": 3}]}
+    args = (w.reader, site_features(), DAYS[0], DAYS[-1], AS_OF)
+    ordered, plain = edge(gate=gate), edge()
+    assert check_entries(args[0], [ordered], *args[1:]) == "portfolio_level"
+    assert check_entries(args[0], [plain, ordered], *args[1:]) == "portfolio_level"
+    assert check_entries(args[0], [ordered], *args[1:], full=True) == "requested"
+    assert check_entries(args[0], [plain], *args[1:]) is None

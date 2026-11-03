@@ -64,8 +64,14 @@ FAST_TESTS = (
     "tests/unit/config/site/guide",
     # [3, 2026-11-02] a resolver with logic in the GraphQL layer (4 s)
     "tests/architecture/api/test_read_model.py",
+    # [2, #1058 and S4] a new site preset changes the Ideas screener count (2 s)
+    "tests/apps/api/graphql/types/screens/test_ideas.py",
+    # [2, #1113] a new catalogue feature changes the generated web catalogue (1 s)
+    "tests/scripts/test_export_catalogue.py",
     # [2 + local reports] folder caps
     "tests/architecture/test_layout.py",
+    # [1, 2026-11-02 #1113] a decision-log entry without date, status and decider (0.05 s)
+    "tests/architecture/pipeline/test_harness_rules.py",
     # [1, 2026-11-02 #1109] registry TOML entries out of sorted order (0.1 s)
     "tests/architecture/pipeline/test_registry_order.py",
     "tests/architecture/test_layout_web.py",

@@ -7,6 +7,8 @@ import { expectNoA11yViolations, fakeQuery } from '@/shared/lib/testing';
 
 import { PausedIdeas } from './PausedIdeas';
 
+vi.mock('@/features/guide-help', () => ({ termHelp: () => null }));
+
 const hooks = vi.hoisted(() => ({ useIdeas: vi.fn() }));
 vi.mock('@/entities/idea', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),

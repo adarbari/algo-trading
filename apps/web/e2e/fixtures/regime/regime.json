@@ -50,6 +50,32 @@
           "feature": "market.regime@v3.fragility",
           "coverageFeature": null,
           "threshold": null
+        },
+        "macroEarly": {
+          "value": null,
+          "unknown": {
+            "code": "NO_PARTITION",
+            "kind": "SYSTEM",
+            "guideTerm": "unavailable_system",
+            "kindText": "not available because of a system error",
+            "cause": null
+          },
+          "feature": "market.regime@v3.macro_early",
+          "coverageFeature": "market.regime@v3.macro_coverage",
+          "threshold": 50.0
+        },
+        "macroConfirming": {
+          "value": null,
+          "unknown": {
+            "code": "NO_PARTITION",
+            "kind": "SYSTEM",
+            "guideTerm": "unavailable_system",
+            "kindText": "not available because of a system error",
+            "cause": null
+          },
+          "feature": "market.regime@v3.macro_confirming",
+          "coverageFeature": "market.regime@v3.macro_coverage",
+          "threshold": 50.0
         }
       },
       "sizing": {

@@ -51,7 +51,7 @@ from algotrade.config.edges.positions.templates import (
 from algotrade.config.edges.verdict import OptionCosts
 from algotrade.config.strategy.schema import Selection
 from algotrade.core.model.errors import ConfigurationError
-from algotrade.core.time.calendar import sessions_between
+from algotrade.core.time.calendar import previous_session, sessions_between
 from algotrade.data import StoreReader
 from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.features.framework.feature import strictest
@@ -77,6 +77,7 @@ from algotrade.services.evaluation.time_series import harness
 from algotrade.services.evaluation.time_series.evaluate import InstrumentResult, TimeSeriesRun
 from algotrade.services.evaluation.time_series.measures import Obs, measures
 from algotrade.services.evaluation.time_series.periods import Period
+from algotrade.services.evaluation.time_series.wheel import wheel_book
 from algotrade.services.features import site_features
 
 NO_VALUE = "NO_VALUE"  # a measured trade the contract gives no return on capital (no collateral)
@@ -109,6 +110,7 @@ def evaluate_sleeve(
     domains: Mapping[str, Sequence[str]] | None = None,
     features: FeatureSet | None = None,
     shares: Sequence[str] = (),
+    templates: Templates | None = None,
 ) -> TimeSeriesRun:
     """``edge`` (``base = "delta_equivalent"``) for each of ``outcomes`` (``sleeve_outcomes``)
     over the decision sessions in ``start..end``; ``label``, ``split`` and ``gate`` as for
@@ -153,13 +155,27 @@ def evaluate_sleeve(
             )
         ps, trades, stock = reads[at]
         mine, out = _cased(reader, held, trades, ps, list(ids.values()), domains)
-        trials = [
-            _trial(held, variant, symbol, ids.get(symbol), unknown.get(symbol), ps, mine,
+        wheel = held.outcome.wheel is not None
+        if wheel and shares:  # a baseline over the put phase's periods would not be the cycle's
+            raise ConfigurationError(f"edge {edge.id}: a wheel has no share baseline")
+        trials = [  # a wheel's trial rows hold no put-phase observation: its book is the evidence
+            _trial(held, variant, symbol, ids.get(symbol), unknown.get(symbol), [] if wheel else ps,
+                   mine,
                    stock, label, (gates or {}).get(variant, gate), split, exploratory,
                    option_costs, (gate_keys or {}).get(variant, ""), out)
             for symbol in symbols
         ]  # fmt: skip
-        book = _book(reader, held, trials, ps, days, len(symbols), start, end, as_of)
+        if wheel:  # X7: the cycles' book, from the stored rows
+            if templates is None:
+                raise ConfigurationError(
+                    f"edge {edge.id}: a wheel's call phase needs the templates"
+                )
+            book = wheel_book(
+                reader, held, templates, ids, len(symbols), [p.entry for p in ps],
+                _opens((gates or {}).get(variant, gate)), as_of, option_costs,
+            )  # fmt: skip
+        else:
+            book = _book(reader, held, trials, ps, days, len(symbols), start, end, as_of)
         results += [replace(r, book=book) for r in trials]
         if variant == MAIN:  # the setup's own trade periods, valued as shares: comparisons only
             results += [
@@ -181,6 +197,17 @@ def evaluate_sleeve(
         sum(p.entry not in measured for p in main),
         tuple(results),
     )
+
+
+def _opens(gate: Callable[[date], str] | None) -> Callable[[date], bool | None]:
+    """Whether the setup's gate is open at the decision session of an entry session (None: unknown
+    there, a data gap that is counted, never read as closed)."""
+
+    def opens(entry: date) -> bool | None:
+        state = "open" if gate is None else gate(previous_session(entry))
+        return None if state == "unknown" else state == "open"
+
+    return opens
 
 
 def _trial(

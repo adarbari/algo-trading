@@ -228,9 +228,7 @@ test('a screener with no run says so, and Run now runs it and shows the results'
   const mock = await mockBuilderApi(page);
   await page.goto('/screeners/my-vrp');
   await expect(
-    page.getByText(
-      'No run stored for this screener on 2026-10-02. Run it now to see what it picks.',
-    ),
+    page.getByText('No run stored for this screener on 2026-10-02; run it now.'),
   ).toBeVisible();
   await expect(page.getByRole('group', { name: 'Last 1 sessions' })).toBeVisible();
   await expect(page.getByText('not run for this session')).toBeVisible(); // the reason, in public words

@@ -704,7 +704,7 @@ export type SessionDateQuery = { session: { date: string } | null };
 export type RegimeQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type RegimeQuery = { regime: { session: string, label: RegimeLabel, headline: string, unknownReason: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, scores: { macroRisk: { value: number | null, feature: string, coverageFeature: string | null, threshold: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null }, marketStress: { value: number | null, feature: string, coverageFeature: string | null, threshold: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null }, fragility: { value: number | null, feature: string, coverageFeature: string | null, threshold: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null } }, sizing: { label: RegimeLabel, multiplier: number | null, enabled: boolean, unknownMultiplier: number, multipliers: Array<{ label: RegimeLabel, multiplier: number }>, screeners: Array<{ screenerId: string, name: string, enabled: boolean, pauseIn: Array<RegimeLabel> }> }, indicators: Array<{ key: string, pace: string, plainName: string, technicalName: string, oneLiner: string, whyItMatters: string, whatOnMeans: string, leadTime: string, falseAlarms: string, value: unknown, format: FeatureFormat | null, status: IndicatorStatus, changed: boolean | null, feature: string, verdictFeature: string, threshold: number | null, direction: RiskDirection | null, before: Array<{ episode: string, line: string }>, links: Array<{ title: string, url: string }>, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, range: { min: number, max: number }, how: Array<{ text: string, url: string | null }> }> } | null };
+export type RegimeQuery = { regime: { session: string, label: RegimeLabel, headline: string, unknownReason: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, scores: { macroRisk: { value: number | null, feature: string, coverageFeature: string | null, threshold: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null }, marketStress: { value: number | null, feature: string, coverageFeature: string | null, threshold: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null }, fragility: { value: number | null, feature: string, coverageFeature: string | null, threshold: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null }, macroEarly: { value: number | null, feature: string, coverageFeature: string | null, threshold: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null }, macroConfirming: { value: number | null, feature: string, coverageFeature: string | null, threshold: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null } }, sizing: { label: RegimeLabel, multiplier: number | null, enabled: boolean, unknownMultiplier: number, multipliers: Array<{ label: RegimeLabel, multiplier: number }>, screeners: Array<{ screenerId: string, name: string, enabled: boolean, pauseIn: Array<RegimeLabel> }> }, indicators: Array<{ key: string, pace: string, plainName: string, technicalName: string, oneLiner: string, whyItMatters: string, whatOnMeans: string, leadTime: string, falseAlarms: string, value: unknown, format: FeatureFormat | null, status: IndicatorStatus, changed: boolean | null, feature: string, verdictFeature: string, threshold: number | null, direction: RiskDirection | null, before: Array<{ episode: string, line: string }>, links: Array<{ title: string, url: string }>, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, range: { min: number, max: number }, how: Array<{ text: string, url: string | null }> }> } | null };
 
 export type RegimeBandsQueryVariables = Exact<{
   start: string;
@@ -887,7 +887,7 @@ export type TraderPreferencesQuery = { traderPreferences: { defaultTab: string |
 export type UserRegistryQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type UserRegistryQuery = { userRegistry: { people: Array<{ id: string, name: string, role: string, licences: Array<string>, scheduled: boolean }> } | null };
+export type UserRegistryQuery = { userRegistry: { people: Array<{ id: string, name: string, role: string, licences: Array<string>, scheduled: boolean, pendingProvider: boolean }> } | null };
 
 export type VerificationQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -4448,6 +4448,48 @@ export const RegimeDocument = new TypedDocumentString(`
         coverageFeature
         threshold
       }
+      macroEarly {
+        value
+        unknown {
+          code
+          kind
+          guideTerm
+          kindText
+          cause {
+            links {
+              level
+              subject
+              status
+              message
+              runId
+            }
+          }
+        }
+        feature
+        coverageFeature
+        threshold
+      }
+      macroConfirming {
+        value
+        unknown {
+          code
+          kind
+          guideTerm
+          kindText
+          cause {
+            links {
+              level
+              subject
+              status
+              message
+              runId
+            }
+          }
+        }
+        feature
+        coverageFeature
+        threshold
+      }
     }
     sizing {
       label
@@ -5339,6 +5381,7 @@ export const UserRegistryDocument = new TypedDocumentString(`
       role
       licences
       scheduled
+      pendingProvider
     }
   }
 }

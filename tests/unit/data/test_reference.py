@@ -273,3 +273,54 @@ def test_descriptions_union_latest_row_markers_and_point_in_time() -> None:
     assert list(descriptions(reader, ["EQ:ETF"])["symbol"]) == ["ETF"]
     then = descriptions(reader, as_of=datetime(2026, 9, 15, tzinfo=UTC)).set_index("symbol")
     assert then.loc["AAA", "description"] == "Old text." and "CCC" not in then.index
+
+
+STRICT_TABLES = ("instruments/company", IBKR_CONTRACTS)
+
+
+@pytest.mark.parametrize("table", STRICT_TABLES)
+def test_a_snapshot_written_after_its_session_is_not_known_on_it(table: str) -> None:
+    """A past-dated run (``company-details --date``) stamps today's facts on an old partition:
+    a read for that session must step back to the snapshot known by then, else None (ADR 0007)."""
+    writer, reader = store()
+    rows = (
+        [{"instrument_id": "EQ:A", "symbol": "A", "cik": "1", "name": "A Inc", "sic": "3571",
+          "sector": "Technology", "fetched_on": D2}]
+        if table == "instruments/company"
+        else [{"instrument_id": "EQ:A", "symbol": "A", "conid": 1, "resolved_at": D2}]
+    )  # fmt: skip
+    late = T0 + timedelta(days=30)  # written long after D2's session closed
+    writer.write_table(table, D2, "late", stamped(rows, D2, "late", late))
+    read = companies if table == "instruments/company" else ibkr_contracts
+    assert read(reader, D2) is None  # known only a month later: not on D2
+    assert read(reader, D2 + timedelta(days=60)) is not None  # known by then
+    writer.write_table(table, D1, "early", stamped(rows, D1, "early", T0 - timedelta(days=1)))
+    found = read(reader, D2)
+    assert found is not None and list(found["run_id"]) == ["early"]  # the earlier snapshot
+    snap = snapshot(reader, table, D2)
+    assert snap is not None and snap.snapshot_date == D1
+
+
+def test_instrument_view_ignores_a_company_snapshot_written_after_the_session() -> None:
+    writer, reader = store()
+    writer.write_table(REF, D2, "r2", stamped(reference({"A": "EQ:A"}), D2, "r2"))
+    company = [{"instrument_id": "EQ:A", "symbol": "A", "cik": "1", "name": "A Inc",
+                "sic": "3571", "sector": "Technology", "fetched_on": D2}]  # fmt: skip
+    late = stamped(company, D2, "c2", T0 + timedelta(days=30))
+    writer.write_table("instruments/company", D2, "c2", late)
+    view = instrument_view(reader, D2, ["instrument.sector"])
+    assert "instruments/company" in view.missing  # UNKNOWN on D2, not today's sector
+
+
+def test_a_known_snapshot_read_never_lists_the_future_for_a_recorded_day() -> None:
+    """A recorded day that listed a later partition could never be reused (ADR 0063): the
+    step back over late-written partitions lists only the dates up to the day."""
+    backend = MemoryBackend()
+    writer = StoreWriter(backend)
+    row = [{"instrument_id": "EQ:A", "symbol": "A", "conid": 1, "resolved_at": D1}]
+    for day in (D1, D2):
+        writer.write_table(IBKR_CONTRACTS, day, f"c{day}", stamped(row, day, f"c{day}", T0))
+    recording = StoreReader(backend).recording()
+    with recording.attribute(D1):
+        ibkr_contracts(recording, D1)
+    assert all(r.end <= D1 for r in recording.reads(D1) if r.kind == "dates")

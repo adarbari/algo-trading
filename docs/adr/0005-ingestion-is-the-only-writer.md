@@ -38,3 +38,11 @@ viewers' Ideas rows in the on-request screener run job, after the Parquet publis
 and before the run record is saved. The index is derived and rebuildable, holds pointers and
 ranks only, and a failed rebuild leaves a stale stamp that the page answers with a live
 computation. It writes no market or feature data.
+
+## Amendment 2026-11-02: the nightly attribution step also writes the text-model usage log (EV4b)
+
+The `attribution` step of the nightly (ADR 0050) classifies headlines through the text model, so
+ingestion is, beside the API, a writer of `usage/llm_calls`: the same recorder, `use_case =
+"attributing"`, the site user, the run's id. It writes nothing else of the model's (no cache, no
+draft). Decided on the owner's behalf by a Fable agent; pending owner confirmation
+([decisions log](../decisions/log.md)).

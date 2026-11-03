@@ -46,12 +46,18 @@ checks that `ALGOTRADE_WEB_DIST` holds a build and that the installed agent runs
 
 The Mac also runs the nightly, so the agents carry priorities (2026-10-19: pages crawled
 while the nightly wrote). The API agent is `ProcessType` Interactive. The nightly,
-post-session and monthly-fill agents are `Nice` 10, `ProcessType` Background and
+reference, post-session and monthly-fill agents are `Nice` 10, `ProcessType` Background and
 `LowPriorityIO`, and `algotrade-ingest` caps Arrow at 2 CPU / 4 IO threads like the API
 (`[resources]` in `config/site/nightly.toml`, with `min_free_gb`: the nightly refuses to
 start with less free on the data volume, and `make doctor` warns below it). The plists are
 written, never installed: after pulling this, rewrite and reload them as printed by
-`algotrade-api schedule` / `algotrade-ingest schedule`.
+`algotrade-api schedule` / `algotrade-ingest schedule`. **Owner step for WF4 (ADR 0039):**
+`algotrade-ingest schedule` now also writes `var/com.algotrade.reference.plist` (the weekly
+reference refresh: Saturday 08:00, login and a 6-hour watchdog; a quiet no-op unless due); run
+the printed `reference_install` lines (and the `post_session_install` lines once, for
+`ibkr-iv-history`, which runs in that agent). Until the reference agent is loaded, company
+details, shares, the macro calendar, IBKR contracts and the ETF holdings slots are not
+refreshed (the nightly no longer does it); `algotrade-ingest reference --force` runs it by hand.
 
 ```bash
 .venv/bin/algotrade-api schedule   # writes var/com.algotrade.api.plist; prints the install commands
@@ -235,19 +241,32 @@ off, confirm email on, anonymous off).
 
 ## 6. Onboarding a user
 
-1. Supabase: Authentication -> Users -> **Add user** -> create with their email and a password
-   (sign-ups are off, so this is the only way in; tell them the password out of band).
-2. Declare them in `config/site/users.toml` (a PR: the file is public, no emails in it):
+An admin onboards a **trader** from Users & configs (`POST /users`: id, email, optional name;
+ID5, ADR 0040, decision log 2026-11-02). The API writes the user's git-ignored
+`config/users/<id>/identity.toml` (`email`, `name`, `declared_by` = the admin, `declared_at`, UTC)
+and reloads the registry in place, so no restart is needed and the new email can sign in at once.
+Nothing is committed: `config/site/users.toml` is never written by the API. The API does not call
+Supabase (it holds no service-role key); the response and the page show the one step left:
 
-   ```toml
-   [[user]]
-   id = "alice"
-   role = "trader"     # or "admin"
-   name = "Alice"
-   ```
-3. Their git-ignored `config/users/alice/identity.toml`: `email = "alice@example.com"`, and after
-   their first sign-in optionally `subject = "<UID>"` from Authentication -> Users.
-4. Restart the API (`scripts/ops/deploy.sh`, or `launchctl kickstart -k gui/$(id -u)/com.algotrade.api` for config only).
+1. Supabase: Authentication -> Users -> **Add user** -> their email, confirm on (sign-ups stay
+   off, so this is the only way in); tell them how to sign in out of band.
+
+The user shows as *pending* in the registry until an admin pins their provider account by
+adding `subject = "<UID>"` (Authentication -> Users) to their `identity.toml`; nothing pins it at
+first sign-in.
+
+An `identity.toml` joins the registry only when it carries `declared_by` naming a current admin
+of `users.toml`: a legacy file (email only), or one declared by someone no longer an admin,
+grants nothing. Users onboarded by an admin who is later demoted or removed from `users.toml` lose access and
+leave the Users list: intended, the safe default (re-onboard them under a current admin after
+deleting their old file). **Offboarding:** delete `config/users/<id>/identity.toml` (or the whole folder)
+and restart the API (or remove their `users.toml` entry by PR), and remove the account at Supabase.
+
+An **admin**, or any data licence (`personal`, `yahoo`), is granted only by a PR to
+`config/site/users.toml` (`[[user]]` with `role` / `licences`; no emails in the file): a
+`users.toml` entry always wins over an identity-declared user of the same id. Each onboarding
+logs one line to the API log, `onboard user=<id> role=trader by=<admin id>` (no email). Refused:
+an id or email already held, `site`, an invalid id or email, anyone but an admin.
 
 `Too many open files` / `socket.accept() out of system resource` in `api.err.log`: launchd
 gives an agent 256 descriptors and every open connection takes one. The agent's plist sets

@@ -14,6 +14,8 @@ from pathlib import Path
 from typing import Any
 
 from algotrade.config.edges.loading import load_edges
+from algotrade.config.edges.positions.chain import OPTION_HISTORY
+from algotrade.config.edges.positions.templates import load_templates
 from algotrade.config.edges.winners import load_winners
 from algotrade.config.site.settings import load_sources, load_users, load_verdict
 from algotrade.config.strategy.resolve import ResolvedConfig
@@ -47,6 +49,11 @@ from algotrade.services.evaluation.cross_section.results import (
 )
 from algotrade.services.evaluation.cross_section.run.evaluation import EdgeEvaluation
 from algotrade.services.evaluation.cross_section.run.scopes import edge_universe
+from algotrade.services.evaluation.cross_section.run.sources import (
+    SourceSlice,
+    check_open,
+    source_slices,
+)
 from algotrade.services.evaluation.discovery.persist import write_winners_study
 from algotrade.services.evaluation.discovery.tells import discover
 from algotrade.services.evaluation.forward.results import run_night
@@ -58,6 +65,7 @@ from algotrade.services.licences import HARNESS_ALL, held_by
 from algotrade.services.read.context import open_stores
 from algotrade.services.screening.exports import run_exports
 from algotrade.services.screening.run import run_screener
+from algotrade.storage.runs import RunRecord
 
 
 def _config_hash(params: Mapping[str, Any], ctx: JobContext) -> str:
@@ -166,7 +174,8 @@ def edge_eval_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, An
     ``cli``), ``mode`` (``incremental``, the default: reuse the stored legs still valid, or
     ``full``: compute every leg, or ``audit``: a full run publishing only the legs that differ from
     the stored ones, then failing naming them; ADR 0063). The harness's rows land in
-    ``results/edge_eval``."""
+    ``results/edge_eval``. An edge reading option trade rows runs as two slices (open Cboe
+    rows, then the owner-only history run; ``run/sources.py``), each its own publish."""
     configs, now = ctx.resources["configs"], datetime.now(UTC)
     edges = {e.id: e for e in load_edges(configs, ctx.user.user_id)}
     if params["edge"] not in edges:
@@ -174,43 +183,69 @@ def edge_eval_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, An
     as_of = datetime.fromisoformat(params["as_of"]) if params.get("as_of") else now
     edge = edges[params["edge"]]
     extra = tuple(b for b in params.get("extra_baselines") or () if b not in edge.baselines)
-    evaluation = evaluate_edge(
-        ctx.resources["reader"],
-        ctx.resources["writer"],
-        configs,
-        ctx.user,
-        replace(edge, baselines=(*edge.baselines, *extra)),
-        date.fromisoformat(params["start"]),
+    run_edge = replace(edge, baselines=(*edge.baselines, *extra))
+    stores = open_stores(ctx.resources["reader"], configs, ctx.user)  # the verdict headline
+    # An edge that reads option trade rows runs as two slices, each its own atomic publish: the
+    # open one over Cboe rows (committed first), then the owner-only history one (ADR 0088 d11).
+    slices = source_slices(
+        run_edge, load_templates(configs), date.fromisoformat(params["start"]),
         date.fromisoformat(params["end"]),
-        as_of,
-        **({"iv_field": params["iv_field"]} if params.get("iv_field") else {}),
-        split_from=date.fromisoformat(params["split_from"]) if params.get("split_from") else None,
-        random_draws=int(params.get("random_draws") or DEFAULT_DRAWS),
-        full=_edge_eval_mode(params) != "incremental",  # an audit recomputes every leg
-        screens=ctx.resources.get("screens"),  # the CLI's multi-edge run (ADR 0059 amendment)
-    )
-    # ``mode`` ``audit`` (the nightly's run on a week's first session, ADR 0063): the run above is
-    # the full recompute; only the legs that differ from the stored ones are published, and the
-    # job then FAILS naming them.
+    )  # fmt: skip
     differing: list[LegDifference] = []
-    if params.get("mode") == "audit":
-        evaluation, differing = _audited(ctx.resources["reader"], evaluation)
-    record = write_edge_eval(
-        ctx.resources["writer"],
-        evaluation,
-        now,
-        owner=edge.owner,
-        trigger=params.get("trigger") or "cli",
-        job_id=ctx.job_id,
-        stores=open_stores(ctx.resources["reader"], configs, ctx.user),  # the verdict headline
-    )
+    published: list[tuple[SourceSlice, EdgeEvaluation, RunRecord]] = []
+    for part in slices:
+        evaluation = evaluate_edge(
+            ctx.resources["reader"],
+            ctx.resources["writer"],
+            configs,
+            ctx.user,
+            run_edge,
+            part.start,
+            part.end,
+            as_of,
+            **({"iv_field": params["iv_field"]} if params.get("iv_field") else {}),
+            split_from=(
+                date.fromisoformat(params["split_from"]) if params.get("split_from") else None
+            ),
+            random_draws=int(params.get("random_draws") or DEFAULT_DRAWS),
+            full=_edge_eval_mode(params) != "incremental",  # an audit recomputes every leg
+            screens=ctx.resources.get("screens"),  # the CLI's multi-edge run (ADR 0059 amendment)
+            job_source=part.job_suffix,
+        )
+        check_open(evaluation, part)  # before the publish: an open run never joins licensed rows
+        # ``mode`` ``audit`` (the nightly's run on a week's first session, ADR 0063): the run above
+        # is the full recompute; only the legs that differ from the stored ones are published, and
+        # the job then FAILS naming them.
+        if params.get("mode") == "audit":
+            evaluation, found = _audited(ctx.resources["reader"], evaluation)
+            differing += found
+        record = write_edge_eval(
+            ctx.resources["writer"],
+            evaluation,
+            now,
+            owner=edge.owner,
+            trigger=params.get("trigger") or "cli",
+            job_id=ctx.job_id,
+            stores=None if part.source == OPTION_HISTORY else stores,  # the history has no verdict
+            source=part,
+        )
+        published.append((part, evaluation, record))
     if differing:
         raise AlgoTradeError(_audit_failure(edge.id, differing))
+    _, evaluation, record = published[0]  # the open (or unsplit) run is the job's result
     rows = edge_eval_frame(evaluation, record.run_id, now)
     return {
         "edge": evaluation.edge_id,
         "run_id": record.run_id,
         "run_hash": evaluation.run_hash,
+        "slices": [
+            {
+                "source": p.source,
+                "run_id": r.run_id,
+                "range": [p.start.isoformat(), p.end.isoformat()],
+            }
+            for p, _, r in published
+        ],
         "as_of": as_of.isoformat(),
         "split_from": evaluation.split_from.isoformat() if evaluation.split_from else None,
         "exploratory": evaluation.exploratory,

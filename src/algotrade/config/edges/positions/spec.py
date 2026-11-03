@@ -10,13 +10,15 @@ rule is ``check_rules``."""
 
 import hashlib
 import json
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from dataclasses import asdict, dataclass, replace
 from datetime import date
 from math import prod
 from typing import TYPE_CHECKING, Any
 
+from algotrade.config.edges import named
 from algotrade.config.edges.identity import LONG, LONG_SHORT
+from algotrade.config.edges.portfolio import PORTFOLIO_KIND
 from algotrade.config.edges.positions import grid
 from algotrade.config.edges.positions.cases import (
     EXIT_CASE_NAMES,
@@ -26,7 +28,7 @@ from algotrade.config.edges.positions.cases import (
     when_of,
 )
 from algotrade.config.edges.positions.chain import reads_share_path
-from algotrade.config.edges.positions.fields import fields_for, is_credit
+from algotrade.config.edges.positions.fields import BOTH, fields_for, is_credit
 from algotrade.config.edges.positions.templates import (
     RETURN_KINDS,
     SIDE_TEMPLATES,
@@ -36,17 +38,19 @@ from algotrade.config.edges.positions.templates import (
 )
 from algotrade.config.site.fields import Table
 from algotrade.config.strategy.catalog import FieldCatalog
-from algotrade.config.strategy.levels import CASE, ENTRY, EXIT
+from algotrade.config.strategy.levels import CASE, ENTRY, EXIT, level_of_field
+from algotrade.config.strategy.portfolio_fields import PORTFOLIO_FIELDS
+from algotrade.config.strategy.portfolio_fields import fields_for as portfolio_fields_for
 from algotrade.config.strategy.regime import check_gate
 from algotrade.core.model.errors import ConfigurationError
-from algotrade.core.model.fields import is_position_field, position_field
+from algotrade.core.model.fields import is_position_field, portfolio_field, position_field
 from algotrade.core.model.ids import validate_id
 from algotrade.core.model.predicates import Group, Rule
 
 if TYPE_CHECKING:
     from algotrade.config.edges.document import Outcome
 
-KEYS = ("position", "expiry_cycle", "skip_report_in_life", "book", "exit")
+KEYS = ("position", "expiry_cycle", "skip_report_in_life", "book", "exit", "wheel")
 EXIT_KEYS = ("take_profit", "stop_loss", "exit_dte", "when")
 OPTION_KIND = "option_pnl"
 SLEEVE_BASE = "delta_equivalent"  # named.DELTA_EQUIVALENT (named imports positions: no cycle)
@@ -375,11 +379,87 @@ def exit_delay(rule: Group) -> int:
     return 0 if all(is_position_field(r.field) for r in rule.rules()) else 1
 
 
+def rule_groups(edge: Any) -> Iterator[Group]:
+    """Every rule group of ``edge`` a level-bound field may sit in: its gate, a variant's gate, an
+    entry condition and the rules of each case value (the exit condition reads only the position
+    level)."""
+    if edge.gate is not None:
+        yield edge.gate
+    outcomes = [edge.outcome]
+    for variant in edge.variants:
+        if variant.gate is not None:
+            yield variant.gate
+        outcomes.append(variant.outcome)
+    for outcome in outcomes:
+        if outcome.entry is not None:
+            yield outcome.entry.when
+        if outcome.position is not None:
+            for value in outcome.position.cases:
+                for case in value.cases:
+                    yield case.when
+
+
+def _portfolio_fields(edge: Any, templates: Templates) -> dict[str, str]:
+    """The ``portfolio.<name>`` fields a rule of ``edge`` may name: those that apply to every
+    template its outcomes may hold (``candidates``); an outcome with no template: the fields of a
+    book of either kind."""
+    sets: list[dict[str, str]] = []
+    for outcome in (edge.outcome, *(v.outcome for v in edge.variants)):
+        if outcome.position is None:
+            sets.append(
+                {portfolio_field(f.name): f.type for f in PORTFOLIO_FIELDS if f.applies == BOTH}
+            )
+            continue
+        for candidate in candidates(outcome):
+            template = templates.get(candidate.position.template if candidate.position else "")
+            if template is not None:
+                sets.append(portfolio_fields_for(template))
+    first, *rest = sets or [{}]
+    return {n: t for n, t in first.items() if all(n in other for other in rest)}
+
+
+def _refuse_portfolio(edge: Any, where: str) -> None:
+    """A ``portfolio.*`` rule needs the setup's own book of trades decided one session after
+    another: a book outcome (one weighted book valued per session), an ensemble, a time-series
+    edge and a named sleeve have no such trades, so a rule naming it is refused (ADR 0088 G15)."""
+    names = sorted(
+        {
+            r.field
+            for g in rule_groups(edge)
+            for r in g.rules()
+            if (level := level_of_field(r.field)) is not None and level.in_order
+        }
+    )
+    if not names:
+        return
+    outcomes = (edge.outcome, *(v.outcome for v in edge.variants))
+    why = (
+        "a portfolio_return outcome" if any(o.kind == PORTFOLIO_KIND for o in outcomes)
+        else "an ensemble" if edge.ensemble
+        else "a time-series edge or named sleeve" if edge.base in named.TIME_SERIES
+        else None
+    )  # fmt: skip
+    if why is not None:
+        raise ConfigurationError(
+            f"{where}: {names} read the setup's own book of trades, which {why} has none "
+            f"(ADR 0088 G15)"
+        )
+
+
 def check_rules(edge: Any, where: str, catalog: FieldCatalog, templates: Templates) -> None:
     """Every rule of an edge against ``catalog`` at its use site: the gate at ``gate``, each
     outcome's entry condition at ``entry``, case rules at ``case`` and the exit condition at
     ``exit`` (with the ``position.*`` fields that apply to its template's legs); a ``position``
-    case chooses among templates of one kind."""
+    case chooses among templates of one kind. The ``portfolio.*`` fields (the setup's own book,
+    ``LEVELS``: gate, entry and case sites only) are those of the outcome's templates."""
+    _refuse_portfolio(edge, where)
+    book = _portfolio_fields(edge, templates)
+    catalog = replace(
+        catalog,
+        levels={**catalog.levels, "portfolio": book},
+        # declared open: a book priced from licensed history reads UNKNOWN (``book.personal_book``)
+        licences={**catalog.licences, **dict.fromkeys(book, "open")},
+    )
     if edge.gate is not None:
         check_gate(edge.gate, catalog, where)
     for variant in edge.variants:

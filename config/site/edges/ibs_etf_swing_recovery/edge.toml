@@ -1,0 +1,157 @@
+# Edge document (ADR 0053, ADR 0088; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Screener: etf_low_ibs (no new feature or preset: the
+# whole rule reads close_range_pos). Idea page: docs/edge-ideas/statarb-technical.md (ibs_etf_mean_reversion).
+# Sibling: ibs_etf_mean_reversion, the same study tested as a one-day timing diagnostic.
+id = "ibs_etf_swing_recovery"
+name = "Index ETF weak-close swing"
+family = "G"
+thesis = "An equity index ETF that closes near the low of its day rises over the following days, so buying it at the next close and holding until its close has recovered toward the day's high earns more than the same funds on other sessions."
+mechanism = """End-of-day order imbalance (market-on-close flow, hedging and liquidity demand) pushes an index fund
+below its value into the close and the pressure fades over days; the fund is a basket, so there is no
+stock-specific information to lose (Pagonidis 2013; Connors and Alvarez 2009). The exit is the
+recovery version (Kinlay 2016): leave once internal bar strength is back above 0.8."""
+persistence = """The study's one-day edge is a few basis points a trade and fell after about 2011 (Kinlay 2016 reports it
+negative in 2015-16), so it is a claim to test, not a given. A multi-day hold with a recovery exit does not
+need the study's close-to-close entry, which this site cannot make; but it is the same crowded
+short-term reversal and may have been arbitraged since publication."""
+schedule = "every_session"
+top_k = "all"
+screeners = ["etf_low_ibs"]
+base = "universe"
+status = "candidate"
+mechanism_kind = "liquidity_provision"
+asset_class = "etfs"
+frozen_from = 2026-04-01
+holdout_from = 2026-11-03  # ADR 0088 d15, H7: the thresholds and variants are the research's; judged on data after the commit that fixes them
+notes = """REUSE FIRST (owner rule 2026-11-02): the whole rule is built from stored fields, with no new feature or
+screener. The entry is the existing etf_low_ibs v1 (internal bar strength, rollup.trend_stats@v2.close_range_pos,
+under 0.2); the exit is close_range_pos above 0.8; the three variants use pct_vs_sma_200, hv_ratio_10_60 and
+volume_z_20d. The study's filtered version (Cutler RSI(3) under 10 and bar strength at most 0.5, held while
+RSI(3) is at most 40) needs a stored RSI(3) column, which the catalogue lacks (rsi_14 is Wilder over 14
+sessions and an expression feature cannot read bar history): it is a follow-up proposal, not built.
+BUILT FROM THE RESEARCH, NOT FROM OUR DATA: the thresholds (0.2 entry, 0.8 exit) are the research's;
+no value was tuned on the stored history, and the history is labelled in-sample until holdout_from.
+SIBLING: ibs_etf_mean_reversion tests the one-day rule as the second-day return for SPY and QQQ
+against an always-invested mix; its verdict is biased negative by that benchmark, so it stays as a
+diagnostic, and this edge measures the same idea against every eligible fund of the list on the same
+sessions. THE STUDY'S OWN TRADE IS NOT MEASURABLE: it buys the close of D, the day the weak close
+happens; this site publishes one nightly batch, so the entry is the close of D + 1
+(start_offset_sessions = 1) and the first day's move is lost (Pandey and Joshi 2023 find that entering a
+day later destroys the one-day trade; the multi-day hold is why this form can survive). At horizon 1 the
+reading is the study's base rule shifted to D + 1, the fixed one-session hold. UNIVERSE: the study's 33
+equity index ETFs minus the seven whose underlying is a local-exchange index (France EWQ, Austria EWO,
+Germany EWG, Spain EWP, Switzerland EWL, Taiwan EWT, UK EWU), where the study found little or no
+effect, and SPY, the benchmark (its excess return is zero by construction, so it could never score):
+25 funds, listed by symbol; RSX and IDX no longer trade, and a fund absent from the universe snapshot
+is simply not there (a survivorship caveat). BENCHMARK: the share path cannot be scored against none
+(a position with a declared exit reads one benchmark), so the excess return is over SPY; the base is
+every eligible fund of the list on the same sessions, so the benchmark's level cancels and the reading
+that matters is the picks against that base. The exit acts one close after the value is observed (a
+catalogue field acts one close later). TRIALS: the main rule and three conditions from the study and
+Connors Research as universe variants (each one trial in the deflated Sharpe ratio); nothing else is
+tried. The volatility variant uses hv_ratio_10_60 above 1 because a rule cannot compare two fields."""
+
+[universe.where]
+all = [
+  { field = "instrument.symbol", op = "in", value = [
+  "QQQ", "IWM", "EWA", "EWC", "EWD", "EWH", "EWI", "EWJ", "EWM", "EWS", "EEM", "EFA",
+  "EPP", "EWY", "EWZ", "EZA", "FXI", "ILF", "ECH", "EPHE", "EPI", "GXG", "IDX", "RSX", "THD"
+  ] },
+]
+
+[outcome]
+kind = "excess_return"
+horizon_sessions = [1, 10]
+benchmark = "SPY"
+start_offset_sessions = 1
+cost_bps = 4
+position = "long_shares"
+
+# The recovery exit (Kinlay 2016): leave once the close sits in the top fifth of its day's range.
+# The walk observes the value at a close after S and leaves at the NEXT close (a catalogue field
+# acts one close later); it never reads a field past the exit close. The horizon is the longest
+# hold; at horizon 1 the rule cannot act, so that reading is a fixed one-session hold.
+[outcome.exit]
+when = { all = [ { field = "rollup.trend_stats@v2.close_range_pos", op = "gt", value = 0.8 } ] }
+
+[implementation]
+horizon = 10
+
+# Connors Research's trend filter: only buy a sell-off in a fund above its 200-day average (the rule held up after 2009 when the plain rule decayed; Kinlay 2016).
+[[variants]]
+id = "trend_up"
+
+[variants.universe.where]
+all = [
+  { field = "instrument.symbol", op = "in", value = [
+  "QQQ", "IWM", "EWA", "EWC", "EWD", "EWH", "EWI", "EWJ", "EWM", "EWS", "EEM", "EFA",
+  "EPP", "EWY", "EWZ", "EZA", "FXI", "ILF", "ECH", "EPHE", "EPI", "GXG", "IDX", "RSX", "THD"
+  ] },
+  { field = "feature.pct_vs_sma_200", op = "gt", value = 0 },
+]
+
+# The study's volatility condition: the effect is stronger when 10-session realised volatility is above its longer level.
+[[variants]]
+id = "vol_rising"
+
+[variants.universe.where]
+all = [
+  { field = "instrument.symbol", op = "in", value = [
+  "QQQ", "IWM", "EWA", "EWC", "EWD", "EWH", "EWI", "EWJ", "EWM", "EWS", "EEM", "EFA",
+  "EPP", "EWY", "EWZ", "EZA", "FXI", "ILF", "ECH", "EPHE", "EPI", "GXG", "IDX", "RSX", "THD"
+  ] },
+  { field = "feature.hv_ratio_10_60", op = "gt", value = 1 },
+]
+
+# The study's volume condition: the effect is stronger on high-volume days for US funds.
+[[variants]]
+id = "volume_up"
+
+[variants.universe.where]
+all = [
+  { field = "instrument.symbol", op = "in", value = [
+  "QQQ", "IWM", "EWA", "EWC", "EWD", "EWH", "EWI", "EWJ", "EWM", "EWS", "EEM", "EFA",
+  "EPP", "EWY", "EWZ", "EZA", "FXI", "ILF", "ECH", "EPHE", "EPI", "GXG", "IDX", "RSX", "THD"
+  ] },
+  { field = "rollup.volume@v1.volume_z_20d", op = "gt", value = 0 },
+]
+
+[quality_bar]
+outcome = """The long share position's excess return over SPY, from the close of S (the session after the decision
+session D) to the close after the first close at which internal bar strength is above 0.8, or to the cap of 10
+sessions (the one-session reading is a fixed one-session hold), less 4 bps a round trip. Price only: the stored
+closes carry no dividend or distribution, so a fund and its benchmark both miss their yield. The harness reads
+the picks against every eligible fund of the list on the same sessions (the base rate), never against cash."""
+trigger_timing = """Internal bar strength, (close - low) / (high - low), is read at the close of D from D's own bar only. The
+position is bought at the close of S = D + 1 (start_offset_sessions = 1, the least the harness allows), and the
+exit rule is read at the closes AFTER S, one at a time, leaving one close after the first where it is above 0.8
+(or at the cap), never at a close the walk has not reached. The study's trade, bought at the close of D, is not
+measurable; nothing after D enters a pick."""
+replication = """Pagonidis (2013): long at the close when internal bar strength is under 0.2 and out at the next close,
+over the study's 33 equity index ETFs from their inception to about 2012 (from the paper, not re-verified); the
+recovery exit above 0.8 is Kinlay's (2016) variant. Here: 25 of those funds (the local-exchange ones and SPY left
+out), entered one close later, the hold capped at 10 sessions."""
+expected_size = """A few basis points a trade for the one-day rule before 2011, negative in 2015-16 (Kinlay 2016). Expect a
+smaller and less stable figure here: a late entry and a post-publication sample, so the result may well be zero."""
+capacity_costs = """Large, liquid funds with narrow spreads: the capacity is not the limit. The cost is 4 bps a round trip,
+right for QQQ and IWM; the country funds trade wider (a few basis points to tens), so the figure is optimistic for
+them, and a late entry's edge is of the same order as the spread. A few trades a year per fund."""
+failure_modes = """The effect is arbitraged away (it decayed after about 2011); a weak close in a falling market keeps
+falling (the trend variant is the check); a fund that never recovers is held to the 10-session cap. Retire if the
+frozen-period lift of the picks over the base rate is not above zero once the holdout is long enough to read."""
+decoys = """The overnight (close to open) premium all index funds earn, and a simple one-month reversal; the base rate
+of every eligible fund of the list is the null, and ibs_etf_mean_reversion tests the same idea against an
+always-held mix."""
+
+[[sources]]
+title = "Pagonidis, A., The IBS Effect: Mean Reversion in Equity ETFs, NAAIM, 2013"
+url = "https://www.naaim.org/wp-content/uploads/2014/04/00V_Alexander_Pagonidis_The-IBS-Effect-Mean-Reversion-in-Equity-ETFs-1.pdf"
+
+[[sources]]
+title = "Connors, L. and Alvarez, C., Short Term Trading Strategies That Work, TradingMarkets, 2009"
+
+[[sources]]
+title = "Kinlay, J., Is the IBS effect still working? (blog, 2016: the one-day rule negative in 2015-16)"
+
+[[sources]]
+title = "Pandey, A. and Joshi, N. (2023), the IBS effect when entering at the next open"

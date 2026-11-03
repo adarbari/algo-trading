@@ -18,6 +18,7 @@ max_duration_minutes = 150       # a nightly run (the market-daily path only) lo
 
 [post]                           # the post-session workflow (ADR 0070): descriptions, verify, edge-eval after the nightly
 max_duration_minutes = 360       # a post-session run longer than this is recorded as a WARN (the weekly audit takes ~3 h)
+edge_eval_target_s = 60          # the edge-eval step's target (ADR 0063): its duration is reported in the summary, a WARN above it
 
 [notify]                         # after every run (desktop: only when the status is not COMPLETE)
 enabled = true                   # false: no desktop notification and no email (the summary file is still written)
@@ -79,6 +80,8 @@ instrument_tables = [            # the tables Explore reads, copied for the last
     "rollups/instrument/earnings_revisions@v1",
     "rollups/instrument/earnings_schedule@v1",
     "rollups/instrument/earnings_surprise@v1",
+    "rollups/instrument/event_calendar@v1",   # 18 columns, the same per name
+    "rollups/instrument/event_reaction@v1",   # about 50 float32 columns
     "rollups/instrument/episode_behaviour@v1",   # 42 MB
     "rollups/instrument/etf_flows@v1",
     "rollups/instrument/etf_macro@v1",   # about 1 MB a year (32 float32 columns, 60 fund rows a session)

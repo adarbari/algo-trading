@@ -11,12 +11,12 @@ import argparse
 import dataclasses
 import json
 import sys
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from datetime import date
 from pathlib import Path
 from typing import Any
 
-from algotrade.config.env import config_dir, credential
+from algotrade.config.env import config_dir, credential, data_url
 from algotrade.config.site.settings import SourcesSettings, load_nightly, load_sources
 from algotrade.config.user import UserContext
 from algotrade.core.model.errors import ConfigurationError
@@ -24,6 +24,8 @@ from algotrade.data import StoreReader
 from algotrade.services.jobs import JobHandler, JobKind, JobRecord, JobStatus
 from algotrade.services.jobs import run_job as run_service_job
 from algotrade.services.jobs.handlers import LIBRARY_HANDLERS
+from algotrade.services.text_model.model import TextModel
+from algotrade.services.text_model.opening import open_text_model
 from algotrade.storage.configs.store import ConfigStore
 from algotrade.storage.factory import open_config_store
 from algotrade.storage.tables.writers import StoreWriter
@@ -34,16 +36,19 @@ from algotrade_ingestion.workflows.nightly.nightly import FINALLY, NIGHTLY, nigh
 from algotrade_ingestion.workflows.nightly.records import arrivals, stored_summary
 from algotrade_ingestion.workflows.nightly.timing import arrival_line
 from algotrade_ingestion.workflows.post_session.post_session import POST_SESSION, post_session_job
+from algotrade_ingestion.workflows.reference.reference import REFERENCE, reference_job
 from algotrade_sources.framework.base import Source
 from algotrade_sources.framework.registry import (
     RAW_SECTIONS,
     Built,
+    build_claude_cli,
     build_sources,
+    build_text_model,
     fixture_source,
 )
 
 # Job kinds this app runs under the ingest run lock: safe to recover at once (see cli.main).
-LOCKED_KINDS = ("nightly", "screen", "post-session")  # post-session: under its named lock
+LOCKED_KINDS = ("nightly", "screen", "post-session", "reference")  # the last two: named locks
 
 
 def config_store(args: argparse.Namespace) -> ConfigStore:
@@ -88,6 +93,22 @@ def task_sources(spec: Task, settings: SourcesSettings, params: Mapping[str, Any
 # ----------------------------------------------------------------------------- tasks
 
 
+def text_model_factory(args: argparse.Namespace) -> Callable[[], tuple[TextModel | None, str]]:
+    """What a task calls for the site's text model (nothing is built until it does): the chain of
+    ``llm.toml`` without any provider restricted to users, its usage written to the store."""
+
+    def build() -> tuple[TextModel | None, str]:
+        return open_text_model(
+            config_store(args),
+            data_url(),
+            chat=build_text_model,
+            cli=build_claude_cli,
+            skip_restricted=True,
+        )
+
+    return build
+
+
 def task_context(
     args: argparse.Namespace,
     reader: StoreReader,
@@ -101,6 +122,7 @@ def task_context(
         sources_settings(args),
         config_store(args),
         raw_sections=RAW_SECTIONS,
+        text_model_factory=text_model_factory(args),
     )
 
 
@@ -145,12 +167,15 @@ def run_job(
     kind: str,
     params: dict[str, object],
     user: str,
+    recover: tuple[str, ...] = LOCKED_KINDS,
 ) -> JobRecord:
     """Run one job to completion through the job service (an explicit re-run: force=True).
-    The caller holds the ingest run lock, so a queued/running job of ``LOCKED_KINDS`` was
-    left by a crashed process: it is marked failed first, or it would block this re-run."""
+    The caller holds the lock of the kinds in ``recover`` (the ingest run lock: all of
+    ``LOCKED_KINDS``; a named lock: its own kind only), so a queued/running job of those kinds
+    was left by a crashed process: it is marked failed first, or it would block this re-run.
+    A named-lock workflow never recovers the kinds another process may be running."""
     settings = sources_settings(args)
-    steps = [s.name for s in (*NIGHTLY, *FINALLY, *POST_SESSION) if s.name in TASKS]
+    steps = [s.name for s in (*NIGHTLY, *FINALLY, *POST_SESSION, *REFERENCE) if s.name in TASKS]
     names = [n for t in steps for n in (*task(t).sources, *task(t).optional_sources)]
     built = sources_for(names, settings)
     resources: dict[str, object] = {
@@ -162,15 +187,17 @@ def run_job(
         "unavailable": built.skipped,
         "raw_sections": RAW_SECTIONS,
         "pacing": built.limiters,
+        "text_model_factory": text_model_factory(args),
     }
     handlers: dict[str, JobKind | JobHandler] = {
         **LIBRARY_HANDLERS,
         "nightly": nightly_job,
         "post-session": post_session_job,
+        "reference": reference_job,
     }
     user_ctx = UserContext(user)
     return run_service_job(
-        writer.runs_backend, handlers, resources, kind, params, user_ctx, recover=LOCKED_KINDS
+        writer.runs_backend, handlers, resources, kind, params, user_ctx, recover=recover
     )
 
 

@@ -13,7 +13,13 @@ from algotrade_ingestion.tasks.derived import (
     rollups,
 )
 from algotrade_ingestion.tasks.derived.paths import option_outcomes, share_outcomes
-from algotrade_ingestion.tasks.events import filing_text, filings, insider, ipo_lockups
+from algotrade_ingestion.tasks.events import (
+    filing_text,
+    filings,
+    insider,
+    ipo_lockups,
+)
+from algotrade_ingestion.tasks.events.attribution import run as attribution
 from algotrade_ingestion.tasks.framework.params import (
     FROM,
     SESSION,
@@ -124,6 +130,10 @@ def run_insider(ctx: TaskContext, p: Params) -> RunRecord:
         p.get("limit"),
         bool(p.get("force")),
     )
+
+
+def run_attribution(ctx: TaskContext, p: Params) -> RunRecord:
+    return attribution.ingest_attribution(ctx, session_of(p))
 
 
 def run_ipo_lockups(ctx: TaskContext, p: Params) -> RunRecord:

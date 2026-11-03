@@ -159,7 +159,7 @@ export function DraftBar({ compact = false, onDeleted, onReturn }: DraftBarProps
       )}
       {untouched && (
         <Banner tone="info" title="Site preset">
-          {`This is the site preset${version(builder.preset?.version ?? null)} with its live preview. Change anything and a copy of it becomes yours (pinned to this version); the preset itself changes only by pull request.`}
+          {`The site preset${version(builder.preset?.version ?? null)}, live; your first change makes your own copy.`}
         </Banner>
       )}
       {pin?.rebaseAvailable && pin.pinned !== null && pin.current !== null && (

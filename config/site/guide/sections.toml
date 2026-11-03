@@ -157,7 +157,7 @@ id = "fundamentals"
 title = "Quality and value"
 purpose = "Quality, value, financing and analyst measures from company statements and estimates."
 intro = "These screens rank names on what a company reports and what analysts expect: profit per dollar of assets, cheapness, share issuance, distress risk, discounts on funds and revisions to estimates. They change slowly, so a name stays on a list for months."
-presets = ["cash_op_profitability", "composite_value", "qmj", "net_share_issuance", "asset_growth", "distress_ohlson", "bdc_price_to_nav", "cef_discount_zscore", "eps_revision_up", "target_upside_high"]
+presets = ["cash_op_profitability", "composite_value", "qmj", "net_share_issuance", "asset_growth", "distress_ohlson", "cash_to_assets_high", "bdc_price_to_nav", "cef_discount_zscore", "eps_revision_up", "target_upside_high"]
 
 [screeners_page]
 what = "A screener is a saved rule screen: a list of checks run each night over the whole universe, and the names that pass are its hits. Each page here shows the checks, what a hit looks like, and what the screen leaves for you to check."

@@ -276,6 +276,7 @@ class Reactions:
     by_report: dict[str, list[date]]
     all_reports: dict[str, list[date]]  # every report known by the session, newest first
     pre: frozenset[tuple[str, date]] = frozenset()  # (instrument, report date) of a pre-open report
+    post: frozenset[tuple[str, date]] = frozenset()  # ... of an after-the-close report
 
 
 def read_reactions(inputs: Inputs, session: date, lookback: int = LOOKBACK) -> Reactions:
@@ -304,8 +305,23 @@ def read_reactions(inputs: Inputs, session: date, lookback: int = LOOKBACK) -> R
     pre = frozenset(
         (str(i), d) for i, d in zip(stamped["instrument_id"], stamped["report"], strict=True)
     )
+    after = (
+        rows[rows["time"].map(earnings.TIMES).eq("post")] if "time" in rows.columns else rows[:0]
+    )
+    post = frozenset(
+        (str(i), d) for i, d in zip(after["instrument_id"], after["report"], strict=True)
+    )
     return Reactions(
-        grid, px.close, px.close * px.volume, px.ids, column_of, spy, by_report, all_reports, pre
+        grid,
+        px.close,
+        px.close * px.volume,
+        px.ids,
+        column_of,
+        spy,
+        by_report,
+        all_reports,
+        pre,
+        post,
     )
 
 

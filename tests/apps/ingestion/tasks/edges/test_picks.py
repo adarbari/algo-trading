@@ -4,7 +4,8 @@ fails when an edge has no row."""
 
 import itertools
 from dataclasses import replace
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 from typing import Any
 
 import pandas as pd
@@ -13,7 +14,7 @@ import pytest
 from algotrade.config.edges.portfolio import ENSEMBLE
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.storage.configs.files import MemoryConfigStore
-from algotrade.storage.runs import RunStatus
+from algotrade.storage.runs import RunRecord, RunStatus
 from algotrade.storage.tables.edge_schemas import NAMED
 from algotrade_ingestion.tasks.edges import picks as task
 from algotrade_ingestion.tasks.framework import entries_ops
@@ -168,3 +169,13 @@ def test_books_ensembles_and_named_setups_store_their_rows_resume_and_pass_the_c
     assert run(world, cfg).stats["written"] == 0  # every key is stored: nothing decided again
     (check,) = task.check_edge_picks(world.reader, DAY, None)  # type: ignore[arg-type]
     assert check.status in ("PASS", "WARN")
+
+
+def test_the_paper_book_is_read_as_the_previous_sessions_nightly_left_it() -> None:
+    """A ``portfolio.*`` gate reads the paper record as of the previous session's cut-off, never
+    the present: no finished nightly of that session means no cut-off (the picks are skipped)."""
+    done = datetime(2026, 9, 1, 23, tzinfo=UTC)
+    nightly = RunRecord("r1", "nightly", DAYS[0], done - timedelta(hours=1)).finish(done)
+    reader = SimpleNamespace(runs=lambda job: [nightly] if job == "nightly" else [])
+    assert task.paper_cutoff(reader, DAYS[1]) == done  # type: ignore[arg-type]
+    assert task.paper_cutoff(reader, DAYS[2]) is None  # DAYS[1]'s nightly never finished

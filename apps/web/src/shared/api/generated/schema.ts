@@ -524,6 +524,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Onboard */
+        post: operations["onboard_users_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1478,6 +1495,45 @@ export interface components {
             /** Value */
             value: unknown;
         };
+        /** OnboardBody */
+        OnboardBody: {
+            /**
+             * Email
+             * @description the address they sign in with (the admin adds it at Supabase)
+             */
+            email: string;
+            /**
+             * Name
+             * @description a display name (optional)
+             * @default
+             */
+            name: string;
+            /**
+             * User Id
+             * @description the new user's id: 1-64 of a-z, 0-9, '_' and '-'
+             */
+            user_id: string;
+        };
+        /** Onboarded */
+        Onboarded: {
+            /**
+             * Pending Provider
+             * @description true until the user's provider account is pinned (it is not created here)
+             */
+            pending_provider: boolean;
+            /** @description the one step the admin still does by hand */
+            provider_step: components["schemas"]["ProviderStep"];
+            /**
+             * Role
+             * @description always 'trader': admin and licences change by PR
+             */
+            role: string;
+            /**
+             * User Id
+             * @description the declared user's id
+             */
+            user_id: string;
+        };
         /**
          * OptionGap
          * @description Why a figure or a whole preview is not available, in public words (ADR 0056).
@@ -1782,6 +1838,19 @@ export interface components {
             passed: number;
             /** Rows */
             rows: number;
+        };
+        /** ProviderStep */
+        ProviderStep: {
+            /**
+             * Email
+             * @description the address to add at the identity provider
+             */
+            email: string;
+            /**
+             * Instruction
+             * @description a fixed id of the remaining step; the web maps it to its Guide entry
+             */
+            instruction: string;
         };
         /** RegimeExplanation */
         RegimeExplanation: {
@@ -3398,6 +3467,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunRequest"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    onboard_users_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OnboardBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Onboarded"];
                 };
             };
             /** @description Validation Error */

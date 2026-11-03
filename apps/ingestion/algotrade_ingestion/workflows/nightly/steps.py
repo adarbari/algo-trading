@@ -313,3 +313,28 @@ def overall(results: Iterable[StepResult | Mapping[str, Any]]) -> Status:
 def unsatisfied(needs: Iterable[str], done: Mapping[str, StepResult]) -> list[str]:
     """The needs that ran in this session and are not satisfied, as ``name (STATUS)``."""
     return [f"{n} ({done[n].status.value})" for n in needs if n in done and done[n].status in BAD]
+
+
+BUSY = "BUSY"  # a workflow's status when the ingest lock was taken: nothing ran
+
+
+def run_summary(
+    session: date,
+    run_id: str,
+    steps: Mapping[str, Any],
+    started: datetime,
+    finished: datetime,
+    warnings: list[dict[str, str]],
+) -> dict[str, Any]:
+    """The summary of a finished optional-step workflow run (post-session, reference): every step
+    optional, so the run SUCCEEDED once it ran, a failed step being one of its warnings."""
+    return {
+        "session": session.isoformat(),
+        "status": Status.SUCCEEDED.value,
+        "run_id": run_id,
+        "steps": steps,
+        "started_at": started.isoformat(),
+        "finished_at": finished.isoformat(),
+        "duration_s": round((finished - started).total_seconds(), 3),
+        "warnings": warnings,
+    }

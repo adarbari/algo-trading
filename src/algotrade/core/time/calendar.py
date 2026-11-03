@@ -190,6 +190,14 @@ def next_session(day: date) -> date:
     return day
 
 
+def window_end(entry: date, horizon: int) -> date:
+    """The session ``horizon`` sessions after the entry session S."""
+    day = entry
+    for _ in range(horizon):
+        day = next_session(day)
+    return day
+
+
 def sessions_between(start: date, end: date) -> list[date]:
     """Every session in ``[start, end]`` (inclusive), in order."""
     return [

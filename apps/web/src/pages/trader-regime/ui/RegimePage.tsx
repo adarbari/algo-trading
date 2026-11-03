@@ -27,8 +27,7 @@ export function RegimePage() {
       <Stack gap={1}>
         <Heading level={1}>Regime</Heading>
         <Text size="sm" tone="secondary">
-          The market as weather, with the warning signs behind it in plain words. It can pause some
-          ideas; it never trades for you.
+          The market as weather, with the warning signs behind it in plain words.
         </Text>
       </Stack>
       <SectionNav items={SECTIONS} aria-label="Regime sections" />

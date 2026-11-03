@@ -67,11 +67,7 @@ class CriterionResult:
     def verdict(self) -> Verdict:
         """Gating FAIL or HARD MISSING rejects; a gating NEAR carries its ``on_miss``; a SOFT
         MISSING only costs points; a SCORE criterion never gates (ADR 0029, 0030)."""
-        hard_missing = self.outcome is Outcome.MISSING and self.criterion.mode is Mode.HARD
-        rejects = self.gating and (self.outcome is Outcome.FAIL or hard_missing)
-        near = self.gating and self.outcome is Outcome.NEAR
-        missing = self.gating and self.outcome is Outcome.MISSING and not rejects
-        return Verdict(rejects, self.penalty, self.criterion.on_miss if near else None, missing)
+        return verdict_of(self.criterion, self.outcome, self.penalty)
 
     @property
     def leaf(self) -> "CriterionResult":
@@ -98,6 +94,17 @@ class CriterionResult:
         if self.outcome is Outcome.NEAR:
             return f"{self.criterion.id} near miss: {text} (by {self.distance:.6g})"
         return f"{self.criterion.id} {self.outcome.value.lower()}: {text}"
+
+
+def verdict_of(criterion: Criterion, outcome: Outcome, penalty: float) -> Verdict:
+    """The verdict of a result with this ``outcome`` and ``penalty`` (one function for the
+    cached property and for the column evaluator, which seeds it)."""
+    gating = criterion.mode.gating
+    hard_missing = outcome is Outcome.MISSING and criterion.mode is Mode.HARD
+    rejects = gating and (outcome is Outcome.FAIL or hard_missing)
+    near = gating and outcome is Outcome.NEAR
+    missing = gating and outcome is Outcome.MISSING and not rejects
+    return Verdict(rejects, penalty, criterion.on_miss if near else None, missing)
 
 
 def _number(value: object) -> bool:

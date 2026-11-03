@@ -2316,6 +2316,63 @@
         "title": "NarrowMiss",
         "type": "object"
       },
+      "OnboardBody": {
+        "properties": {
+          "email": {
+            "description": "the address they sign in with (the admin adds it at Supabase)",
+            "title": "Email",
+            "type": "string"
+          },
+          "name": {
+            "default": "",
+            "description": "a display name (optional)",
+            "title": "Name",
+            "type": "string"
+          },
+          "user_id": {
+            "description": "the new user's id: 1-64 of a-z, 0-9, '_' and '-'",
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id",
+          "email"
+        ],
+        "title": "OnboardBody",
+        "type": "object"
+      },
+      "Onboarded": {
+        "properties": {
+          "pending_provider": {
+            "description": "true until the user's provider account is pinned (it is not created here)",
+            "title": "Pending Provider",
+            "type": "boolean"
+          },
+          "provider_step": {
+            "$ref": "#/components/schemas/ProviderStep",
+            "description": "the one step the admin still does by hand"
+          },
+          "role": {
+            "description": "always 'trader': admin and licences change by PR",
+            "title": "Role",
+            "type": "string"
+          },
+          "user_id": {
+            "description": "the declared user's id",
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id",
+          "role",
+          "pending_provider",
+          "provider_step"
+        ],
+        "title": "Onboarded",
+        "type": "object"
+      },
       "OptionGap": {
         "description": "Why a figure or a whole preview is not available, in public words (ADR 0056).",
         "properties": {
@@ -2855,6 +2912,26 @@
           "narrow_misses"
         ],
         "title": "PreviewSummary",
+        "type": "object"
+      },
+      "ProviderStep": {
+        "properties": {
+          "email": {
+            "description": "the address to add at the identity provider",
+            "title": "Email",
+            "type": "string"
+          },
+          "instruction": {
+            "description": "a fixed id of the remaining step; the web maps it to its Guide entry",
+            "title": "Instruction",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "instruction"
+        ],
+        "title": "ProviderStep",
         "type": "object"
       },
       "RegimeExplanation": {
@@ -5962,6 +6039,47 @@
         "summary": "Run",
         "tags": [
           "screens"
+        ]
+      }
+    },
+    "/users": {
+      "post": {
+        "operationId": "onboard_users_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OnboardBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Onboarded"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Onboard",
+        "tags": [
+          "users"
         ]
       }
     }

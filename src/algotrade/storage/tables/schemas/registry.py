@@ -18,6 +18,7 @@ from algotrade.storage.tables.edge_schemas import (
 from algotrade.storage.tables.schemas.events import (
     ANALYST_ESTIMATE_SNAPSHOTS,
     ANALYST_VENDOR_ACCESS,
+    ATTRIBUTION_EVENTS,
     EARNINGS_EVENTS,
     FILING_EVENTS,
     FILING_TEXT_EVENTS,
@@ -127,6 +128,7 @@ KNOWN: dict[str, TableSpec] = {
         ANALYST_VENDOR_ACCESS,
         ANALYST_ESTIMATE_SNAPSHOTS,
         EARNINGS_EVENTS,
+        ATTRIBUTION_EVENTS,
         MACRO_RELEASE_EVENTS,
         FILING_EVENTS,
         FILING_TEXT_EVENTS,
