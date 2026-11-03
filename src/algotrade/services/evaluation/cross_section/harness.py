@@ -303,9 +303,9 @@ def evaluate_edge(
     (``_time_series``). ``job_source``: the history slice's run-job suffix, whose trial log the
     trial count reads (``prior_trials``, ADR 0088 d11); that slice reads the chain groups before
     the cutover from the option-history root through the splice (``history``, default the root
-    at ``$ALGOTRADE_OPTION_HISTORY_URL``); a run that read a partition through it, or reused a
-    leg that did, makes every one of its trials personal (``read_licence``, decided per run: the
-    slice is owner-only, so the over-approximation only errs closed)."""
+    at ``$ALGOTRADE_OPTION_HISTORY_URL``, none when it is unset: ``_sliced``); a run that read a
+    partition through it, or reused a leg that did, makes every one of its trials personal
+    (``read_licence``, decided per run: the slice is owner-only, so it only errs closed)."""
     reader, screens = _sliced(reader, screens, job_source, history)
     if edge.base in TIME_SERIES:
         return _time_series(
@@ -558,10 +558,13 @@ def _sliced(
 ) -> tuple[StoreReader, ScreenCache | None]:
     """The reader and screen cache of a slice: the history slice's read the chain groups before
     the cutover through the splice, with no cross-edge cache (another edge's cached screen read
-    the main store alone); any other slice's are as given."""
-    if job_source != OPTION_HISTORY:
+    the main store alone); any other slice's are as given. With no history root configured (the
+    history is not bought) the history slice reads as before, the main store alone; a root that
+    is configured but not mounted raises (``HistoryUnavailableError``, ADR 0084's sentinel)."""
+    url = option_history_url() if history is None else None
+    if job_source != OPTION_HISTORY or (history is None and url is None):
         return reader, screens
-    return spliced(reader, history or history_store(option_history_url())), None
+    return spliced(reader, history or history_store(url)), None
 
 
 def _iv_licences(

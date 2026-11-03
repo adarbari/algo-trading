@@ -6,6 +6,7 @@ partition restated in the root invalidates the session that read it. The fixture
 nine groups; the root is a store built like the bought history's (``tests/helpers``)."""
 
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -104,12 +105,28 @@ def test_a_partition_restated_in_the_root_invalidates_the_session_that_read_it()
     assert again.legs_computed > 0 and again.legs_invalidated.get("inputs", 0) > 0
 
 
-def test_a_history_slice_with_no_root_configured_fails_rather_than_reading_the_main_store(
+def test_with_no_root_configured_the_history_slice_reads_as_before(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """The history is not bought yet: an unset URL leaves the slice on the main store (no splice,
+    so the nightly's option edges keep running), the trials as licensed as before."""
     monkeypatch.delenv(OPTION_HISTORY_URL, raising=False)
+    plain = _run(build_world(), None, T1, full=True)
     w = build_world()
-    with pytest.raises(ConfigurationError, match=OPTION_HISTORY_URL):
+    unset = evaluate_edge(
+        w.reader, w.results, w.configs, UserContext("site"), edge(**SPLIT), DAYS[0], DAYS[-1], T1,
+        full=True, job_source=OPTION_HISTORY,
+    )  # fmt: skip
+    assert [r.measures for r in unset.results] == [r.measures for r in plain.results]
+    assert {r.licence for r in unset.results} == {"open"}
+
+
+def test_a_configured_root_that_is_not_mounted_fails_rather_than_reading_the_main_store(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv(OPTION_HISTORY_URL, (tmp_path / "unmounted").as_uri())
+    w = build_world()
+    with pytest.raises(ConfigurationError, match="mounted"):
         evaluate_edge(
             w.reader, w.results, w.configs, UserContext("site"), edge(), DAYS[0], DAYS[-1], T1,
             job_source=OPTION_HISTORY,
