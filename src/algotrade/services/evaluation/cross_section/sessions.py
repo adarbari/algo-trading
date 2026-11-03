@@ -28,6 +28,7 @@ from datetime import date
 
 from algotrade.config.edges.document import Edge
 from algotrade.config.edges.named import DELTA_EQUIVALENT, LADDER
+from algotrade.config.edges.schedules.events import entry_delay
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import next_session
 from algotrade.core.time.windows import (
@@ -200,7 +201,8 @@ def leg_blocks(
             f"edge {edge.id}: an entry condition with an on_event schedule is not evaluated "
             f"(S = D + 1 is the event rule)"
         )
+    delay = entry_delay(edge.schedule, edge.outcome.start_offset_sessions)  # 1: the event rule
     return [
-        [Leg(d, entry_session(d, 1)) for d in block]
+        [Leg(d, entry_session(d, delay)) for d in block]
         for block in event_blocks(sorted(events.names), days, horizon)
     ]

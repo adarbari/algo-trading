@@ -30,3 +30,11 @@ def test_subtype_rules_fail_closed() -> None:
         events.event_schedule_ok(t, "on_event:filing_8k")
     with pytest.raises(ConfigurationError, match="not a subtype"):
         events.event_schedule_ok(t, "on_event:index_change:sideways")
+
+
+@pytest.mark.parametrize("offset", [-1, 0, 1])
+def test_an_event_edge_enters_the_session_after_d_whatever_its_offset(offset: int) -> None:
+    """X5 follow-up: an event schedule's offset places the anchor (S = anchor + offset, D = S - 1),
+    so the entry is one session after the served D; a plain schedule's offset counts from D."""
+    assert events.entry_delay("on_event:earnings_expected", offset) == 1
+    assert events.entry_delay("every_session", 2) == 2

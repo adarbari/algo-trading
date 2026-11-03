@@ -148,10 +148,10 @@ def test_no_picks_read_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def _setup(
     monkeypatch: pytest.MonkeyPatch, rows: list[dict[str, Any]], kind: str = "excess_return",
-    entry: object = None,
+    entry: object = None, offset: int = 2,
 ) -> list[Any]:  # fmt: skip
     """Stub the document, the stored night and ``load_example_positions``; returns its calls."""
-    outcome = SimpleNamespace(kind=kind, start_offset_sessions=2, entry=entry)
+    outcome = SimpleNamespace(kind=kind, start_offset_sessions=offset, entry=entry)
     calls: list[Any] = []
     monkeypatch.setattr(
         module, "parsed_edges", lambda ctx, user: [SimpleNamespace(id="drift", outcome=outcome)]
@@ -198,3 +198,15 @@ def test_no_session_is_none_and_an_unreadable_document_is_empty(
     assert module.load_setup_examples(None, EDGE, ["EQ:A"]) is None
     monkeypatch.setattr(module, "parsed_edges", lambda ctx, user: [])
     assert module.load_setup_examples(CTX_ME, EDGE, ["EQ:A"]) == ()
+
+
+@pytest.mark.parametrize("offset", [-1, 0, 1])
+def test_an_event_setups_entry_is_the_session_after_the_served_one_whatever_its_offset(
+    monkeypatch: pytest.MonkeyPatch, offset: int
+) -> None:
+    """X5 follow-up: an event schedule's offset places the anchor: S = D + 1, never D + offset."""
+    calls = _setup(monkeypatch, [{**ROW, "pick_ids": ["EQ:A"]}], offset=offset)
+    event: Any = SimpleNamespace(id="drift", schedule="on_event:earnings_expected")
+    module.load_setup_examples(CTX_ME, event, ["EQ:A"])
+    ((_, delay, _),) = calls
+    assert delay == 1
