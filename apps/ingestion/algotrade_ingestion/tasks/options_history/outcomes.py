@@ -72,6 +72,7 @@ from algotrade_ingestion.tasks.derived.paths.close_fields import (
     rule_licence,
 )
 from algotrade_ingestion.tasks.derived.paths.option_outcomes import (
+    EXPECTED_DATE,
     SITE,
     frame_and_publish,
     refusal,
@@ -169,14 +170,13 @@ def start_refusals(
     reader: StoreReader, wanted: Sequence[Wanted], closes: Sequence[date]
 ) -> dict[str, str]:
     """Position key -> why it is not written over ``closes``: an exit rule over a field the range
-    cannot read (``close_fields``), or ``skip_report_in_life`` (the expected-report read is a
-    later slice)."""
+    cannot read (``close_fields``), or ``skip_report_in_life`` over no expected-report date."""
     out = {}
     for w in wanted:
         spec = w.outcome.position
         problems = refuse_unstored(reader, w.fields, closes)
-        if spec is not None and spec.skip_report_in_life:
-            problems.insert(0, "skip_report_in_life needs the expected-report read")
+        if spec is not None and spec.skip_report_in_life:  # the date read at each entry (X3)
+            problems += refuse_unstored(reader, [EXPECTED_DATE], closes)
         if problems:
             out[w.key] = "; ".join(problems[:SHOWN])
     return out
