@@ -4,14 +4,15 @@ table to the main store; a range spanning the cutover is the two parts; what was
 is logged and makes the licence personal; a read the splice cannot route raises rather than
 answering from the main store alone."""
 
-from datetime import date, timedelta
+from datetime import timedelta
 
 import pytest
 
-from algotrade.data import StoreReader
+from algotrade.data import STAMPED, ReadRecord, StoreReader, dates_digest, stamps_digest
 from algotrade.data.chains import FIRST_CBOE_CHAIN_SESSION
-from algotrade.data.option_history.splice import SplicedReader
+from algotrade.data.option_history.splice import SplicedReader, read_licence, spliced
 from algotrade.storage.backends.memory import MemoryBackend
+from algotrade.storage.tables.readers import RollingRead
 from algotrade.storage.tables.writers import StoreWriter
 from tests.helpers.stored_frames import stamped
 
@@ -74,9 +75,57 @@ def test_a_view_shares_the_log_and_reads_the_splice_cannot_route_raise() -> None
     _, _, reader = _world()
     assert reader.including("r").reads is reader.reads
     with pytest.raises(NotImplementedError):
-        reader.recording()
-    with pytest.raises(NotImplementedError):
         reader.pinned(1)
     with pytest.raises(NotImplementedError):
         reader.with_runs_frozen(["job"])
-    assert isinstance(BEFORE, date)
+    with pytest.raises(NotImplementedError):
+        reader.read_run(TABLE, BEFORE, "h")  # would answer from the main store alone
+    with pytest.raises(NotImplementedError):
+        reader.recording().partition_stats(TABLE, BEFORE)
+    with pytest.raises(NotImplementedError):
+        spliced(StoreReader(MemoryBackend()).pinned(1), StoreReader(MemoryBackend()))
+    assert reader.read_run(TABLE, AFTER, "m") is not None  # from the cutover: the main store
+
+
+def test_the_recorder_logs_a_history_read_with_its_own_stamps_and_a_main_read_as_rows() -> None:
+    """The leg-reuse record (ADR 0063) of a spliced read: the root's sequence is its own, so its
+    read is ``stamped`` with the root's commit sequences; a main read is ``rows`` as ever."""
+    _, hist, reader = _world()
+    recording = reader.recording()
+    with recording.attribute(AFTER):
+        recording.table(TABLE, BEFORE)
+        recording.table_range(TABLE, BEFORE, AFTER)
+        recording.table(OTHER, BEFORE)
+        assert recording.has_partition(TABLE, BEFORE)  # the splice's listing
+        assert recording.latest_date(TABLE, BEFORE) == BEFORE
+    root = StoreReader(hist.backend).partition_seq(TABLE, BEFORE, BEFORE)
+    found = recording.reads(AFTER)
+    assert ReadRecord(TABLE, BEFORE, BEFORE, STAMPED, stamps_digest(root)) in found
+    cut = FIRST_CBOE_CHAIN_SESSION - timedelta(days=1)
+    assert ReadRecord(TABLE, BEFORE, cut, STAMPED, stamps_digest(root)) in found
+    assert {(r.table, r.start, r.kind) for r in found if r.kind == "rows"} == {
+        (TABLE, FIRST_CBOE_CHAIN_SESSION, "rows"),  # the main part of the spanning range
+        (OTHER, BEFORE, "rows"),
+    }
+    assert {r.digest for r in found if r.kind == "dates"} == {  # both stores' listing
+        dates_digest([BEFORE, AFTER]),  # has_partition
+        dates_digest([BEFORE]),  # latest_date on or before BEFORE
+    }
+    assert reader.licence == "personal"  # the recorder logs into the splice's reads too
+    assert read_licence(StoreReader(MemoryBackend()), found) == "personal"  # a reused leg's
+    assert read_licence(StoreReader(MemoryBackend()), ()) == "open"
+
+
+def test_partition_stamps_come_from_the_store_that_answers_the_session() -> None:
+    main, hist, reader = _world()
+    early = reader.partition_seq(TABLE, BEFORE, BEFORE)
+    assert early == StoreReader(hist.backend).partition_seq(TABLE, BEFORE, BEFORE)
+    both = reader.partition_seq(TABLE, BEFORE, AFTER)
+    assert set(both) == {BEFORE, AFTER}
+    assert both[AFTER] == StoreReader(main.backend).partition_seq(TABLE, AFTER, AFTER)[AFTER]
+    assert reader.partition_seq(OTHER, BEFORE, BEFORE) == StoreReader(main.backend).partition_seq(
+        OTHER, BEFORE, BEFORE
+    )
+    memo = RollingRead(TABLE, ("iv30",))
+    rolled = reader.table_range_rolling(memo, BEFORE, AFTER)
+    assert rolled is not None and list(rolled["iv30"]) == [0.1, 0.2]

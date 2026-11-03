@@ -45,10 +45,11 @@ from algotrade.config.edges.document import (
 from algotrade.config.edges.identity import LONG, LONG_SHORT
 from algotrade.config.edges.named import DELTA_EQUIVALENT, TIME_SERIES
 from algotrade.config.edges.portfolio import PORTFOLIO_KIND
-from algotrade.config.edges.positions.chain import CHAIN_KIND
+from algotrade.config.edges.positions.chain import CHAIN_KIND, OPTION_HISTORY
 from algotrade.config.edges.positions.spec import exits_digest
 from algotrade.config.edges.positions.templates import load_templates
 from algotrade.config.edges.verdict import OPTION_LEVELS
+from algotrade.config.env import option_history_url
 from algotrade.config.site.settings import load_verdict
 from algotrade.config.strategy.regime import site_regime
 from algotrade.config.strategy.schema import MODEL_IMPL, Selection
@@ -56,9 +57,10 @@ from algotrade.config.user import UserContext
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import sessions_between
 from algotrade.data import StoreReader
+from algotrade.data.option_history.splice import history_store, read_licence, spliced
 from algotrade.data.outcomes import GrainReads, stored_sessions
 from algotrade.features.expressions.feature_set import FeatureSet
-from algotrade.features.framework.feature import Feature
+from algotrade.features.framework.feature import Feature, strictest
 from algotrade.services.evaluation.cross_section.baselines.variant import (
     Variant,
     _Scope,
@@ -287,6 +289,7 @@ def evaluate_edge(
     full: bool = False,
     screens: ScreenCache | None = None,
     job_source: str = "",
+    history: StoreReader | None = None,
 ) -> EdgeEvaluation:
     """``edge`` and its ``[[variants]]`` over the decision sessions in ``start..end`` for every
     horizon, its screeners and baselines, with outcomes known by ``as_of``. ``iv_field``: the
@@ -299,7 +302,12 @@ def evaluate_edge(
     ``MissingDataError`` when no outcome is stored for a horizon. An edge with ``base =
     "out_of_window"`` or ``"delta_equivalent"`` is measured by ``time_series/``
     (``_time_series``). ``job_source``: the history slice's run-job suffix, whose trial log the
-    trial count reads (``prior_trials``, ADR 0088 d11)."""
+    trial count reads (``prior_trials``, ADR 0088 d11); that slice reads the chain groups before
+    the cutover from the option-history root through the splice (``history``, default the root
+    at ``$ALGOTRADE_OPTION_HISTORY_URL``, none when it is unset: ``_sliced``); a run that read a
+    partition through it, or reused a leg that did, makes every one of its trials personal
+    (``read_licence``, decided per run: the slice is owner-only, so it only errs closed)."""
+    reader, screens = _sliced(reader, screens, job_source, history)
     if edge.base in TIME_SERIES:
         return _time_series(
             reader,
@@ -322,15 +330,7 @@ def evaluate_edge(
     days = sessions_between(start, end)
     verdict = load_verdict(configs)
     scopes = edge_scopes(configs, user, edge, iv_field, verdict.borrow_bps_annual)
-    licences: dict[str, str | None] = {}
-    for scope in scopes:
-        if scope.iv_field in MIXED_SOURCE_IV:
-            raise ConfigurationError(
-                f"iv_field {scope.iv_field!r} mixes sources: name one vendor's field"
-            )
-        licences[scope.key] = (
-            iv_licence(configs, user, scope.iv_field) if needs_implied_vol(scope.edge) else None
-        )
+    licences = _iv_licences(configs, user, scopes)
     schedules = event_schedules(reader, session, scopes, days)
     session.release()  # the eligible sets read for the events are not kept
     plans = [
@@ -378,6 +378,7 @@ def evaluate_edge(
         ),
     )
     stats = _measure(reader, session, plans, variants, schedules, as_of, spec, reuse)
+    read = read_licence(reader, (r for day in reuse.reads.values() for r in day.reads))
     results, randoms, projected = [], [], projection_count(load_verdict(configs))  # (0064)
     # ``projected``: the decision sessions whose exits are stored, read once per run
     reports = None  # the real report dates, read once and only for an earnings_expected edge
@@ -484,7 +485,7 @@ def evaluate_edge(
                         [m.config for m in variant.members] or [variant.config],
                         licences[scope.key],
                         stats.outcome_licence,
-                        fitted_floor(verdict.fitted_score_setups, reads),
+                        strictest((fitted_floor(verdict.fitted_score_setups, reads), read)),
                     ),
                     legs=_details(blocks_open, block_stats, found, vclosed)
                     if scope.key == MAIN
@@ -550,6 +551,40 @@ def evaluate_edge(
     )
 
 
+def _sliced(
+    reader: StoreReader,
+    screens: ScreenCache | None,
+    job_source: str,
+    history: StoreReader | None,
+) -> tuple[StoreReader, ScreenCache | None]:
+    """The reader and screen cache of a slice: the history slice's read the chain groups before
+    the cutover through the splice, with no cross-edge cache (another edge's cached screen read
+    the main store alone); any other slice's are as given. With no history root configured (the
+    history is not bought) the history slice reads as before, the main store alone; a root that
+    is configured but not mounted raises (``HistoryUnavailableError``, ADR 0084's sentinel)."""
+    url = option_history_url() if history is None else None
+    if job_source != OPTION_HISTORY or (history is None and url is None):
+        return reader, screens
+    return spliced(reader, history or history_store(url)), None
+
+
+def _iv_licences(
+    configs: ConfigStore, user: UserContext, scopes: Sequence[_Scope]
+) -> dict[str, str | None]:
+    """Each scope's implied-vol field's licence (None: its outcome reads none); a field mixing
+    vendors raises."""
+    licences: dict[str, str | None] = {}
+    for scope in scopes:
+        if scope.iv_field in MIXED_SOURCE_IV:
+            raise ConfigurationError(
+                f"iv_field {scope.iv_field!r} mixes sources: name one vendor's field"
+            )
+        licences[scope.key] = (
+            iv_licence(configs, user, scope.iv_field) if needs_implied_vol(scope.edge) else None
+        )
+    return licences
+
+
 def _time_series(
     reader: StoreReader,
     writer: ResultWriter,
@@ -604,7 +639,8 @@ def _time_series(
             edge_variant=r.edge_variant, lost_sessions=r.lost, timing=r.timing or None,
             book=r.book or None,
             licences=trial_licences(
-                features, ran[r.edge_variant], edge.universe, [], None, r.outcome_licence
+                features, ran[r.edge_variant], edge.universe, [], None, r.outcome_licence,
+                read_licence(reader, ()),
             ),
         )
         for r in run.results

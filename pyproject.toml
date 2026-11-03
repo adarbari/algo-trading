@@ -213,7 +213,6 @@ allowed_importers = [
 ]
 # the splice is the one module the cross-section harness may import (F7, ADR 0088 decision 11)
 ignore_imports = ["algotrade.services.evaluation.cross_section.** -> algotrade.data.option_history.splice"]
-unmatched_ignore_imports_alerting = "none"  # the harness wiring of the splice is a later slice
 
 [[tool.importlinter.contracts]]
 name = "The history chain-group splice is read only by the cross-section harness and the task that computes the groups (ADR 0088 decision 11)"

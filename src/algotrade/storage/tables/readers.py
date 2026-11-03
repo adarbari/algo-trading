@@ -6,7 +6,7 @@ bars, adjustments, events and chains are ``algotrade.data``. Consumers get this 
 """
 
 import hashlib
-from collections.abc import Collection, Hashable, Iterator, Sequence
+from collections.abc import Collection, Hashable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
@@ -308,7 +308,8 @@ class ReadRecord:
     """One read an attributed day made. ``kind`` ``rows``: partitions ``start..end`` of
     ``table`` were read (found or not: a read that found nothing is recorded too; ``digest``, when
     the read could tell, the hash of the partition dates it returned, so a partition purged since
-    is noticed); ``dates``:
+    is noticed); ``stamped``: partitions ``start..end`` of ``table`` read from another store,
+    ``digest`` their dates and commit sequences there (``stamps_digest``); ``dates``:
     the partition dates of ``table`` the caller used were listed, ``digest`` their hash
     (``dates_digest``), ``start`` the earliest of them; ``end`` is the day, or the latest date
     listed when that is after it (a read of the future: never reusable)."""
@@ -323,6 +324,18 @@ class ReadRecord:
 def dates_digest(days: Sequence[date]) -> str:
     """The hash of a list of partition dates: what a ``dates`` read is compared by."""
     return hashlib.sha256(",".join(d.isoformat() for d in days).encode()).hexdigest()[:16]
+
+
+STAMPED = "stamped"  # a ``ReadRecord`` kind: partitions read from a store with its own sequence
+
+
+def stamps_digest(stamps: Mapping[date, int]) -> str:
+    """The hash of partitions and their commit sequences: what a ``stamped`` read is compared by.
+    A read of a store whose sequence is not the reader's own (the option-history root behind the
+    splice, ADR 0088 decision 11) cannot be judged against ``inputs_seq``; its record holds every
+    partition's own stamp instead, so a restated, added or purged partition changes the digest."""
+    text = ",".join(f"{d.isoformat()}:{stamps[d]}" for d in sorted(stamps))
+    return hashlib.sha256(text.encode()).hexdigest()[:16]
 
 
 @dataclass
@@ -529,9 +542,13 @@ class RecordingReader(StoreReader):
         first, last = (seen[0], max(seen[-1], day)) if seen else (day, day)
         self._log(ReadRecord(table, first, last, "dates", dates_digest(seen)))
 
+    def _listing(self, table: str) -> list[date]:
+        """The partition dates of ``table``, unlogged: the read every logged listing is made of."""
+        return StoreReader.dates(self, table)
+
     def dates(self, table: str) -> list[date]:
         recording = self._open()  # before the read: the sequence it will be stamped with
-        found = super().dates(table)
+        found = self._listing(table)
         if recording:
             self._log_dates(table, found)
         return found
@@ -546,7 +563,7 @@ class RecordingReader(StoreReader):
 
     def latest_date(self, table: str, on_or_before: date | None = None) -> date | None:
         recording = self._open()
-        found = StoreReader.dates(self, table)  # not self.dates: logged here, once
+        found = self._listing(table)  # not self.dates: logged here, once
         seen = [d for d in found if on_or_before is None or d <= on_or_before]
         if recording:
             self._log_dates(table, seen)
@@ -556,7 +573,7 @@ class RecordingReader(StoreReader):
         """Logged as the one partition it names: a later partition never changes the answer,
         an earlier one does (``dates`` digest of ``[first]``)."""
         recording = self._open()
-        found = StoreReader.dates(self, table)
+        found = self._listing(table)
         if recording and found:
             self._log(ReadRecord(table, found[0], found[0], "dates", dates_digest(found[:1])))
         return found[0] if found else None
