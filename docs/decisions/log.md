@@ -310,7 +310,7 @@ follow-up PR).
 - Question: S4 asks for sorts on profitability, cash and default as presets; which are new, and what shape?
 - Options: three new presets / reuse the two that exist and add the cash sort / one Python screener per sort.
 - Decision: profitability (`cash_op_profitability`) and default (`distress_ohlson`) already exist as rule presets of the same shape, so only the cash sort is new: `cash_to_assets_high` v1 over a new expression feature `cash_to_assets` (cash / total assets, null for a stale balance sheet). All three share the base gates, one `not_null` signal and a `tie_break` ranking, pinned by a test; no edge document names them yet, so there is no setup wiring. Vol-of-vol is not built: it needs option history (F7), and joins as one more preset of the shape.
-- decided by: Claude (Sonnet) in away mode
+- decided by: Fable on the owner's behalf
 - status: pending owner confirmation
 ## 2026-11-02 | Portfolio level in the nightly picks task (ADR 0083, ADR 0088, backend-plan G15 / E15) | The setup's book is the forward paper record
 - Question: when a site setup's gate, entry or case rule reads `portfolio.*` (its own book, never real holdings), which book does the nightly picks task (`tasks/edges/picks.py` -> `services/evaluation/edge_picks/night.py`) compute it from?
