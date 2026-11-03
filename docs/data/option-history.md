@@ -50,6 +50,50 @@ importable only by ingestion's import and checks.
    RMS of the daily return difference at most 5 basis points, cumulative gap at most 100 basis
    points a year. A miss is reported, never tuned away.
 
+## Option trade outcomes from the history (E5, ADR 0088 decision 11), the day after the import
+
+Personal licence, owner-only evidence. Nothing here runs before the import and the trust check
+(steps 5 and 6 above) are done, and before the main store holds what the engine needs from the
+range start: Tiingo bars to 2002, `forward_returns@v2`, `rates/treasury` and `events/dividend`
+(D8 loaded them from 2002-01-02; the task refuses a missing session of bars or the curve and says
+which).
+
+1. **Dry look**, one year first (this measures the batch time the plan estimated at 0.5 to 1.7 h a
+   pass; the figures go in the PR or the status log, estimated against measured):
+
+   ```bash
+   algotrade-ingest run option-history-outcomes --from 2008-01-02 --to 2008-12-31 --batch 20
+   ```
+
+   It writes `outcomes/option/structure_pnl@v2` rows (`price_source = option_history`, licence
+   `personal`) for the index underlyings and `SPY QQQ IWM` (`--symbols` names others; single names
+   wait for the listing history of PR #968), only for windows entered before 2026-10-02 (the Cboe
+   chains own the table from there). Read the summary record `option-history-outcomes-summary`:
+   `coverage` and `refused` empty, `batches`, `rows`, `seconds`, `waited_for_nightly`.
+2. **Everything**, detached (hours; resumable: a window end already written for the same positions
+   and the same history import is skipped, `--force` rewrites):
+
+   ```bash
+   nohup algotrade-ingest run option-history-outcomes --from 2002-01-02 --to 2026-10-01 > var/logs/option-history-outcomes.log 2>&1 &
+   ```
+
+   It takes no run lock for the whole run: each batch is computed under the `ingest-tree` lock with
+   no run open, then published under the ingest lock for that one publish (`wait=False`, retried a
+   minute later), and never starts or publishes between the session close plus `settle_minutes` and
+   `data_deadline` of an exchange day (`config/site/nightly.toml`, pacific time): the nightly runs
+   beside it and waits at most one retry.
+3. **PUT replication through the engine** (needs the `index_put_write` rows of step 2 and the PUT
+   level, `algotrade-ingest run macro`):
+
+   ```bash
+   algotrade-ingest run option-history-put-engine-check --from 2008-01-02 --to 2026-09-01
+   ```
+
+   With more than one stored SPX position it lists the `position_key`s: name one with `--position`.
+   Tolerance: the cumulative gap at most 100 bp a year (ADR 0084); the rows hold no daily marks, so
+   the RMS is of roll-to-roll returns and reported only (`option-history-put-check` keeps the daily
+   5 bp test).
+
 ## First replication of Cboe's PUT index (the 2019-08 sample, measured 2026-10-25)
 
 One roll only: the sample holds 22 sessions (2019-08-01 to 08-30), so the put sold at the 2019-08-16

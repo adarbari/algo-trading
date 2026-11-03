@@ -1,0 +1,86 @@
+# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. The new version of c13_iv_term_structure_straddles (ADR 0088, build row X6),
+# filed 2026-11-03 as an option setup on the bought history. BLOCKED until HistoricalOptionData L2
+# is imported (E5 job, F7 features). A new id is a new trial; the old version is retired with its runs.
+id = "c13_term_slope_straddle_buy"
+name = "Implied-volatility term slope: long straddle"
+thesis = "Names whose long-dated implied volatility sits far above their short-dated one earn more from a bought straddle than names with an inverted term structure."
+mechanism = """Short-dated implied volatility over-reacts to recent news and mean-reverts toward the
+long end, so the slope forecasts the direction of the next month's change in implied volatility and
+with it the straddle's return (Vasquez 2017)."""
+persistence = """The same limits as the per-name premium sort (c12): the trade needs option books across
+hundreds of names, spreads are wide and capacity is small. The slope remained a predictor in the
+machine-learning study of option returns (Bali, Beckmeyer, Moerke and Weigert 2023)."""
+family = "C"
+schedule = "month_end"
+universe = "liquid_optionable_floored"
+top_k = 20
+screeners = []
+baselines = ["vrp_iv_hv"]
+status = "blocked"
+plain_reason = "Needs years of option-chain history to compare short and long implied volatility, and the purchased history is not imported yet."
+mechanism_kind = "paid_for_risk"
+frozen_from = 2018-01-01  # ADR 0088 H7: split = end of the paper sample (1996-2007); the bought history starts 2018, so all of it is out-of-sample
+holdout_from = 2026-10-26  # ADR 0088 d15: the first session of the unseen holdout; no verdict until closed trades from it reach 3 months
+rejection_reason = """Blocked until the bought option history is imported (ADR 0088 build row X6). The slope's
+long end has no history: iv_term@v1 holds the 90-day point from the Cboe chains stored since 2026-10-02
+only, and the plan's 180-day point (iv_term@v2.iv_180d, F7 history features) does not exist yet; the
+source's slope is the 6-month to 1-year point. E5 (the history import job) and F7 are being built;
+neither has history yet. The screener is not written: it ranks by that slope, a field this PR does not
+invent (the plan names it iv_term@v2.iv_180d; a ratio feature over it and iv30 is added with F7)."""
+notes = """THE NEW VERSION of c13_iv_term_structure_straddles (retired 2026-11-03, ADR 0088, X6): from the
+modelled long straddle on one IBKR 30-day volatility to option_pnl on stored chain rows, the
+long_straddle position (a new template: the two at-the-money legs bought, capital = the premium paid,
+collateral max_loss) held 21 sessions from the month-end decision, net of the site's option cost levels,
+judged by the tails profile. The source buys the high-slope decile and sells the low-slope one; this
+setup holds the long straddle on the highest slope only (the short leg is a separate setup, not filed).
+Buying options is judged here like any setup; the Guide's "why we do not publish put-buying setups"
+(X8) concerns puts alone, and this is a straddle. The slope proxy to state when the screener is written: the plan's
+180-day point against iv30, not the source's 6-month to 1-year one. Data: bought chains from 2018 (E5,
+F7); the frozen period is all of it. No gate: a bought straddle has no short-premium risk to pause."""
+
+[outcome]
+kind = "option_pnl"
+position = "long_straddle"
+tenor_days = 30
+horizon_sessions = [21]
+benchmark = "none"
+start_offset_sessions = 1
+
+[quality_bar]
+outcome = """The long at-the-money straddle's return on the premium paid (its collateral) from the entry
+close to the close 21 sessions later, net of the site's option cost levels (verdict.toml
+[option_costs]); the tails profile weighs the return, its bootstrap t, the probabilistic Sharpe ratio
+and the CVaR of the worst trades against every liquid optionable name's same straddle."""
+trigger_timing = """The slope is stored after the close of the decision session D (the last session of the
+month); the first fill is the next session's close, S = D + 1 (start_offset_sessions = 1); the contract
+is chosen on S's chain."""
+replication = """The source's rule: slope = the long-dated at-the-money implied volatility (6 months to 1
+year) minus the one-month one, a monthly decile sort, long the high-slope straddles and short the
+low-slope ones, held to expiry (Vasquez 2017). Here, once unblocked, the top 20 by the 180-day to 30-day
+slope are held long; the proxy is stated above."""
+expected_size = """The decile spread is economically large and not explained by jump risk or the standard
+factors, 1996-2007 (Vasquez 2017; the abstract gives no number we verified, so none is filed). With the
+bought history there are about 90 independent month-ends from 2018; until it is imported no size can be
+stated."""
+capacity_costs = """Single-name option spreads of 5 to 10% of premium are the whole game for a bought
+straddle: the site's effective and full cost levels are the test, the mid level flatters. A buyer has
+defined risk and needs no margin."""
+failure_modes = """An inverted term structure around earnings is event pricing, not mean reversion; a steep
+one in a calm market is cheap to be wrong about. Retire if, in the frozen period, the picks' return on
+premium after costs is not above the same straddle on every liquid optionable name."""
+decoys = """The earnings inversion (a report inside the front month inverts the slope for a known reason),
+the per-name premium sort (c12) and the filed VRP setups; test the slope after taking out names with a
+report inside the window."""
+
+[[sources]]
+title = "Vasquez, A., Equity Volatility Term Structures and the Cross-Section of Option Returns, Journal of Financial and Quantitative Analysis, 2017"
+url = "https://www.cambridge.org/core/journals/journal-of-financial-and-quantitative-analysis/article/equity-volatility-term-structures-and-the-cross-section-of-option-returns/F0A40E99FD2458367DD9A56A89783D38"
+
+[[sources]]
+title = "Coval, J. and Shumway, T. (2001), Expected Option Returns, Journal of Finance"
+url = "https://ideas.repec.org/a/bla/jfinan/v56y2001i3p983-1009.html"
+
+[[sources]]
+title = "Goyal, A. and Saretto, A. (2009), Cross-section of option returns and volatility, Journal of Financial Economics"
+url = "https://ideas.repec.org/a/eee/jfinec/v94y2009i2p310-326.html"

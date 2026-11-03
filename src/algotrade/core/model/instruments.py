@@ -94,6 +94,11 @@ def index_id(key: str) -> str:
     return instrument_id(AssetClass.INDEX, key)
 
 
+def is_index_id(instrument: str) -> bool:
+    """Whether ``instrument`` is an index level id (``IDX:SPX``)."""
+    return instrument.startswith(f"{AssetClass.INDEX}:")
+
+
 def macro_id(key: str) -> str:
     """The id of an economic series (``MACRO:T10Y3M``); the only place ``MACRO:`` ids are
     minted."""

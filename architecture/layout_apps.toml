@@ -256,6 +256,11 @@ purpose = "the attribution task (ADR 0050, EV4): why each big mover of a session
 kind = "task-domain"
 
 [[dir]]
+path = "apps/ingestion/algotrade_ingestion/tasks/events/dossier"
+purpose = "the dossier-import task (ADR 0050, EV5): the owner-reviewed deep-dive dossiers (TOML) validated whole and stored as instruments/factors, events/factor_occurrence and analyst_review rows of events/attribution; run.py"
+kind = "task-domain"
+
+[[dir]]
 path = "apps/ingestion/algotrade_ingestion/tasks/framework"
 purpose = "task machinery: the ingest run loop (IngestRun, TaskContext), the task registry and refresh scheduling (slot days for incremental tasks)"
 
@@ -393,6 +398,14 @@ reason = "`check_outcomes` is the outcomes step's acceptance check (ADR 0053 ame
 [[shared]]
 module = "apps/ingestion/algotrade_ingestion/tasks/derived/paths/option_outcomes.py"
 reason = "`check_option_outcomes` is the option-outcomes step's acceptance check (ADR 0053 amendment, EB H13, ADR 0039): the workflow declares which check accepts which step and runs it right after the step"
+
+[[shared]]
+module = "apps/ingestion/algotrade_ingestion/tasks/derived/paths/close_fields.py"
+reason = "the history writer (tasks/options_history/outcomes.py, ADR 0088 decision 11) reads an exit rule's catalogue fields per close and refuses an unstored one with the same loader as option-outcomes: one reader, not a copy"
+
+[[shared]]
+module = "apps/ingestion/algotrade_ingestion/tasks/derived/paths/wanted.py"
+reason = "the history writer takes the same positions to write as option-outcomes (`positions_wanted`): a new edge document needs no change in either writer"
 
 [[shared]]
 module = "apps/ingestion/algotrade_ingestion/tasks/derived/paths/share_outcomes.py"

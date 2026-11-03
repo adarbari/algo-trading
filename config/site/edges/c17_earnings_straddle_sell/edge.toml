@@ -1,0 +1,157 @@
+# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. The new version of c17_earnings_iv_crush_sell (ADR 0088,
+# build row X5, research C2), filed 2026-11-03 as an option setup on the bought history. BLOCKED
+# until HistoricalOptionData L2 is imported (E5 job, F7 features): no chain row before 2026-10-02
+# is stored today. A new id is a new trial; the old version is retired with its runs.
+id = "c17_earnings_straddle_sell"
+name = "Earnings straddle sale, paused in stress"
+thesis = "In large liquid names whose options price the report well above the name's own past earnings moves, selling the at-the-money straddle at the close before the report and covering after earns the premium, except in market stress, when the loss tail is the whole trade."
+mechanism = """Retail demand for event protection and lottery calls, and the jump risk dealers cannot
+hedge, push the pre-report straddle above the move that follows; the premium is the insurer's
+(practitioner evidence only; no peer-reviewed rule publishes a return for the sale)."""
+persistence = """Well known and crowded: practitioner sites publish the trade. The average edge is small
+and the payoff is a short jump tail: one 30% gap erases the premium of many trades, so the setup
+sits out the market regimes where gaps cluster (STRESS, CRISIS) and is judged on its tail
+(CVaR against the unconditioned sale), not its win rate."""
+family = "C"
+schedule = "on_event:earnings_expected"
+top_k = 20
+base = "event"
+screeners = ["earnings_move_rich"]
+baselines = ["earnings_move_cheap"]
+status = "blocked"
+plain_reason = "Needs years of option-chain history around earnings reports to test the sale, and the purchased history is not imported yet."
+mechanism_kind = "paid_for_risk"
+frozen_from = 2018-01-01  # ADR 0088 H7: split = end of the paper sample (1996-2013); the bought history starts 2018, so all of it is out-of-sample
+holdout_from = 2026-10-26  # ADR 0088 d15: the first session of the unseen holdout; no verdict until closed trades from it reach 3 months
+rejection_reason = """Blocked until the bought option history is imported (ADR 0088 build row X5). No chain row
+before 2026-10-02 is stored, and the 2018 start needs HistoricalOptionData L2: E5 (the history import
+job, tasks/options_history) and F7 (the history features: implied_move@v1 and earnings_move_ratio over
+the bought chains, so earnings_move_rich has a past) are being built; neither has history yet. Unblock
+by importing the history, then the history run (`edge-eval:<edge>:<user>:option_history`, owner-only)
+measures it. On Cboe rows alone (from 2026-10-02) the open slice has too few reports for a verdict."""
+notes = """THE NEW VERSION of c17_earnings_iv_crush_sell (retired 2026-11-03, ADR 0088, X5): from the
+modelled straddle on one 30-day IBKR volatility (option_model_pnl) to option_pnl on stored chain rows,
+the short_straddle position (an iron_fly variant on the same trades), entered at the close before the
+report and covered at the close of the reaction session, net of the site's option cost levels, judged
+by the tails profile (the option_pnl default; its CVaR criterion is the site's max_cvar_ratio, plan 2.6).
+CONDITIONAL, in two parts: (1) the screener is earnings_move_rich (S3: the report's straddle at least
+1.3 times the name's mean absolute move on its last eight reports; F4), the plain sale on every
+reporting name is the decoy; (2) the gate pauses the setup when market.regime@v3.label is STRESS or
+CRISIS (the ADR 0049 rule; an unknown label never passes). A report inside the stress window is
+therefore never sold.
+THE ANCHOR, as built (F10, not as the plan words it): the plan wanted the reaction-session class
+entered one session ahead using the report time known at D. The class as built,
+on_event:earnings_reaction_session, is known only when the reaction session has come (its fields
+read after the event), and the document parser refuses an entry before such an event, so it cannot
+open a trade across the report. This document uses the schedule that is announced ahead,
+on_event:earnings_expected (SCHEDULED dates only, as of D), and the next report's stored time of day
+(rollup.earnings@v1.earnings_time, known at D): a pre-market report is entered at the close before
+the report session (offset -1; the base universe is pre-market reports only), an after-close report at the report session's own close (the
+after_hours variant, offset 0), both held one session, to the close of the reaction session. A
+report with an unknown time is not entered. The reaction-session anchor stays the right one for the
+post-event setups; projecting it ahead (a follow-up, F10b) would replace the two offsets by one.
+Data: history from 2018 is the bought chains (E5, F7); the frozen period is that whole history, the
+paper sample ending before it (the source's 1996-2013 sample is the straddle purchase of c16, the
+sale is its practitioner mirror). The 3-month holdout (ADR 0088 d15) starts 2026-10-26 and is not
+enforced by code beyond the verdict check. Large caps only (the universe floors $5 and $50M a day;
+earnings_move_rich itself is the S&P 500). Defined risk comes from the iron_fly variant, which cuts
+the tail and most of the premium."""
+
+[gate]
+all = [
+  { field = "market.regime@v3.label", op = "in", value = ["CALM", "CAUTION"] },
+]
+
+# Before-open reports only: the offset below is the close before the report session.
+[universe.where]
+all = [
+  { field = "instrument.security_type", op = "in", value = ["COMMON_STOCK", "ADR"] },
+  { field = "instrument.status", op = "eq", value = "ACTIVE" },
+  { field = "instrument.optionable", op = "eq", value = true },
+  { field = "rollup.price_stats@v2.close", op = "gt", value = 5 },
+  { field = "rollup.price_stats@v2.adv_usd_20d", op = "gte", value = 50_000_000 },
+  { field = "rollup.earnings_expected@v1.expected_basis", op = "eq", value = "SCHEDULED" },
+  { field = "rollup.earnings@v1.earnings_time", op = "eq", value = "pre" },
+]
+
+[outcome]
+kind = "option_pnl"
+position = "short_straddle"
+tenor_days = 30
+horizon_sessions = [1]
+benchmark = "none"
+start_offset_sessions = -1
+
+# The defined-risk version of the same trades: the iron fly cuts the tail and most of the premium.
+[[variants]]
+id = "iron_fly"
+[variants.outcome]
+position = "iron_fly"
+
+# An after-close report: the close before the reaction session is the report session's own.
+# Variants may set the universe and the outcome's shared keys; the time of day is a universe rule.
+[[variants]]
+id = "after_hours"
+[variants.outcome]
+start_offset_sessions = 0
+[variants.universe]
+[variants.universe.where]
+all = [
+  { field = "instrument.security_type", op = "in", value = ["COMMON_STOCK", "ADR"] },
+  { field = "instrument.status", op = "eq", value = "ACTIVE" },
+  { field = "instrument.optionable", op = "eq", value = true },
+  { field = "rollup.price_stats@v2.close", op = "gt", value = 5 },
+  { field = "rollup.price_stats@v2.adv_usd_20d", op = "gte", value = 50_000_000 },
+  { field = "rollup.earnings_expected@v1.expected_basis", op = "eq", value = "SCHEDULED" },
+  { field = "rollup.earnings@v1.earnings_time", op = "eq", value = "post" },
+]
+
+[quality_bar]
+outcome = """The short at-the-money straddle's return on its Reg-T collateral from the close before the report
+to the close of the reaction session, net of the site's option cost levels (verdict.toml [option_costs]);
+the tails profile weighs the return, its bootstrap t, the probabilistic Sharpe ratio and the CVaR of
+the worst trades against the unconditioned sale. The distribution, not the win rate, is the result."""
+trigger_timing = """The expected report date and its time of day are known weeks ahead (earnings_expected@v1,
+earnings@v1.earnings_time, known_from <= D); the screen (earnings_move_rich) and the regime gate are
+read at the close of D and the entry is the next close, S = D + 1: S is the report session minus one
+for a before-open report and the report session for an after-close one. A date taken from last year
+(PRIOR_YEAR) is a guess; a report whose time is unknown is skipped, never guessed. The straddle is
+chosen on S's chain."""
+replication = """The practitioner rule: at the close before the report sell the at-the-money straddle (or a
+defined-risk iron fly) expiring after it, cover at the close after. No peer-reviewed rule publishes a
+return for the sale, so no figure is filed; the conditioning (the straddle priced above the name's own
+past moves, no sale in STRESS or CRISIS) is this site's, taken from the options research (C2), and
+its thresholds are judged only on data after the commit that fixes them (ADR 0088 H7)."""
+expected_size = """No published return. The test is whether the implied move exceeds the realised one by enough to
+pay the costs and the tail: the stored reactions give the realised half back to 2007 and the bought
+chains give the implied half from 2018. Until the history is imported no size can be stated."""
+capacity_costs = """Single-name option spreads around a report are wide and widest at the close before it; the
+site's effective and full cost levels are the test, the mid level flatters. Undefined-risk straddles
+need Reg-T margin, the iron fly less. An individual's size is far below the open interest of names
+with $50M of daily volume."""
+failure_modes = """The tail: one large gap wipes ten to twenty winners, and gaps cluster in stress, which the
+gate removes only after the label turns (it holds five sessions), so the first stress days are
+still sold. Crowding thins the premium. Retire if, in the frozen period, the picks' return on collateral
+after costs is not above the unconditioned sale of every reporting name the same sessions, or their
+CVaR is worse by more than the site's max_cvar_ratio."""
+decoys = """The plain sale on every reporting name (earnings_move_cheap names are the other half of the
+screen), the filed VRP setups (this is the premium at an event) and the pre-earnings straddle
+purchase (c16, the mirror image); the post-event drift is a separate setup."""
+
+[[sources]]
+title = "Gao, C., Xing, Y. and Zhang, X., Anticipating Uncertainty: Straddles around Earnings Announcements, Journal of Financial and Quantitative Analysis, 2018"
+url = "https://resolve.cambridge.org/core/journals/journal-of-financial-and-quantitative-analysis/article/anticipating-uncertainty-straddles-around-earnings-announcements/7B34877AD5E06304BA3C55FBA3219FDD"
+
+[[sources]]
+title = "Goyal, A. and Saretto, A. (2009), Cross-section of option returns and volatility, Journal of Financial Economics"
+url = "https://ideas.repec.org/a/eee/jfinec/v94y2009i2p310-326.html"
+
+[[sources]]
+title = "Carr, P. and Wu, L. (2009), Variance Risk Premiums, Review of Financial Studies"
+url = "https://ideas.repec.org/a/oup/rfinst/v22y2009i3p1311-1341.html"
+
+# Known gap (architect review, 2026-11-03): the example and exit-rule reads in
+# services/read/evaluation/positions/ add the offset to the served session D, but an event
+# schedule enters at S = D + 1; no example is served while this edge is blocked, and the helper
+# is a follow-up before it is unblocked.

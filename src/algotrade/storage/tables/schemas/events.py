@@ -100,7 +100,59 @@ ATTRIBUTION_EVENTS = fixed(
     "model string",  # a model row: the provider and model that answered
     "prompt_version string",
     runs="merge",
-    key=("instrument_id", "ts", "source"),  # a model row never overwrites a filing row
+    # a model row never overwrites a filing row; a later review (``known_from``) never overwrites an
+    # earlier one: a session between the two imports still sees the first
+    key=("instrument_id", "ts", "source", KNOWN_FROM),
+)
+
+# L1: the deep dive's reviewed dossier of a name (ADR 0050 decision 6, EV5), written only by the
+# ``dossier-import`` task. ``instruments/factors``: one row per factor of the dossier an import
+# stored (``status`` ``active`` | ``retired``: a retired factor is marked, never deleted),
+# ``reviewed_on`` the owner's review date. ``known_from`` is the import's session, so a session
+# before the import never sees it. Every import writes the WHOLE dossier of the name: a reader
+# takes, per instrument, the rows of the latest IMPORT RUN (``run_id``, newest ``knowledge_ts``)
+# among those whose ``known_from`` is on or before its session (``events/factor_occurrence``
+# too): a date dropped from a later dossier disappears with it, a corrected re-import on the same
+# session replaces the first (merge keeps the union of runs; the reader picks the run).
+FACTOR_KINDS = (
+    "peer", "macro", "regulation", "commodity", "litigation", "product_cycle", "financing", "flows",
+)  # fmt: skip
+FACTOR_STATUSES = frozenset({"active", "retired"})
+
+FACTOR_REFERENCE = fixed(
+    "instruments/factors",
+    "reference",
+    ("instrument_id", "factor_id", KNOWN_FROM),
+    "instrument_id string!",
+    "factor_id string!",
+    f"{KNOWN_FROM} date!",
+    "kind string!",
+    "status string!",
+    "description string!",
+    "reviewed_on date!",
+    runs="merge",
+    key=("instrument_id", "factor_id", KNOWN_FROM),
+)
+
+# L1: the dated occurrences and undated watch items of a dossier's factors (``date_kind``
+# ``dated``: ``ts`` is the day, midnight UTC; ``window``: ``ts`` the expected window's first day
+# and ``window_end`` its last). An occurrence may be past (an instance the factor explains) or
+# ahead (it joins the forward calendar). ``known_from`` is the import's session.
+OCCURRENCE_DATE_KINDS = frozenset({"dated", "window"})
+
+FACTOR_OCCURRENCE_EVENTS = fixed(
+    "events/factor_occurrence",
+    "event",
+    ("instrument_id", "ts", KNOWN_FROM, "factor_id"),
+    "instrument_id string!",
+    "ts timestamp_utc!",
+    f"{KNOWN_FROM} date!",
+    "factor_id string!",
+    "label string!",
+    "date_kind string!",
+    "window_end date",
+    runs="merge",
+    key=("instrument_id", "ts", "factor_id", KNOWN_FROM),
 )
 
 # L1: the 8-K and 8-K/A filings of the scoped companies (ADR 0050), one row per instrument and

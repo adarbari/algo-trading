@@ -12,12 +12,16 @@ filled from an earlier session), written to partition S under a ``position_key``
 resolved legs (``config/edges/positions/key.py``). An exit rule over catalogue fields reads each
 close's fields from that close's partition only (``close_fields``); a rule over a field the
 window cannot read at all is REFUSED (recorded, the position's other windows and the other
-positions still write, the check FAILs), as is ``skip_report_in_life`` until the earnings read
-lands (E4b). A row's ``knowledge_ts`` is the latest chain and field partition read up to its own
-exit; its ``licence`` the strictest of the price source and the rule's fields. A window whose S is
-before the first stored chain is not computed (chains are stored from 2026-10-02); one whose T has
-not closed is refused. Each night also recomputes the ``RECHECK`` window ends before it (a re-run
-never retracts a row; its rows win per key), so a night's missed run is caught up.
+positions still write, the check FAILs). ``skip_report_in_life`` (``skip_reports``) leaves a name
+UNMEASURED as ``REPORT_IN_LIFE`` when the expected report date known at the decision session D
+(``earnings_expected@v1`` read from D's own partition, never the actual report) falls from D to
+the selected expiry, and as ``REPORT_UNKNOWN`` when a reporting type has no expected date (never
+read as "no report"); a type that files no report (ETF, index, fund) passes. A row's
+``knowledge_ts`` is the latest chain and field partition read up to its own exit; its ``licence``
+the strictest of the price source and the rule's fields. A window whose S is before the first
+stored chain is not computed (chains are stored from 2026-10-02); one whose T has not closed is
+refused. Each night also recomputes the ``RECHECK`` window ends before it (a re-run never retracts
+a row; its rows win per key), so a night's missed run is caught up.
 
 ``frame_and_publish`` is the one function that writes the table (G24): the owner-run history
 writer (E5) computes frames and calls it.
@@ -29,7 +33,7 @@ refused position FAILs.
 """
 
 from collections.abc import Collection, Mapping
-from datetime import date
+from datetime import date, datetime
 
 import pandas as pd
 
@@ -37,7 +41,7 @@ from algotrade.config.edges.loading import load_edges
 from algotrade.config.edges.positions.templates import load_templates
 from algotrade.config.env import config_dir
 from algotrade.config.site.settings import SourcesSettings
-from algotrade.core.time.calendar import close_time, sessions_ending
+from algotrade.core.time.calendar import close_time, previous_session, sessions_ending
 from algotrade.data import StoreReader
 from algotrade.data.chains import (
     CHAIN_STATUS,
@@ -48,9 +52,12 @@ from algotrade.data.chains import (
     option_quote_rows,
     underlying_quotes,
 )
+from algotrade.data.reference import instruments
 from algotrade.engines.structures.chain import DayChain
+from algotrade.engines.structures.settlement import report_in_life
 from algotrade.engines.structures.trades import select_window, walk_trades
 from algotrade.features.expressions.feature_set import FeatureSet
+from algotrade.features.rollups.options.wing_search import LegSelection
 from algotrade.features.rollups.positioning.chain_inputs import closing_spots, one_row_per_contract
 from algotrade.features.site import site_features
 from algotrade.storage.configs.files import FileConfigStore
@@ -120,17 +127,18 @@ class ChainLoader:
         self._days[day] = labels, spots, stamps
         return self._days[day]
 
+    def _quotes(self, day: date, ids: Collection[str] | None) -> pd.DataFrame | None:
+        """The session's option quotes (``QUOTE_COLUMNS`` and ``knowledge_ts``), of the contracts
+        ``ids`` or all; the history writer's loader reads the bought history here."""
+        return option_quote_rows(self.reader, day, ids, (*QUOTE_COLUMNS, "knowledge_ts"))
+
     def __call__(self, day: date, ids: Collection[str] | None) -> DayChain:
         if ids is None and day in self._entry:
             return self._entry[day]
         labels, spots, base = self._day(day)
         stamps = list(base)
         held = None if ids is not None and not ids else ids  # no contract held: none to read
-        options = (
-            None
-            if ids is not None and not ids
-            else option_quote_rows(self.reader, day, held, (*QUOTE_COLUMNS, "knowledge_ts"))
-        )
+        options = None if ids is not None and not ids else self._quotes(day, held)
         if options is not None and not options.empty:
             stamps.append(pd.Timestamp(options["knowledge_ts"].max()))
             options = one_row_per_contract(options).drop(columns=["knowledge_ts", "ts"])
@@ -169,31 +177,72 @@ def trade_rows(
     loader: ChainLoader,
     fields: FieldLoader,
     licence: str,
+    price_source: str = PRICE_SOURCE,
 ) -> tuple[pd.DataFrame, int]:
     """The ``structure_pnl@v2`` rows of position ``w`` for the window ``sessions`` (S..T in
     order) -> (rows, the number of names with an ``OK`` chain at S). The chain of S is read whole,
     the later sessions' only for the contracts the entry chose; each close's rule fields come from
-    that close's own partition."""
+    that close's own partition. ``price_source`` is where the chains came from (the history writer
+    passes ``option_history``)."""
     spec = w.outcome.position
     assert spec is not None
     entry = loader(sessions[0], None)
     selected = select_window(
         entry, spec.legs, int(w.outcome.tenor_days or 0), spec.expiry_cycle, sessions[-1]
     )
+    known = entry.known
+    if spec.skip_report_in_life:
+        selected, read = skip_reports(selected, entry.day, fields)
+        known = max((x for x in (known, read) if x is not None), default=None)
     held = {c.instrument_id for sel in selected.values() for c in sel.legs}
     days = [entry, *(loader(d, held) for d in sessions[1:])]
     names = sorted(n for n, sel in selected.items() if sel.reason is None)
-    catalogue, stamps = [], [entry.known]
+    catalogue, stamps = [], [known]
     for day in days[1:]:
         values, field_known = fields(day.day, w.fields, names)
         catalogue.append(values)
         stamps.append(max((x for x in (day.known, field_known) if x is not None), default=None))
     trades = walk_trades(days, spec.legs, spec.collateral, selected, w.rules, catalogue, spec.book)
     rows = position_rows(
-        trades, stamps, key=w.key, hold=w.hold, window_end=sessions[-1], price_source=PRICE_SOURCE,
+        trades, stamps, key=w.key, hold=w.hold, window_end=sessions[-1], price_source=price_source,
         licence=licence, ts=close_time(sessions[0]),
     )  # fmt: skip
     return rows, len(selected)
+
+
+EXPECTED_DATE = "rollup.earnings_expected@v1.expected_report_date"
+
+
+def skip_reports(
+    selected: Mapping[str, LegSelection], entry: date, fields: FieldLoader
+) -> tuple[dict[str, LegSelection], datetime | None]:
+    """``selected`` (and the ``knowledge_ts`` of the partition read, which the row must not
+    precede) with each name whose selected expiry holds a report left unselectable
+    (``REPORT_IN_LIFE``), or ``REPORT_UNKNOWN`` when its report date is not known: the expected
+    date and the security type are read as of the decision session D (the session before the
+    entry ``entry``; a report on D itself, after the close, reacts inside the life, so the life
+    starts at D). Names without legs keep their own reason."""
+    names = sorted(n for n, sel in selected.items() if sel.legs)
+    decision = previous_session(entry)
+    expected, read = fields(decision, [EXPECTED_DATE], names)
+    types: dict[str, object] = {}
+    if names:
+        reference = instruments(fields.reader, decision, names)
+        types = dict(
+            zip(reference["instrument_id"].astype(str), reference["security_type"], strict=True)
+        )
+    out = dict(selected)
+    for name in names:
+        raw = expected.get(name, {}).get(EXPECTED_DATE)
+        due = None if raw is None or pd.isna(raw) else date.fromisoformat(str(raw)[:10])
+        kind = types.get(name)
+        expiry = max(c.expiry for c in selected[name].legs)
+        inside = report_in_life(None if kind is None else str(kind), due, decision, expiry)
+        if inside is None:
+            out[name] = LegSelection(reason="REPORT_UNKNOWN")
+        elif inside:
+            out[name] = LegSelection(reason="REPORT_IN_LIFE")
+    return out, read
 
 
 def _one(
@@ -213,10 +262,10 @@ def _one(
             if sessions[0] < first:
                 run.record_item(w.key, "BEFORE_HISTORY")
                 continue
-            refusal = _refusal(ctx.reader, w, sessions)
-            if refusal:
-                run.record_item(w.key, f"REFUSED: {refusal}")
-                run.stats[w.key] = {"refused": refusal}
+            why = refusal(ctx.reader, w, sessions)
+            if why:
+                run.record_item(w.key, f"REFUSED: {why}")
+                run.stats[w.key] = {"refused": why}
                 continue
             if sessions[0] != current:
                 loader.reset()  # the previous hold's entry chain is not this one's
@@ -241,12 +290,12 @@ def _one(
     return run.record
 
 
-def _refusal(reader: StoreReader, w: Wanted, sessions: list[date]) -> str:
+def refusal(reader: StoreReader, w: Wanted, sessions: list[date]) -> str:
     """Why position ``w`` is not written for the window ``sessions`` ('' when it is)."""
-    spec = w.outcome.position
-    if spec is not None and spec.skip_report_in_life:
-        return "skip_report_in_life needs the expected-report read (a later slice)"
     problems = refuse_unstored(reader, w.fields, sessions[1:])
+    spec = w.outcome.position
+    if spec is not None and spec.skip_report_in_life:  # the date read at D: no partition, no run
+        problems += refuse_unstored(reader, [EXPECTED_DATE], [previous_session(sessions[0])])
     return "; ".join(problems[:SHOWN])
 
 

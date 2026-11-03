@@ -240,3 +240,19 @@ taxonomy cause and one of the headlines shown (the evidence, with its URL), conf
 backfill; `model` and `prompt_version` are columns. The step is skipped, with the reason, when the
 text model is off or Massive news is not built; the filing rows never depend on it. Chosen by a
 Fable agent on the owner's behalf; pending owner confirmation.
+
+## Amendment 2026-11-03: the dossier as built (EV5)
+
+The dossier is one TOML file per name (`.claude/skills/event-deep-dive/dossier-format.md`, schema 1),
+validated whole by `services/attributing/dossier.py`; `dossier-import` (`--path` a file or folder,
+`--date` the import session) stores nothing when any file has a problem. Every import writes the
+**whole** dossier of a name (a name needs at least one factor; the review date is a column of its
+factor rows), so a reader takes, per name, the rows of the latest import run among those with `known_from`
+on or before its session (a same-session re-import replaces the first): a date dropped from a later dossier disappears with it, and a retired factor stays listed
+with `status = retired`. `instruments/factors` is a `reference`-grain merge table keyed by
+(instrument, factor, `known_from`); `events/factor_occurrence` an event table keyed by
+(instrument, `ts`, factor, `known_from`), a watch item stored at its window's first day with
+`window_end`; reviewed attributions are `source = analyst_review` rows of `events/attribution`
+(highest source wins on read; the key includes `known_from`, so an earlier review survives a later import). All rows are `known_from` the import session, never the reaction
+session or the review date. Chosen by the implementing session; the first import on the scope list is
+the owner's run.

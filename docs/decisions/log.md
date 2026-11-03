@@ -377,3 +377,19 @@ follow-up PR).
 - decided by: Fable on the owner's behalf
 - status: pending owner confirmation
 - Reasoning: apps never import each other and the library never imports vendors, so one shared composition with injected builders is the only shape without a copy; the owner's login must never serve the site user; spend is one time series.
+
+## 2026-11-03 | Options design build row X5 | The earnings sale enters on the announced-ahead class, not the F10 reaction-session class
+- Question: row X5 says c17 enters across the report by the F10 reaction-session anchor. As built, `on_event:earnings_reaction_session` is known only once the reaction session has come (`announced_ahead` false), and the parser refuses an entry before such an event, so no trade could open before the report. What does the document use?
+- Options: (a) `on_event:earnings_expected` (announced ahead) with the stored report time as a universe rule, offset -1 for before-open and 0 for after-close (variant), and `spec_of` allowing an offset below 1 on an announced-ahead schedule; (b) build F10b first, projecting the reaction session from the time known at D, then file c17; (c) enter after the event.
+- Decision: (a), with F10b a follow-up that would replace the two offsets by one.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the document is blocked until the history exists, so (a) costs nothing and keeps the point-in-time rule (the date and time of day are known by D, `known_from <= D`); (b) is a feature and schedule change with its own review; (c) is not the thesis.
+
+## 2026-11-03 | EV8 | How an admin changes the event-study scope list
+- Question: the Admin screen must add / remove scope tickers; `config/site/events/scope.toml` is site config (changes by PR; the config writer refuses site writes). Where do the admin's changes live?
+- Options: (A) a new admin-owned, git-ignored document `config/admin/events/scope.toml` (reserved scope `admin`, `[[added]]` / `[[removed]]` with `by`, `at`, `note`) layered over the site list at load; (B) the API rewrites the site file; (C) a small table the API writes.
+- Decision: (A). Effective list = site names + admin added - admin removed, resolved once in `services/events/scope.py`; a removal drops only the `list` reason (never the tier reason) and deletes no stored data; written through `services/authoring` (admin role), symbol checked by the site loader's rule and `SymbolResolver`. A change is only recorded: the next nightly's budgeted fill picks added names up. ADR 0029 (an `admin` config scope), 0005 (API write list), 0015 (the admin layer) and 0050 are amended in the EV8 PR; the admin file lives on the Mac only, so `docs/hosting.md` lists it in the backup.
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: keeps "site by PR" intact, no git-tracked file dirtied on the host, one new document kind instead of a store.

@@ -7,7 +7,7 @@ without writing an ADR. Fresh session: run `/start` (`make doctor` + `make statu
 Read in this order, **by section and only when the task needs it** (grep, then read the lines):
 
 1. `docs/roadmap.md`, **"Now / Next" only** (`/start` reads just that): running jobs, next
-   items, facts; a PR that opens or closes one updates it. Phase tables and open decisions only on request.
+   items, facts; a PR that opens or closes a track updates its row, a slice PR only appends `- [track] text` to `docs/status/log.md` (union-merged: shared rows conflicted on every merge). Phase tables and open decisions only on request.
 2. `docs/architecture.md` (target architecture + the rules enforced on today's code) and the
    spec for your area: `docs/data/layers.md`, `docs/configuration.md`, `docs/data/storage.md`,
    `docs/data/instruments.md`, `docs/data/vendors.md`, `docs/ui/architecture.md`,
@@ -198,6 +198,7 @@ Every table, list or feed uses the shared filter bar (ADR 0082, once accepted) a
 | A decision that changes architecture | `.claude/skills/write-adr` |
 | Review and release a PR (reviewer loop, owner decisions, removing `no-automerge`) | `.claude/skills/review-and-release` |
 | A lesson from this session (owner correction, rule-preventable error) | `.claude/skills/capture-learning` |
+| Owner-run deep dive on a name: factors, dated occurrences, reviewed causes -> a dossier, imported | `.claude/skills/event-deep-dive` |
 | Promote an accepted formula or backlog item to a site feature | `.claude/skills/promote-feature` |
 | Start of day: what slowed the last sessions down, top 3 fixed before new work | `.claude/skills/review-sessions` (`/review-sessions`, `make friction`) |
 
