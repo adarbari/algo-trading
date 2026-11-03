@@ -462,7 +462,7 @@ purpose = "what an edge evaluation reports beyond its stored rows (ADR 0053): th
 
 [[dir]]
 path = "src/algotrade/services/evaluation/cross_section/run"
-purpose = "what one edge evaluation is set up from and returns (ADR 0053): its identity, the Edge fields that make a run (RUN_INPUTS) and the bookkeeping ones, the run hash, the effective split and the trials earlier runs logged (identity.py); the variants and the scopes it evaluates, a scope's universe, its event schedules and an implied-vol field's licence (scopes.py); the typed result, EdgeEvaluation with each VariantResult, LegDetail and RandomPicks (evaluation.py); split from harness.py, which plans and assembles the run"
+purpose = "what one edge evaluation is set up from and returns (ADR 0053): its identity, the Edge fields that make a run (RUN_INPUTS) and the bookkeeping ones, the run hash, the effective split and the trials earlier runs logged (identity.py); the variants and the scopes it evaluates, a scope's universe, its event schedules and an implied-vol field's licence (scopes.py); the typed result, EdgeEvaluation with each VariantResult, LegDetail and RandomPicks (evaluation.py); the price-source slices of an option edge's evaluation, open (Cboe) and history, and the open slice's licence check (sources.py, ADR 0088 d11); split from harness.py, which plans and assembles the run"
 
 [[dir]]
 path = "src/algotrade/services/evaluation/discovery"

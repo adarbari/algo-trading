@@ -12,8 +12,8 @@ A run's trade ledger (``results/edge_trades``, ADR 0064) is read here too (``loa
 the one reader: a hidden run's rows before its split only, per-name values under a licence the
 viewer does not hold as ``Unknown(LICENCE)``, and a ledger the retention purge removed
 (``Unknown(PRUNED)``) told apart from one the run never wrote (``Unknown(NOT_STORED)``), each with
-its admin cause (ADR 0056). ``ledger_keep`` says which partitions the
-purge spares: those of each edge's canonical run, latest run per user and cited run."""
+its admin cause (ADR 0056). ``ledger_keep`` says which partitions the purge spares: those of each
+edge's canonical run, latest run per user and cited run."""
 
 from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass, replace
@@ -35,7 +35,7 @@ from algotrade.features.framework.feature import LICENCES, strictest
 from algotrade.quant.edges.statistics import window_weights
 from algotrade.services.read.availability.cause import run_cause, table_cause
 from algotrade.services.read.context import ReadContext, Stores, once_per_request, run_partition
-from algotrade.services.read.evaluation.edges import Edge, load_edges, parsed_edges
+from algotrade.services.read.evaluation.edges import Edge, held_licences, load_edges, parsed_edges
 from algotrade.services.read.values import Unknown, UnknownCode, to_scalar
 from algotrade.storage.configs.store import ConfigStore
 from algotrade.storage.runs import RunRecord, RunStatus
@@ -98,6 +98,7 @@ class EdgeRun:
     screener_hashes: tuple[tuple[str, str], ...] = ()
     evidence_licence: str = "open"  # its outcome rows' and rules' strictest licence (E1)
     exits_digest: str | None = None  # the declared exits it tested (None: none, or an older run)
+    pre_split: bool = False  # an option edge's run with no ``price_source`` (ADR 0088 d11)
 
 
 @dataclass(frozen=True)
@@ -279,6 +280,7 @@ def run_of_record(
         screener_hashes=tuple(sorted((stats.get("screener_hashes") or {}).items())),
         evidence_licence=str(stats.get("evidence_licence") or "open"),
         exits_digest=stats.get("exits_digest"),
+        pre_split="price_source" not in stats and edge.reads_chain,
     )
 
 
@@ -301,9 +303,8 @@ def _committed(ctx: Stores, edge: Edge, owner: str) -> list[EdgeRun]:
 
     Kept in the request's ``ctx.memo`` (not the shared cache: an entry per edge per owner would
     evict other pages' frames) under the run-record generation (read before the records) and
-    every input ``_run`` reads of the edge and the session; a reader whose records are a
-    snapshot is not memoised. A page asks this per edge per
-    field (4,210 reads of a page of 81 edges), each decoding every record."""
+    every input ``_run`` reads of the edge and the session; a reader whose records are a snapshot
+    is not memoised. A page asks this per edge per field (4,210 reads), each decoding a record."""
     if ctx.reader.runs_frozen():
         return _read_committed(ctx, edge, owner)
     session = ctx.session.date if isinstance(ctx, ReadContext) else None  # as ``_run`` reads it
@@ -337,10 +338,13 @@ def _read_committed(ctx: Stores, edge: Edge, owner: str) -> list[EdgeRun]:
 
 def load_edge_runs(ctx: Stores, edge: Edge) -> tuple[EdgeRun, ...]:
     """Every committed run of ``edge`` the user sees (theirs, then the site's), newest first."""
+    held = held_licences(ctx)
     owners = dict.fromkeys([ctx.user.user_id, SITE_USER])
     runs: dict[str, EdgeRun] = {}
     for o in owners:  # a legacy ``local`` run is the viewer's own record too: the site's copy wins
         for r in _committed(ctx, edge, o):
+            if r.pre_split and r.evidence_licence not in held:  # may hold history rows (d11)
+                continue
             if r.run_id not in runs or r.legacy_owner is not None:
                 runs[r.run_id] = r
     return tuple(sorted(runs.values(), key=lambda r: r.knowledge_ts, reverse=True))
@@ -386,9 +390,8 @@ def load_site_trials(ctx: Stores) -> int:
     user's own edges are not the site's). An edge with no canonical run, or one from before the
     count, adds none. Kept until the next publish or run, and keyed on the site edges' ids,
     frozen periods and statuses, so an edited document recounts."""
-    # one request asks per edge per field, from resolvers running side by side (every one of them
-    # on ``RequestContext.stores()``, a ``StoreContext``): the count (and the config reads of its
-    # key) once
+    # one request asks per edge per field, from resolvers running side by side (all on
+    # ``RequestContext.stores()``, a ``StoreContext``): the count (and its key's reads) once
     memo_key = ("site-trials", ctx.reader.version(), ctx.reader.runs_generation())
     return once_per_request(ctx, memo_key, lambda: _site_trials(ctx))
 

@@ -92,10 +92,12 @@ def write_run(
     screener_hashes: dict[str, str] | None = None,
     evidence_licence: str | None = None,
     exits_digest: str | None = None,
+    source: str = "",
 ) -> None:
     """A run of ``drift``: an ``all`` row and a frozen (or, for another split, a ``split``)
     row for ``momo``; ``minutes`` after T; ``trades``: its ledger (``results/edge_trades``, its
-    row count on the record)."""
+    row count on the record); ``source``: the run's ``price_source`` (``cboe``,
+    ``option_history``: the history slice, its own run job)."""
     writer = ResultWriter(backend)
     at = T + timedelta(minutes=minutes)
     done = T + timedelta(minutes=minutes if finished_minutes is None else finished_minutes)
@@ -129,9 +131,12 @@ def write_run(
         stats["evidence_licence"] = evidence_licence
     if exits_digest is not None:  # an option setup's declared exits (runs before it: none)
         stats["exits_digest"] = exits_digest
+    if source:  # the price-source split's runs say which slice they are; before it: none
+        stats["price_source"] = source
     if trigger is not None:  # runs from before the trigger was recorded have none
         stats["trigger"] = trigger
-    record = RunRecord(run_id, f"edge-eval:{edge}:{owner}", END, at)
+    suffix = ":option_history" if source == "option_history" else ""
+    record = RunRecord(run_id, f"edge-eval:{edge}:{owner}{suffix}", END, at)
     with writer.publishing(run_id, done):
         writer.write_result("edge_eval", END, run_id, frame, pending=True)
         if series:

@@ -8,6 +8,7 @@ from typing import Any
 
 import pytest
 
+from algotrade.config.edges.positions.templates import KIND, NAME
 from algotrade.config.user import UserContext
 from algotrade.core.time.calendar import is_session
 from algotrade.quant.edges.statistics import window_weights
@@ -32,12 +33,17 @@ from algotrade.services.read.evaluation.runs import (
     run_of_record,
 )
 from algotrade.services.read.evaluation.verdict import load_edge_verdict
+from algotrade.services.read.evaluation.verdict.evidence_licence import (
+    evidence_visible,
+    load_history_runs,
+)
 from algotrade.services.read.values import UnknownCode
 from algotrade.storage.backends.memory import MemoryBackend
-from algotrade.storage.configs.files import MemoryConfigStore
+from algotrade.storage.configs.files import FileConfigStore, MemoryConfigStore
 from algotrade.storage.runs import RunStatus
 from algotrade.storage.tables.readers import StoreReader
 from algotrade.storage.tables.schemas import result_table
+from tests.conftest import REPO_ROOT
 from tests.unit.services.read.evaluation.conftest import (
     DOCS,
     EDGE,
@@ -740,3 +746,46 @@ def test_bounded_canonical_run_skips_a_run_committed_after_the_session(
     found[:] = [_Committed("new", True)]
     only_newer = runs_module.load_canonical_run(None, edge, bounded=True)  # type: ignore[arg-type]
     assert only_newer.run is None and only_newer.not_run is not None
+
+
+def _option_stores(backend: MemoryBackend, user: str = "trader") -> Any:
+    """Stores of a setup that reads option rows (a position baseline), a trader or the owner."""
+    edge = {**EDGE, "baselines": ["position:long_shares"]}
+    users = {"user": [{"id": "owner", "role": "admin", "licences": ["personal"]},
+                      {"id": "trader", "role": "trader"}]}  # fmt: skip
+    site = FileConfigStore(REPO_ROOT / "config", local=False)
+    docs = {
+        **DOCS, ("site", "edges", "drift"): edge, ("site", "settings", "users"): users,
+        ("site", KIND, NAME): site.load("site", KIND, NAME),
+    }  # fmt: skip
+    return stores(backend, user, docs)
+
+
+def test_the_history_run_is_its_own_job_the_open_reads_never_list(backend: MemoryBackend) -> None:
+    write_run(backend, "open", FROZEN, 0.6, evidence_licence="open", source="")
+    write_run(backend, "hist", FROZEN, 0.6, minutes=5, evidence_licence="personal",
+              source="option_history")  # fmt: skip
+    for user in ("trader", "owner"):  # neither the open verdict nor the trial count sees it
+        ctx = _option_stores(backend, user)
+        (edge,) = load_edges(ctx)
+        assert [r.run_id for r in load_edge_runs(ctx, edge)] == ["open"]
+    owner = _option_stores(backend, "owner")
+    (edge,) = load_edges(owner)
+    assert [r.run_id for r in load_history_runs(owner, edge)] == ["hist"]
+    trader = _option_stores(backend, "trader")
+    assert load_history_runs(trader, edge) == ()  # served only to a holder of its licence
+
+
+def test_a_pre_split_option_run_is_dropped_for_a_viewer_without_its_licence(
+    backend: MemoryBackend,
+) -> None:
+    write_run(backend, "combined", FROZEN, 0.6, evidence_licence="personal")  # no price_source
+    write_run(backend, "split", FROZEN, 0.6, minutes=5, evidence_licence="open", source="cboe")
+    trader = _option_stores(backend, "trader")
+    (edge,) = load_edges(trader)
+    assert [r.run_id for r in load_edge_runs(trader, edge)] == ["split"]
+    assert evidence_visible(trader, edge)  # the combined run no longer hides the open verdict
+    owner = _option_stores(backend, "owner")
+    runs = {r.run_id: r for r in load_edge_runs(owner, edge)}
+    assert set(runs) == {"combined", "split"}
+    assert (runs["combined"].pre_split, runs["split"].pre_split) == (True, False)
