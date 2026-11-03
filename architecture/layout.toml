@@ -297,6 +297,11 @@ purpose = "feature groups from corporate events and filings (earnings, dividends
 contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
 
 [[dir]]
+path = "src/algotrade/features/rollups/event_study"
+purpose = "feature groups of the event study (ADR 0050 EV2 on): the reaction to each event class in normal days, instrument groups and market-entity groups (the S&P 500's), with the pure maths they share in moves.py"
+contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
+
+[[dir]]
 path = "src/algotrade/features/rollups/events"
 purpose = "feature groups of the event classes an edge schedule triggers on (on_event:<class>[:<subtype>], ADR 0050, ADR 0053 amendment 2026-10-18) and of event windows around a session (the 8-K filings and earnings reaction windows of its last sessions, the no-news filter): one module per group, its documented FEATURES (a sessions-since count, the event's date, a subtype field), a pure compute and its GROUP declaration"
 contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]

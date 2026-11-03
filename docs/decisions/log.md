@@ -334,6 +334,13 @@ follow-up PR).
 - decided by: orchestrator (design call)
 - status: pending owner confirmation
 - Reasoning: each is the nearest accepted form of the brief; none changes a stored verdict of another setup.
+## 2026-11-02 | EV2 | the event-study groups stay out of the drafting prompt
+- Question: `event_reaction@v1` adds 48 statistic columns; their descriptions ("daily", "price", "normal day") outranked `atr_pct` for "daily range under 3% of price" and the golden case lost it from the slice (PR 1131 CI).
+- Options: reword the descriptions to dodge the words / add the groups to `UNDRAFTED_GROUPS` (the `etf_macro@v1` precedent) / raise the slice cap.
+- Decision: add `event_reaction@v1` and `market_event_reaction@v1` to `UNDRAFTED_GROUPS`; the screener fields over them are EV6's expression features, which are drafted.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the columns are statistics for the Events tab, not a stock screen's fields; rewording hides the cause and the cap is for every case.
 ## 2026-11-02 | WF4: how the three ingestion workflows map onto the code
 - Question: the workflows ADR names `market-daily` / `reference` / `enrichment`; the post-session ADR already built `post-session` (descriptions, verify, edge-eval) and the `nightly` record is what reads and releases depend on. What are the three, and where does each step go?
 - Options: rename records and add a third agent; or keep `nightly` as market-daily and `post-session` as enrichment, adding only `reference`.

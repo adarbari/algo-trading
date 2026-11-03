@@ -381,6 +381,16 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 note = "the last earnings report's window volume over the 20 sessions before it (E3); reads events/earnings and bars/1d through earnings_reaction's window rule"
 
 [[table]]
+name = "rollups/instrument/event_reaction@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+note = "ADR 0050 EV2: per event class (macro releases, monthly expiry, quarter end, own earnings) the name's reaction in normal days, the big-move flags and the unattributed jump-risk base rate; reads bars/1d, events/macro_release (known_from <= S) and events/earnings through earnings_reaction's reading"
+
+[[table]]
+name = "rollups/market/market_event_reaction@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/market_rollups.py"
+note = "ADR 0050 EV2: the S&P 500's (IDX:SPX) reaction to each macro release and rule day in normal days, one MKT:US row; reads macro/series and events/macro_release"
+
+[[table]]
 name = "rollups/instrument/etf_launches@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 note = "ADR 0076: the launch date (Tiingo listing start, launch_date_source tiingo_listing) of each thematic or sector ETF launched in the last 1300 sessions, the sessions since it, its category and theme; reads instruments/listing_history and the latest instruments/reference category as identity reads, a launch only from its own start date"

@@ -401,6 +401,13 @@ Assumptions to confirm (I proceed on them unless told otherwise):
 2. **`event_reaction@v1`** (Opus for the definitions and point-in-time rule, Sonnet for the
    group): own earnings, macro and market-structure events; the unattributed residual;
    `IDX:SPX` as a reference.
+   **As built (EV2, 2026-11-02; architect review):** the window is 756 sessions (three years), not "all
+   stored history" of 4.2: a longer window is a new version, so the 2018 bars the backfill stored are not
+   all read yet; the 8-K per-quarter precedence over the Nasdaq rows (section 7) is not applied (EV2b, `earnings_reaction`
+   reads the calendar rows as before); `revert_rate`, `p_down_gt_*` and `iv_crush` wait (the earnings overpaid fields
+   exist); the earnings multiple is on the single reaction session (4.1), not v2's E-1 to E+1 window; a peer's report
+   is not excluded from the unscheduled residual until EV3. The S&P 500's reaction is its own market-entity group,
+   `market_event_reaction@v1`.
 3. **`peer_sensitivity@v1`** and peer earnings as events (Opus: the selection rule; Sonnet).
 4. **Attribution** (Opus for the tables and the text-model use; Sonnet for the readers): 8-K
    filing index, Massive headlines capped per night, `services/attributing`, `events/attribution`.
