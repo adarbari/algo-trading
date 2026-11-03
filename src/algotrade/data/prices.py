@@ -82,6 +82,19 @@ def _split_flagged(
     return frame[~drop].reset_index(drop=True), hit.reset_index(drop=True)
 
 
+def flagged_bars(reader: StoreReader, start: date, end: date) -> pd.DataFrame:
+    """The FLAGGED bars with ``start <= ts (UTC date) <= end`` (``instrument_id``, ``ts``,
+    ``reason``, ``detail``, ``event_date``, sorted by ``event_date``): a flag is a fact of
+    record, the latest row of a bar wins, so a ``CLEARED`` row retracts it. For a feature that
+    says why a bar is missing (``price_history.bar_status`` ``BAD_BAR``)."""
+    frame = read_events(reader, FLAGS_TABLE, start, end).frame
+    if frame.empty:
+        return frame.assign(event_date=[])
+    frame = frame[frame["status"] == FLAGGED]
+    frame = frame.assign(event_date=pd.to_datetime(frame["ts"], utc=True).dt.date)
+    return frame.sort_values(["event_date", "instrument_id"], kind="stable").reset_index(drop=True)
+
+
 def bars_with_flags(
     reader: StoreReader,
     interval: str,

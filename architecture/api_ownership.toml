@@ -41,6 +41,13 @@ section = "docs/adr/0057-auto-deploy-from-origin-main.md#decision"
 detect = [{ call = "fnmatchcase" }]
 
 [[responsibility]]
+id = "gc-freeze"
+description = "Keep Python's cyclic garbage collector off the warmed caches: freeze the heap after each warm pass and raise the gen-0 threshold, so a full collection never scans the multi-GB cache while holding the GIL (docs/perf/api-memory.md)"
+owner = ["apps/api/algotrade_api/ops/gc_freeze.py"]
+section = "docs/adr/0044-hosting-from-the-owners-mac.md#decision"
+detect = [{ string = "gc.freeze" }]
+
+[[responsibility]]
 id = "http-api"
 description = "Serve HTTP: FastAPI routers (one per area: writes, job polling, health, live quotes, preview POSTs), response schemas, CORS, error mapping and the ASGI server; routes call one library function each (page reads are GraphQL: graphql-schema)"
 owner = ["apps/api/algotrade_api/*"]
