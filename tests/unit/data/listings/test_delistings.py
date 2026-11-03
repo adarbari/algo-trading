@@ -9,7 +9,7 @@ import pytest
 
 from algotrade.core.model.errors import MissingDataError
 from algotrade.data.listings.delistings import TABLE, convention, known_by, read_delistings
-from algotrade.data.listings.universe import delisted_listings
+from algotrade.data.listings.universe import delisted_by, delisted_listings
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.readers import StoreReader
 from algotrade.storage.tables.writers import StoreWriter
@@ -57,13 +57,7 @@ def test_known_by_keeps_the_rows_known_on_or_before_the_session() -> None:
     assert list(known_by(frame, date(2020, 1, 6))["x"]) == [1, 2]
 
 
-def test_delisted_listings_gives_the_final_venue_and_the_latest_cik() -> None:
-    rows = [
-        ("EQ:A", "AAA", "NASDAQ", "COMMON_STOCK", "0001", "2000-01-03", "2010-01-04"),
-        ("EQ:A", "AAB", "NYSE", "COMMON_STOCK", None, "2010-02-01", "2015-01-05"),
-        ("EQ:B", "BBB", "NYSE", "ETF", "0002", "2000-01-03", "2020-01-02"),  # after the session
-        ("EQ:C", "CCC", "NASDAQ", "COMMON_STOCK", "0003", "2000-01-03", None),  # open
-    ]
+def _listing_store(rows: list[tuple]) -> StoreReader:  # type: ignore[type-arg]
     frame = pd.DataFrame(
         rows,
         columns=[
@@ -75,7 +69,10 @@ def test_delisted_listings_gives_the_final_venue_and_the_latest_cik() -> None:
             "start_date",
             "end_date",
         ],
-    ).assign(source="tiingo", asset_type="Stock", ts=pd.Timestamp("2026-10-05", tz="UTC"))
+    )
+    frame = frame.assign(
+        source="tiingo", asset_type="Stock", ts=pd.Timestamp("2026-10-05", tz="UTC")
+    )
     for column in ("start_date", "end_date"):
         frame[column] = pd.to_datetime(frame[column]).dt.date
     backend = MemoryBackend()
@@ -83,7 +80,49 @@ def test_delisted_listings_gives_the_final_venue_and_the_latest_cik() -> None:
     StoreWriter(backend).write_table(
         "instruments/listing_history", day, "r", stamped(frame.to_dict("records"), day, "r")
     )
-    gone, snapshot = delisted_listings(StoreReader(backend), date(2016, 1, 4))
-    assert snapshot == day and list(gone["instrument_id"]) == ["EQ:A"]
-    row = gone.iloc[0]
+    return StoreReader(backend)
+
+
+def test_delisted_listings_gives_the_final_venue_and_the_latest_cik() -> None:
+    reader = _listing_store(
+        [
+            ("EQ:A", "AAA", "NASDAQ", "COMMON_STOCK", "0001", "2000-01-03", "2010-01-04"),
+            ("EQ:A", "AAB", "NYSE", "COMMON_STOCK", None, "2010-01-11", "2015-01-05"),
+            ("EQ:B", "BBB", "NYSE", "ETF", "0002", "2000-01-03", "2020-01-02"),  # after the session
+            ("EQ:C", "CCC", "NASDAQ", "COMMON_STOCK", "0003", "2000-01-03", None),  # open
+        ]
+    )
+    gone, snapshot = delisted_listings(reader, date(2016, 1, 4))
+    assert snapshot == date(2026, 10, 5) and list(gone["instrument_id"]) == ["EQ:A"]
+    row = gone.iloc[0]  # a ticker change 4 sessions later is no delisting of its own
     assert (row["last_day"], row["exchange"], row["cik"]) == (date(2015, 1, 5), "NYSE", "0001")
+    assert bool(row["final"])
+
+
+def test_a_delisted_and_relisted_id_has_a_row_per_gap() -> None:
+    reader = _listing_store(
+        [
+            ("EQ:R", "RRR", "NASDAQ", "COMMON_STOCK", "0007", "2000-01-03", "2010-01-04"),
+            ("EQ:R", "RRR", "NYSE", "COMMON_STOCK", None, "2010-01-20", "2014-01-06"),  # gap
+            ("EQ:R", "RRRN", "NYSE", "COMMON_STOCK", None, "2014-01-08", "2018-01-02"),  # 1 session
+            ("EQ:S", "SSS", "NYSE", "COMMON_STOCK", "0008", "2000-01-03", "2012-01-03"),
+            ("EQ:S", "SSS", "NYSE", "COMMON_STOCK", "0008", "2013-01-02", None),  # relisted, open
+        ]
+    )
+    gone, _ = delisted_listings(reader, date(2030, 1, 1))
+    got = [(r.instrument_id, r.last_day, r.exchange, r.final) for r in gone.itertuples()]
+    assert got == [
+        (
+            "EQ:R",
+            date(2010, 1, 4),
+            "NASDAQ",
+            False,
+        ),  # next starts the 11th session after: a real gap
+        ("EQ:R", date(2018, 1, 2), "NYSE", True),  # 2014-01-06 -> 01-08 is a ticker change
+        ("EQ:S", date(2012, 1, 3), "NYSE", False),  # open again: not final
+    ]
+    assert gone.loc[gone["last_day"] == date(2010, 1, 4), "cik"].item() == "0007"
+    assert gone.loc[gone["last_day"] == date(2018, 1, 2), "cik"].item() == "0007"
+    by = delisted_by(reader, date(2030, 1, 1))
+    assert by == {"EQ:R": date(2018, 1, 2)}  # the outcomes' rule: only the last stretch
+    assert delisted_by(reader, date(2016, 1, 4)) == {}  # R was open in 2016, S relisted

@@ -51,7 +51,7 @@ detect = [{ call = "read_generation" }]
 
 [[responsibility]]
 id = "delisting-reading"
-description = "Read events/delisting (ADR 0087 decision 4): the latest full snapshot written on or before a session (a later one never stands in) and which it was, the filter a feature applies (known_from <= S), and the vocabulary and no-OTC-price convention of the table (reasons, bases, the -55% NASDAQ / -30% otherwise replacement return, after Shumway 1997 and Shumway and Warther 1999); the table is quarantined like the outcomes: only data/listings reads it (tests/architecture/data/test_delistings_quarantine.py), the outcome label reads the delistings in (S, T] from the frame as stored"
+description = "Read events/delisting (ADR 0087 decision 4): the latest full snapshot written on or before a session (a later one never stands in) and which it was, optionally pinned by knowledge_ts to an instant, the filter a feature applies (known_from <= S), and the vocabulary and no-OTC-price convention of the table (reasons, bases, the -55% NASDAQ / -30% otherwise replacement return, after Shumway 1997 and Shumway and Warther 1999); the table is quarantined like the outcomes: only data/listings reads it (tests/architecture/data/test_listing_end_date_readers.py), the outcome label reads the delistings in (S, T] from the frame as stored"
 owner = ["src/algotrade/data/listings/delistings.py"]
 allowed = [
     "apps/ingestion/algotrade_ingestion/tasks/listings/delistings.py",  # the writer: the table's name, vocabulary and convention

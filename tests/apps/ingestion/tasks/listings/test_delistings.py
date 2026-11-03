@@ -8,7 +8,9 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+import pytest
 
+from algotrade.core.model.errors import MissingDataError
 from algotrade.core.time.calendar import sessions_ending
 from algotrade.data.listings.delistings import TABLE, known_by, read_delistings
 from algotrade.storage.runs import RunRecord, RunStatus
@@ -63,7 +65,7 @@ def world(
     writer, _ = store()
     skip = {i: [k for k in range(N) if np.isnan(c[k])] for i, c in specs.items()}
     write_bars(writer, {i: np.nan_to_num(c, nan=1.0) for i, c in specs.items()}, skip=skip)
-    write_rows(writer, HISTORY, date(2026, 10, 5), listings)
+    write_rows(writer, HISTORY, DAY, listings)  # the history is written the last day delisted
     if filings:
         write_rows(writer, "events/filing", DAY, list(filings))
     return writer
@@ -147,8 +149,11 @@ def test_known_from_follows_the_form_25_acceptance_else_the_last_session() -> No
 
 def test_an_id_with_two_listings_is_delisted_only_once_both_have_ended() -> None:
     first = listing("EQ:FB", DAYS[10], exchange="NASDAQ")
-    record, _ = run(world({"EQ:FB": closes(LAST)}, [first, listing("EQ:FB", None, "NASDAQ")]))
+    record, reader = run(world({"EQ:FB": closes(LAST)}, [first, listing("EQ:FB", None, "NASDAQ")]))
     assert record.stats["delisted"] == 0 and record.stats["rows"] == 0
+    assert (
+        record.status is RunStatus.FAILED and reader.dates(TABLE) == []
+    )  # never an empty snapshot
     both = [first, listing("EQ:FB", DAY, exchange="NYSE", cik="0002")]
     _, reader = run(world({"EQ:FB": closes(LAST)}, both))
     row = stored(reader).loc["EQ:FB"]
@@ -193,3 +198,32 @@ def test_a_feature_reads_a_delisting_only_from_its_known_from() -> None:
     assert known_by(frame, DAY).empty
     assert list(known_by(frame, DAYS[LAST + 1])["instrument_id"]) == ["EQ:A"]
     assert len(frame) == 1  # the outcome label reads the frame as stored, whatever its known_from
+
+
+def test_a_session_before_the_listing_history_was_written_is_refused() -> None:
+    writer = world({"EQ:A": closes(LAST)}, [listing("EQ:A", DAY)])
+    record, reader = run(writer, DAYS[LAST - 1])  # the history was written on DAYS[LAST]
+    assert record.status is RunStatus.FAILED and reader.dates(TABLE) == []
+    assert "written after the session" in record.stats["failed_because"][0]
+
+
+def test_a_replay_before_the_write_does_not_see_the_snapshot() -> None:
+    writer = world({"EQ:A": closes(LAST)}, [listing("EQ:A", DAY)])
+    _, reader = run(writer)  # written at END 22:00 UTC
+    before = datetime.combine(END, time(21), UTC)
+    after = datetime.combine(END, time(23), UTC)
+    assert read_delistings(reader, as_of=after)[1] == END
+    with pytest.raises(MissingDataError):
+        read_delistings(reader, as_of=before)
+
+
+def test_a_relisted_id_gets_a_row_for_each_gap() -> None:
+    bars = np.full(N, np.nan)
+    bars[:6] = 10.0  # the first stretch, delisted on DAYS[5]
+    bars[20 : LAST + 1] = 10.0  # relisted on DAYS[20], delisted again on DAY
+    first = listing("EQ:R", DAYS[5])
+    second = dict(listing("EQ:R", DAY), start_date=DAYS[20])
+    record, reader = run(world({"EQ:R": bars}, [first, second]))
+    got = stored(reader)
+    assert sorted(got["last_session"]) == [DAYS[5], DAY]
+    assert record.stats["rows"] == 2 and record.stats["delisted"] == 2

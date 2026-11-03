@@ -37,10 +37,11 @@ record whose start no Tiingo row gives) is never in a window: it is counted in
 
 from collections.abc import Collection
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 
 import pandas as pd
 
+from algotrade.core.time.calendar import sessions_between
 from algotrade.data.listings.membership import SP500, index_members
 from algotrade.data.listings.membership import TABLE as MEMBERSHIP
 from algotrade.data.reference import REFERENCE_HINT, Snapshot, read_snapshot
@@ -217,14 +218,35 @@ def read_listings(reader: StoreReader) -> tuple[pd.DataFrame, date]:
     return frame[frame["source"].eq(TIINGO)].reset_index(drop=True), snap.snapshot_date
 
 
+RELIST_GAP_SESSIONS = (
+    10  # a next listing of the same id this many sessions later is a ticker change
+)
+
+
+def _gap_ends(rows: pd.DataFrame) -> pd.Series:
+    """Per row: the first day a next listing of the id may start for the gap to be a real one (the
+    ``RELIST_GAP_SESSIONS``-th session after the row's end), null where the row has no end."""
+    ends = rows["last_day"].dropna().drop_duplicates()
+    sessions = {
+        e: pd.Timestamp(sessions_between(e.date() + timedelta(1), e.date() + timedelta(30))[
+            RELIST_GAP_SESSIONS - 1])
+        for e in ends
+    }  # fmt: skip
+    return rows["last_day"].map(sessions)
+
+
 def delisted_listings(reader: StoreReader, session: date) -> tuple[pd.DataFrame, date]:
-    """One row per instrument id (with a trusted id) whose listings have all ended on or before
-    ``session`` (``MissingDataError`` with no snapshot): ``instrument_id``, ``last_day`` (the
-    vendor's last trading day: the latest end of its listings), ``exchange`` and ``security_type``
-    of the listing that ended last (its final venue and type) and ``cik`` (the latest non-null
-    one of its listings), sorted by id, and the listing snapshot read. A listing that ends after
-    ``session``, or is open, keeps its id out: at ``session`` its delisting was not known. An id
-    several listings share (a ticker change) is delisted only once every one has ended; a
+    """One row per delisting of an instrument id (with a trusted id) known on ``session``
+    (``MissingDataError`` with no snapshot), and the listing snapshot read: ``instrument_id``,
+    ``last_day`` (the vendor's last trading day of that stretch), ``exchange`` and
+    ``security_type`` of the listing that ended (its final venue and type), ``cik`` (the latest
+    non-null one of the id's listings up to it), ``final`` (the id's last listing: every listing
+    of the id has ended), sorted by id and day.
+
+    An id's ended listing is a delisting when it is the last (``final``: every listing of the id
+    has ended on or before ``session``) or when the id's next listing starts more than
+    ``RELIST_GAP_SESSIONS`` sessions after it (a delisted name that relisted: a real gap, not a
+    ticker change). A listing that ends after ``session``, or is open, is not a delisting yet; a
     listing that starts after ``session`` is not yet known."""
     frame, snap = listing_frame(reader)
     has_id = frame["instrument_id"].notna() & (frame["instrument_id"].astype(str) != "")
@@ -232,29 +254,30 @@ def delisted_listings(reader: StoreReader, session: date) -> tuple[pd.DataFrame,
     rows = frame[has_id & started].assign(
         instrument_id=lambda f: f["instrument_id"].astype(str),
         last_day=lambda f: pd.to_datetime(f["end_date"]),
+        first_day=lambda f: pd.to_datetime(f["start_date"]),
     )
-    ends = rows.groupby("instrument_id")["last_day"].agg(["count", "size", "max"])
-    gone = ends[(ends["count"] == ends["size"]) & (ends["max"] <= pd.Timestamp(session))]
-    rows = rows[rows["instrument_id"].isin(gone.index)]
-    last = rows.sort_values(["instrument_id", "last_day"], kind="stable")
-    final = last.drop_duplicates("instrument_id", keep="last").set_index("instrument_id")
-    cik = last.dropna(subset=["cik"]).drop_duplicates("instrument_id", keep="last")
-    out = pd.DataFrame(
-        {
-            "last_day": [d.date() for d in final["last_day"]],
-            "exchange": final["exchange"],
-            "security_type": final["security_type"],
-            "cik": cik.set_index("instrument_id")["cik"].reindex(final.index),
-        },
-        index=final.index,
+    rows = rows.sort_values(["instrument_id", "first_day", "last_day"], kind="stable")
+    by_id = rows.groupby("instrument_id")
+    rows["next_start"] = by_id["first_day"].shift(-1)
+    rows["cik"] = by_id["cik"].ffill()
+    rows["cik"] = rows.groupby("instrument_id")["cik"].bfill()
+    open_ids = rows.loc[rows["last_day"].isna(), "instrument_id"].unique()
+    ended = rows["last_day"] <= pd.Timestamp(session)
+    last_one = rows["next_start"].isna() & ~rows["instrument_id"].isin(open_ids) & ended
+    real_gap = rows["next_start"] > _gap_ends(rows)
+    rows = rows.assign(final=last_one)[ended & (last_one | real_gap)]
+    out = rows[["instrument_id", "last_day", "exchange", "security_type", "cik", "final"]]
+    out = out.assign(last_day=[d.date() for d in out["last_day"]])
+    return out.sort_values(["instrument_id", "last_day"], kind="stable").reset_index(drop=True), (
+        snap.snapshot_date
     )
-    out = out.rename_axis("instrument_id").reset_index()
-    return out.sort_values("instrument_id", kind="stable"), snap.snapshot_date
 
 
 def delisted_by(reader: StoreReader, session: date) -> dict[str, date]:
-    """Instrument id -> last trading day, for the listings with a trusted id whose ``end_date``
-    is on or before ``session`` (``delisted_listings``). For the outcomes task (a window ending
-    at ``session`` marks a name with no bar at its end DELISTED)."""
+    """Instrument id -> last trading day, for the ids whose every listing has ended on or before
+    ``session`` (the ``final`` rows of ``delisted_listings``; an id that relisted and is open
+    again is absent). For the outcomes task (a window ending at ``session`` marks a name with no
+    bar at its end DELISTED)."""
     gone, _ = delisted_listings(reader, session)
-    return dict(zip(gone["instrument_id"], gone["last_day"], strict=True))
+    final = gone[gone["final"]]
+    return dict(zip(final["instrument_id"], final["last_day"], strict=True))

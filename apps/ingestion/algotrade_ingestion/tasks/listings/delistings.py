@@ -117,7 +117,7 @@ def _row(
     if last is None:
         return None
     last_session, raw_last = last
-    verdict = judge(filings, last_day, last_session)
+    verdict = judge(filings, last_session)
     otc = _terminal(rows, last_session)
     as_of = otc[0] if otc else last_session
     last_close = _adjust(bars, iid, raw_last, as_of)
@@ -175,13 +175,18 @@ def ingest_delistings(ctx: TaskContext, session: date) -> RunRecord:
         except MissingDataError as exc:
             run.failed(f"no listing history to read: {exc}")
             return run.record
-        ids = [str(i) for i in gone["instrument_id"]]
+        if snapshot > session:  # the table is current knowledge: a replay would read the future
+            run.failed(f"listing history of {snapshot} was written after the session {session}")
+            return run.record
+        ids = sorted({str(i) for i in gone["instrument_id"]})
         filings = read_events(ctx.reader, FILINGS, *ALL_TIME, ids).frame.reindex(
             columns=FILING_COLUMNS
         )
         rows, no_last_bar = build_rows(ctx, gone, filings)
         frame = pd.DataFrame(rows)
-        if not frame.empty:
+        if frame.empty:  # never leave an older snapshot as the latest silently
+            run.failed("no delisting row: nothing delisted by the session, or no last bar stored")
+        else:
             run.write(TABLE, frame, SOURCE)
         unknown = int((frame["reason"] == UNKNOWN).sum()) if len(frame) else 0
         with_filings = set(filings["instrument_id"].astype(str)) if len(filings) else set()

@@ -4,9 +4,11 @@ a session (ADR 0087 decisions 4 and 5).
 ``events/delisting`` is a FULL snapshot per run session (every delisted instrument each run), so
 a reason that changes when filings arrive is a new snapshot. The read takes the latest snapshot
 **on or before** ``as_of_write`` (None: the latest) and says which, ADR 0036's rule for snapshot
-tables; a later snapshot never stands in (it would carry what was learned after). The table is
-quarantined like the outcomes: only this module reads it (``tests/architecture/data/
-test_delistings_quarantine.py``).
+tables; a later snapshot never stands in (it would carry what was learned after). ``as_of`` pins
+what was stored by an instant (``knowledge_ts``), so a replay before a write does not see it. The
+table is quarantined like the outcomes: only this module reads it, and only the writer, the
+outcomes task (PR6a) and ``services/evaluation`` (PR6b) import this module (AST scan in
+``tests/architecture/data/test_listing_end_date_readers.py``).
 
 Two point-in-time uses, which differ on purpose (ADR 0087 decision 4):
 
@@ -23,7 +25,7 @@ NYSE / AMEX ones about -30%; the zero return of every other basis is shown besid
 (PR6), never hidden.
 """
 
-from datetime import date
+from datetime import date, datetime
 
 import pandas as pd
 
@@ -68,18 +70,20 @@ def convention(reason: str, exchange: str | None) -> tuple[str, float]:
 
 
 def read_delistings(
-    reader: StoreReader, as_of_write: date | None = None
+    reader: StoreReader, as_of_write: date | None = None, as_of: datetime | None = None
 ) -> tuple[pd.DataFrame, date]:
     """Every row of the latest ``events/delisting`` snapshot written on or before ``as_of_write``
-    (None: the latest) and that snapshot's date; ``MissingDataError`` with none."""
+    (None: the latest) and that snapshot's date; ``MissingDataError`` with none. ``as_of`` (a UTC
+    instant) pins what was STORED then (``knowledge_ts <= as_of``): a replay before a write does
+    not see it, and a snapshot with nothing known by then is skipped for the one before."""
     days = [d for d in reader.dates(TABLE) if as_of_write is None or d <= as_of_write]
-    if not days:
-        when = f" on or before {as_of_write}" if as_of_write else ""
-        raise MissingDataError(TABLE, f"no snapshot stored{when}", HINT)
-    frame = reader.table(TABLE, days[-1])
-    if frame is None:
-        raise MissingDataError(TABLE, f"snapshot {days[-1]} unreadable", HINT)
-    return frame, days[-1]
+    for day in reversed(days):
+        frame = reader.table(TABLE, day, as_of)
+        if frame is not None and not frame.empty:
+            return frame, day
+    when = f" on or before {as_of_write}" if as_of_write else ""
+    known = f" known at {as_of}" if as_of else ""
+    raise MissingDataError(TABLE, f"no snapshot stored{when}{known}", HINT)
 
 
 def known_by(frame: pd.DataFrame, session: date) -> pd.DataFrame:
