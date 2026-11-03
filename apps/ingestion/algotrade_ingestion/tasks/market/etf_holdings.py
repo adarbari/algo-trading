@@ -611,9 +611,12 @@ def ingest_etf_holdings(
     force: bool = False,
     limit: int | None = None,
     only: Sequence[str] = (),
+    daily_only: bool = False,
 ) -> RunRecord:
     """Read the due ETFs' holdings from their issuers (``only``: just these tickers; ``force``:
-    every covered fund, accepting what it reads without the sanity checks)."""
+    every covered fund, accepting what it reads without the sanity checks; ``daily_only``: just
+    the ``daily_funds``, the market-daily step: the weekly slots are the ``reference``
+    workflow's, ADR 0039)."""
     etfs = active_etfs(instruments(ctx.reader, session))
     if only:
         etfs = etfs[etfs["symbol"].isin([s.upper() for s in only])]
@@ -651,7 +654,7 @@ def ingest_etf_holdings(
         )  # fmt: skip
         daily = daily_due(sources.daily_funds, covered, history.read, session, hold)
         rest = [s for s in due if s not in daily]
-        capped = nightly_cap(rest, covered, limit)
+        capped = [] if daily_only else nightly_cap(rest, covered, limit)
         todo = daily + capped
         shared = FundContext(
             sources,
@@ -689,7 +692,7 @@ def ingest_etf_holdings(
             rejected=sum(1 for v in funds.values() if v.startswith(REJECTED)),
             failed=run.failures()[:20],
             failed_count=len(run.failures()),
-            deferred_by_limit=len(rest) - len(capped),
+            deferred_by_limit=0 if daily_only else len(rest) - len(capped),
             rows=rows,
             share_rows=share_rows,
             daily=len(daily),

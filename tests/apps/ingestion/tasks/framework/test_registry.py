@@ -121,7 +121,7 @@ def test_etf_holdings_takes_its_defaults_from_settings(calls: Calls) -> None:
     )
     c = task_ctx(StoreWriter(MemoryBackend()), sources={"ssga_holdings": ssga}, settings=settings)
     run_task("etf-holdings", c, {"session": DAY, "symbols": "xlk, spy", "limit": 5})
-    _, sources, session, force, limit, only, _ = calls.args[-1]
+    _, sources, session, force, limit, only, _, _ = calls.args[-1]
     assert (sources.issuers, sources.refresh_days, sources.keep_top) == ([ssga], 3, 20)
     assert (sources.fallback_scope, session, force, limit, only) == (
         "all",
@@ -132,7 +132,9 @@ def test_etf_holdings_takes_its_defaults_from_settings(calls: Calls) -> None:
     )
 
 
-def test_the_nightly_reads_a_slice_of_funds_and_the_cli_reads_everything(calls: Calls) -> None:
+def test_the_reference_run_reads_a_weeks_slice_of_funds_and_the_cli_reads_everything(
+    calls: Calls,
+) -> None:
     ssga = SsgaHoldings(http_for(lambda url: b""))
     ctx = task_ctx(StoreWriter(MemoryBackend()), sources={"ssga_holdings": ssga})
 
@@ -142,19 +144,19 @@ def test_the_nightly_reads_a_slice_of_funds_and_the_cli_reads_everything(calls: 
         return calls.args[-1][4]
 
     assert limit_of({}) is None  # `algotrade-ingest etf-holdings`: every fund due
-    assert limit_of({"nightly": True}) == 200  # [etf_holdings] per_night
-    assert limit_of({"nightly": True, "limit": 7}) == 7  # an explicit limit wins
+    assert limit_of({"weekly": True}) == 1400  # [etf_holdings] per_night
+    assert limit_of({"weekly": True, "limit": 7}) == 7  # an explicit limit wins
     uncapped = SourcesSettings.from_document({"etf_holdings": {"per_night": 0}})
-    assert limit_of({"nightly": True}, uncapped) is None  # 0: no cap
+    assert limit_of({"weekly": True}, uncapped) is None  # 0: no cap
     custom = SourcesSettings.from_document({"etf_holdings": {"per_night": 25}})
-    assert limit_of({"nightly": True}, custom) == 25
+    assert limit_of({"weekly": True}, custom) == 175
 
 
-def test_the_nightly_step_runs_after_bars_and_chains_with_the_nightly_flag() -> None:
+def test_the_nightly_step_runs_after_bars_and_chains_as_the_daily_files_only() -> None:
     names = [step.name for step in pipeline.NIGHTLY]
     assert names.index("etf-holdings") > names.index("chains") > names.index("bars")
     step = pipeline.NIGHTLY[names.index("etf-holdings")]
-    assert step.params == {"nightly": True} and step.latest_only
+    assert step.params == {"daily_only": True} and step.latest_only
 
 
 def test_etf_holdings_is_skipped_without_an_issuer_or_when_switched_off() -> None:

@@ -419,17 +419,20 @@ def test_company_details_command(
     use_source(monkeypatch, "sec_submissions", fake.submissions)
     code, result = call(capsys, "company-details", "--date", DAY, "--limit", "5")
     assert (code, result["rows"], result["cik_from_sec_map"]) == (0, 1, 1)  # AAPL via the map
+    scheduled_at(monkeypatch, DAY)
     _, nightly = call(capsys, "nightly", "--date", DAY, "--workers", "1")
-    details = nightly["runs"][-1]["steps"]["company-details"]
-    assert details["result"]["requested"] == 0  # already fresh: no requests
+    assert "company-details" not in nightly["runs"][-1]["steps"]  # the weekly reference run's
+    _, weekly = call(capsys, "reference", "--force")
+    assert weekly["steps"]["company-details"]["result"]["requested"] == 0  # already fresh
 
 
-def test_nightly_skips_company_details_without_contact(
-    env: Path, capsys: pytest.CaptureFixture[str]
+def test_reference_skips_company_details_without_contact(
+    env: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    scheduled_at(monkeypatch, DAY)
     call(capsys, "universe", "--stocks", str(env / "stocks.csv"), "--version", "v", "--date", DAY)
-    _, nightly = call(capsys, "nightly", "--date", DAY, "--workers", "1")
-    details = nightly["runs"][-1]["steps"]["company-details"]
+    _, weekly = call(capsys, "reference", "--force")
+    details = weekly["steps"]["company-details"]
     assert details["status"] == "SKIPPED" and details["reason"].startswith("skipped")
 
 
@@ -640,7 +643,9 @@ def test_post_session_runs_after_the_nightly_then_is_a_quiet_no_op(
     assert call(capsys, "nightly", "--workers", "1")[0] == 0
     code, post = call(capsys, "post-session")
     assert code == 0 and post["status"] == "SUCCEEDED" and post["session"] == DAY
-    assert set(post["steps"]) == {"descriptions", "verify", "edge-eval", "edge-verdicts"}
+    assert set(post["steps"]) == {
+        "descriptions", "verify", "ibkr-iv-history", "edge-eval", "edge-verdicts"
+    }  # fmt: skip
     assert post["steps"]["verify"]["status"] == "SKIPPED"  # [ibkr] is off here
     assert post["steps"]["edge-eval"]["status"] == "SKIPPED"
     records = open_backend(data_url()).runs.find("post-session")
@@ -694,3 +699,16 @@ def test_the_option_history_import_takes_no_main_lock_but_the_put_check_does() -
     for the hours it runs; the PUT check writes a run record to the main store, under its lock."""
     assert not cli.writes(argparse.Namespace(command="run", task="option-history-import"))
     assert cli.writes(argparse.Namespace(command="run", task="option-history-put-check"))
+
+
+def test_reference_refuses_a_past_date_and_a_scheduled_run_waits_for_a_pending_nightly(
+    env: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The sources serve only their current state, so a past ``--date`` is refused (ADR 0007);
+    a scheduled run (no ``--date`` / ``--force``) is not due while a nightly is pending."""
+    import_universe(env, capsys, DAY)
+    scheduled_at(monkeypatch, DAY)
+    assert cli.main(["reference", "--date", "2020-01-02"]) == 2
+    assert "must be" in capsys.readouterr().err
+    assert cli.main(["reference"]) == 0  # no nightly done yet: pending, so not due
+    assert "nothing to do" in capsys.readouterr().out

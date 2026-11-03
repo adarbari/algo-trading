@@ -46,12 +46,18 @@ checks that `ALGOTRADE_WEB_DIST` holds a build and that the installed agent runs
 
 The Mac also runs the nightly, so the agents carry priorities (2026-10-19: pages crawled
 while the nightly wrote). The API agent is `ProcessType` Interactive. The nightly,
-post-session and monthly-fill agents are `Nice` 10, `ProcessType` Background and
+reference, post-session and monthly-fill agents are `Nice` 10, `ProcessType` Background and
 `LowPriorityIO`, and `algotrade-ingest` caps Arrow at 2 CPU / 4 IO threads like the API
 (`[resources]` in `config/site/nightly.toml`, with `min_free_gb`: the nightly refuses to
 start with less free on the data volume, and `make doctor` warns below it). The plists are
 written, never installed: after pulling this, rewrite and reload them as printed by
-`algotrade-api schedule` / `algotrade-ingest schedule`.
+`algotrade-api schedule` / `algotrade-ingest schedule`. **Owner step for WF4 (ADR 0039):**
+`algotrade-ingest schedule` now also writes `var/com.algotrade.reference.plist` (the weekly
+reference refresh: Saturday 08:00, login and a 6-hour watchdog; a quiet no-op unless due); run
+the printed `reference_install` lines (and the `post_session_install` lines once, for
+`ibkr-iv-history`, which runs in that agent). Until the reference agent is loaded, company
+details, shares, the macro calendar, IBKR contracts and the ETF holdings slots are not
+refreshed (the nightly no longer does it); `algotrade-ingest reference --force` runs it by hand.
 
 ```bash
 .venv/bin/algotrade-api schedule   # writes var/com.algotrade.api.plist; prints the install commands

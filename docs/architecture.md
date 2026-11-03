@@ -199,17 +199,16 @@ audits. The local runner uses 2 threads.
 
 ### The nightly workflow (R5, ADR 0039)
 
-> ADR 0039 steps WF1-WF3 are implemented (needs, acceptance, hold-back, resume, waivers). Still
-> to come: WF4 (split into `market-daily` / weekly `reference` / `enrichment`) and WF5 (reads
-> default to the latest SUCCEEDED session); until WF4 the reference steps run in this one
-> workflow as optional steps. WF4 has started: the `post-session` workflow (below, ADR 0070)
-> runs after the nightly.
+> ADR 0039 steps WF1-WF4 are implemented (needs, acceptance, hold-back, resume, waivers, the
+> split into this `market-daily` workflow, the weekly `reference` workflow and `enrichment` =
+> the post-session workflow, below). Still to come: WF5 (reads default to the latest SUCCEEDED
+> session).
 
 `apps/ingestion/algotrade_ingestion/workflows/`: `nightly.py` (the steps and the job
 handler), `steps.py` (needs, acceptance, status rule), `attempts.py` (resume and expiry),
 `sessions.py` (catch-up), `screens.py` (screen jobs), `notify.py` (summary file + notifiers),
-`records.py` / `report.py` / `timing.py` / `render.py` (the summary email); `post_session/` (the
-post-session workflow, below).
+`records.py` / `report.py` / `timing.py` / `render.py` (the summary email); `reference/` (the
+weekly reference workflow) and `post_session/` (the post-session workflow, below).
 
 - **Steps** (`NIGHTLY`): `universe-build`, `company-details`, `shares`, `macro-calendar`, `filings`, `earnings`, `bars`, `rates`,
   `corporate-actions`, `chains`, `etf-holdings`, `ibkr-contracts`, `ibkr-iv`, `rollups`,
@@ -299,17 +298,36 @@ post-session workflow, below).
   never the post-session run), an optional step's failure as an `optional_step` WARN. All in `config/site/nightly.toml` (`[notify] enabled = false`
   turns every notification off).
 
+### The reference workflow (ADR 0039, WF4)
+
+`workflows/reference/` refreshes what changes slowly, weekly, as the `reference` job with its own
+run record: `company-details`, `shares`, `macro-calendar`, `ibkr-contracts` and the ETF holdings
+slots (`etf-holdings` with `weekly`). All optional (a failure warns and alerts). Caps that are per
+night in config (`[etf_holdings] per_night`, `[sec_edgar] statements_backfill_per_night`) are
+multiplied by 7 for the run. The nightly keeps `etf-holdings` as the daily files only
+(`daily_funds`) and `ibkr-iv` as the session snapshot.
+
+- **Due** (`reference.due`): once per ISO week of the last closed session, on a weekend (New York
+  time) or when no published run is 8 days old, only while no nightly or post-session is pending;
+  `nothing to do` (exit 0) otherwise; `--force` / `--date` run regardless. A clean run ends the
+  week; a run with a FAILED step is retried by the watchdog up to 3 times.
+- **Locks**: the run holds the named lock `reference`; each step runs under the ingest lock in its
+  own block (waiting for it) and stops the run, the rest NOT_RUN, when a nightly is pending.
+- **Agent**: `com.algotrade.reference` (Saturday 08:00, login, 6-hourly watchdog), written by
+  `algotrade-ingest schedule`, never installed (owner step: `docs/hosting.md`).
+
 ### The post-session workflow (ADR 0070)
 
 A session is served when its `nightly` record is COMPLETE (ADR 0062), so what does not decide a
 session does not run in front of it. `workflows/post_session/` runs `descriptions` (ADR 0034),
-`verify` (ADR 0026) and `edge-eval` (ADR 0063) as the `post-session` job with its own run
+`verify` (ADR 0026), the capped IBKR IV history `ibkr-iv-history` (ADR 0039's enrichment: `algotrade-ingest
+enrichment` is an alias) and `edge-eval` (ADR 0063) as the `post-session` job with its own run
 record (COMPLETE once it ran: every step is optional, a failure is a warning).
 
 - **One session, once**: only for `max(done nightly sessions)` (a catch-up night's earlier
   sessions get none); a quiet no-op (`nothing to do`, exit 0) once its post-session record is
   published; `--force` runs again; `--date D` runs for a nightly-done D.
-- **Locks**: `descriptions` and `verify` under the ingest run lock (taken: `busy`, exit 3, no
+- **Locks**: `descriptions`, `verify` and `ibkr-iv-history` under the ingest run lock (taken: `busy`, exit 3, no
   record); `edge-eval` after, outside it, under the per-owner evaluation claim, and the whole run
   holds the named lock `post-session`. `recover_unpublished` touches only ingest runs, so it never
   rolls back an evaluation's commit in flight.

@@ -1,5 +1,6 @@
-"""Nightly and IBKR: ``ibkr-contracts`` and ``ibkr-iv`` run after the chains and before the rollups
-(latest session only); both are SKIPPED with a WARN (never FAILED) when ``[ibkr]`` is disabled or
+"""Nightly and IBKR: ``ibkr-iv`` (the session snapshot; ``ibkr-contracts`` is the reference
+workflow's) runs after the chains and before the rollups (latest session only); it is SKIPPED with
+a WARN (never FAILED) when ``[ibkr]`` is disabled or
 the gateway is not reachable; the email gets a "Verification vs IBKR" section (``verify`` itself
 is the post-session workflow's, ADR 0070) and IBKR IV coverage."""
 
@@ -32,7 +33,7 @@ from tests.helpers.ingest_fakes import task_ctx, without_edges
 from tests.helpers.stored_frames import stamped, universe_rows
 
 D, BEFORE = date(2026, 10, 2), date(2026, 10, 1)
-IBKR_STEPS = ("ibkr-contracts", "ibkr-iv")
+IBKR_STEPS = ("ibkr-iv",)
 
 
 def _complete(name: str) -> Any:
@@ -68,7 +69,8 @@ def test_the_ibkr_steps_are_optional() -> None:
 def test_ibkr_enrichment_runs_after_chains_before_rollups_latest_only() -> None:
     names = [s.name for s in NIGHTLY]
     chains, rollups = names.index("chains"), names.index("rollups")
-    assert chains < names.index("ibkr-contracts") < names.index("ibkr-iv") < rollups
+    assert chains < names.index("ibkr-iv") < rollups
+    assert "ibkr-contracts" not in names
     assert all(s.latest_only for s in NIGHTLY if s.name.startswith("ibkr-"))
 
 

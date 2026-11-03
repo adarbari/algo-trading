@@ -184,3 +184,34 @@ snapshot fetches (universe build, chains; fitness test in `test_screens.py`). Co
   latest stored one); `edge-signals` (a paper pick is made only on the night it is for);
   `edge-eval` (one run evaluates every stored outcome session); `verify` (the live source shows
   only the present); `history-copy` (one run copies the whole year).
+
+## Amendment (2026-11-02, WF4: the split is built)
+The three cadences exist as commands, run records and launchd agents; the engine is the nightly's
+(`Step`, `run_step`, `run_isolated`, `IngestRun`), no second runner.
+- **`market-daily`** is the `nightly` job and record under ADR 0039's name (`algotrade-ingest
+  market-daily` is an alias: reads, the release and ADR 0062 keep the record name). It loses
+  `company-details`, `shares`, `macro-calendar` and `ibkr-contracts`. `etf-holdings` stays as
+  `daily_only`: the `[etf_holdings] daily_funds` share counts are read every night
+  (`etf_shares_outstanding`, the flow features); the weekly slots move. `ibkr-iv` is the
+  session snapshot only and no longer needs `ibkr-contracts` (the conids are stored).
+- **`reference`** (`workflows/reference/`, `algotrade-ingest reference`, agent
+  `com.algotrade.reference`: Saturday 08:00, login, 6-hourly watchdog): the five steps above,
+  all optional (a failure is a warning and an alert), run record `reference` (session = the last
+  closed one). Per-night caps become a week's worth (`weekly`: `[etf_holdings] per_night` and
+  `[sec_edgar] statements_backfill_per_night` x 7), so throughput is unchanged. Due once per ISO
+  week of the last closed session, on a weekend (New York time) or when no published run is 8 days
+  old, and only while no nightly or post-session run is pending; a clean run ends the week, a
+  failed one is retried by the watchdog up to 3 runs. Each step runs in its own block under the
+  ingest lock (waiting for it) and the run holds the named lock `reference`; before each step it
+  stops (the rest NOT_RUN) if a nightly is pending, because a file lock is not fair and the nightly
+  does not wait. A name new to the universe waits up to a week for its CIK, conids and facts
+  (UNKNOWN until then, ADR 0036).
+- **`enrichment`** is the post-session workflow (ADR 0070; `enrichment` is an alias of the
+  command): it gains `ibkr-iv-history`, the capped IV history backfill (`[ibkr]
+  iv_backfill_per_night`), recorded under the history task's name so every resume lookup still
+  sees its items. `descriptions` stays there, not in `reference`: its Massive cap is per night and
+  a weekly run would cut coverage 7x. `verify` is there too (ADR 0070).
+- **Agents**: `algotrade-ingest schedule` writes the nightly (market-daily), reference and
+  post-session (enrichment) plists, never installed (ADR 0044).
+- Fitness test `tests/architecture/ingestion/test_workflow_cadences.py`: the cadences' steps are
+  disjoint and each is a registry task or a declared job step.

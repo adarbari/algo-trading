@@ -6,7 +6,14 @@ from algotrade_ingestion.tasks.derived import history_copy
 from algotrade_ingestion.tasks.edges import picks as edge_picks
 from algotrade_ingestion.tasks.edges import verdicts as edge_verdicts
 from algotrade_ingestion.tasks.framework import source_guards
-from algotrade_ingestion.tasks.framework.params import Params, session_of, symbols
+from algotrade_ingestion.tasks.framework.params import (
+    SESSION,
+    Param,
+    Params,
+    Task,
+    session_of,
+    symbols,
+)
 from algotrade_ingestion.tasks.framework.run import TaskContext
 from algotrade_ingestion.tasks.maintenance import (
     bar_quality,
@@ -77,6 +84,10 @@ def run_ibkr_iv(ctx: TaskContext, p: Params) -> RunRecord:
         source = source_guards.ibkr_source(ctx)
         return ibkr_iv.backfill_ivs(ctx, source, p["start"], end, symbols(p), p.get("limit"))
     return ibkr_iv.nightly_ivs(ctx, source_guards.ibkr_source(ctx), session_of(p), symbols(p))
+
+
+def run_ibkr_iv_history(ctx: TaskContext, p: Params) -> RunRecord:
+    return ibkr_iv.nightly_history(ctx, source_guards.ibkr_source(ctx), session_of(p), symbols(p))
 
 
 def run_futures_curves(ctx: TaskContext, p: Params) -> RunRecord:
@@ -181,3 +192,17 @@ def run_compact_runs(ctx: TaskContext, p: Params) -> RunRecord:
         workers=p.get("workers"),
         beside_ingest=bool(p.get("beside_ingest")),
     )
+
+
+IBKR_IV_HISTORY = Task(
+    "ibkr-iv-history",
+    "IBKR IV history of up to [ibkr] iv_backfill_per_night underlyings without any "
+    "(the enrichment step; resumes the ibkr-iv --from/--to backfill's items)",
+    ibkr_iv,
+    (ibkr_iv.TABLE,),
+    run_ibkr_iv_history,
+    sources=("ibkr",),
+    settings="sources.toml [ibkr] iv_history_days, iv_backfill_per_night",
+    params=(SESSION, Param("symbols", ("--symbols",), str, "comma-separated tickers")),
+    skip=source_guards.gateway_down,
+)  # declared here, not in registry.py (file cap); registry.py lists it in TASKS

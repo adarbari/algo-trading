@@ -709,8 +709,8 @@ TASKS: dict[str, Task] = {
         ),
         Task(
             "ibkr-iv",
-            "IBKR implied / historical vol: nightly snapshot, or a resumable history backfill "
-            "(--from/--to)",
+            "IBKR implied / historical vol: the session's snapshot, or a resumable history "
+            "backfill (--from/--to)",
             ibkr_iv,
             (ibkr_iv.TABLE,),
             entries_ops.run_ibkr_iv,
@@ -725,6 +725,7 @@ TASKS: dict[str, Task] = {
             ),
             skip=source_guards.gateway_down,
         ),
+        entries_ops.IBKR_IV_HISTORY,
         Task(
             "futures-curves",
             "nightly futures curve snapshot per root (IBKR, read-only): the front contracts' "

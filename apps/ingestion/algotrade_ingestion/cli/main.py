@@ -21,10 +21,15 @@
                               step that cannot succeed, e.g. chains past their day: ADR 0039;
                               the owner only, never a session or agent: hook guard_waive)
     algotrade-ingest post-session [--date D] [--force] [--wait]
-                              (descriptions, verify and edge-eval of the last session whose
-                              nightly is done, after it: ADR 0070; a quiet no-op when its
-                              post-session record exists; holds the ingest lock only for the
-                              first two)
+                              (descriptions, verify, the IBKR IV history and edge-eval of the last
+                              session whose nightly is done, after it: ADR 0070; a quiet no-op
+                              when its post-session record exists; holds the ingest lock only
+                              for the steps that write tables)
+    algotrade-ingest reference [--date D] [--force] [--wait]
+                              (the weekly refresh of company details, shares, the macro calendar,
+                              IBKR contracts and the ETF holdings slots: ADR 0039; a quiet no-op
+                              unless due: a weekend, or overdue, with no nightly pending)
+    algotrade-ingest market-daily / enrichment   (aliases of nightly / post-session: ADR 0039)
     algotrade-ingest serve-release [--rebuild] [--wait]
                               (build, promote and prune the serving release of the default session
                               under the serve lock: ADR 0077; a quiet no-op while CURRENT already
@@ -100,10 +105,13 @@ from algotrade_ingestion.ops.schedule import (
     MONTHLY_LABEL,
     POST_LABEL,
     POST_WATCHDOG_MINUTES,
+    REFERENCE_LABEL,
+    REFERENCE_WATCHDOG_MINUTES,
     WAKE_COMMAND,
     monthly_fill_plist,
     nightly_plist,
     post_session_plist,
+    reference_plist,
 )
 from algotrade_ingestion.tasks.framework.registry import TASKS, Task
 from algotrade_ingestion.tasks.framework.run import recover_unpublished
@@ -117,6 +125,16 @@ from algotrade_ingestion.workflows.post_session.post_session import (
     post_done,
     target_session,
 )
+from algotrade_ingestion.workflows.reference.reference import (
+    BUSY as REFERENCE_BUSY,
+)
+from algotrade_ingestion.workflows.reference.reference import (
+    REFERENCE_LOCK,
+    REFERENCE_RUN,
+    due,
+    nightly_pending,
+    week_state,
+)
 from algotrade_ingestion.workflows.serve_release.serve_release import (
     ServeStatus,
     git_head,
@@ -128,6 +146,9 @@ from algotrade_ingestion.workflows.serve_release.serve_release import (
 TASK_COMMANDS = tuple(name for name in TASKS if name != "golden-load")
 # Former command names kept working: ``features`` computed option_liquidity before 2b.2.
 ALIASES = {"rollups": ["features"]}
+# ADR 0039's workflow names for the two commands built before the split: the parser accepts
+# them, and ``canonical`` maps them back right after parsing so every check sees one name.
+WORKFLOW_ALIASES = {"market-daily": "nightly", "enrichment": "post-session"}
 LOCKED_EXIT = 3  # another run holds the store's ingest lock
 STEP_NAMES = tuple(s.name for s in NIGHTLY)  # what --waive accepts
 
@@ -153,8 +174,9 @@ def writes(args: argparse.Namespace) -> bool:
         "report",
         "arrivals",
         "post-session",
+        "reference",
         "serve-release",
-    ):  # post-session, serve-release: own locks
+    ):  # post-session, reference, serve-release: own locks (reference: one per step)
         return False
     # Probe the ingest lock themselves (compact-runs) or hold the history store's own (ADR 0084):
     if getattr(args, "task", None) in ("compact-runs", "option-history-import"):
@@ -224,7 +246,15 @@ def post_session(args: argparse.Namespace, backend: Backend) -> int:
             if args.date is None and not args.force and pending_session(writer) != session:
                 return 0  # finished by another run while this one queued
             params = {"session": session.isoformat(), "wait": args.wait}
-            job = run_job(args, StoreReader(backend), writer, "post-session", params, SITE_USER)
+            job = run_job(
+                args,
+                StoreReader(backend),
+                writer,
+                "post-session",
+                params,
+                SITE_USER,
+                ("post-session",),
+            )
     except RunLockedError as exc:  # another post-session run: not an error when scheduled
         print(f"busy: {exc}")
         return LOCKED_EXIT
@@ -232,6 +262,52 @@ def post_session(args: argparse.Namespace, backend: Backend) -> int:
         print(f"busy: {job.result.get('reason')}")
         return LOCKED_EXIT
     args.ran_job = True  # the post-session workflow ran now: its edge desk makes release r2
+    return report(job)
+
+
+def reference_refusal(args: argparse.Namespace, writer: StoreWriter, session: date) -> str | None:
+    """Why ``reference`` has nothing to run now (printed), else ``None``. ``--date`` or
+    ``--force`` run regardless; otherwise the weekly rule applies (``reference.due``)."""
+    if args.date is not None or args.force:
+        return None
+    now = datetime.now(UTC)
+    settings = load_nightly(config_store(args))
+    quiet = not nightly_pending(writer, now, settings) and pending_session(writer) is None
+    week = week_state(writer.runs_for(REFERENCE_RUN), session)
+    return None if due(week, now, quiet) else f"not due: {session} week"
+
+
+def reference(args: argparse.Namespace, backend: Backend) -> int:
+    """``reference``: the weekly reference refresh for the last closed session. Holds the named
+    ``reference`` lock for the run; ``reference.run_reference`` takes the ingest lock per step,
+    waiting for it, and (a scheduled run) stops when a nightly is pending. The sources serve only
+    their current state, so ``--date`` must be the last closed session (never a past one: today's
+    facts under an old session date would leak, ADR 0007). The due check is repeated once the
+    lock is held, so a start that queued behind a run does not repeat it."""
+    writer = StoreWriter(backend)
+    session = default_session(args, datetime.now(UTC))
+    if args.date is not None and args.date != session:
+        print(
+            f"error: reference serves the current state: --date must be {session}", file=sys.stderr
+        )
+        return 2
+    by_hand = args.date is not None or args.force
+    try:
+        with exclusive_run(backend, REFERENCE_LOCK, wait=args.wait):
+            if (why := reference_refusal(args, writer, session)) is not None:
+                print(f"nothing to do: {why}")
+                return 0
+            params = {"session": session.isoformat(), "yield": not by_hand}
+            job = run_job(
+                args, StoreReader(backend), writer, "reference", params, SITE_USER, ("reference",)
+            )
+    except RunLockedError as exc:  # another reference run: not an error when scheduled
+        print(f"busy: {exc}")
+        return LOCKED_EXIT
+    if job.result.get("status") == REFERENCE_BUSY:
+        print(f"busy: {job.result.get('reason')}")
+        return LOCKED_EXIT
+    args.ran_job = True
     return report(job)
 
 
@@ -269,8 +345,8 @@ def start_serve_release(args: argparse.Namespace) -> None:
     exit code: a release that fails is recorded and alerts on its own; its one line goes to
     stderr, the nightly's stdout being its own report."""
     ran = getattr(args, "ran_job", False)
-    if args.command == "nightly" and not ran:
-        return
+    if args.command in ("nightly", "reference") and not ran:  # a reference run's snapshot
+        return  # tables are dated the last closed session: its release may need a rebuild
     rebuild = args.command == "post-session" and ran
     wait = args.command == "nightly" or ran  # the hourly watchdog never queues behind a build
     try:
@@ -300,7 +376,7 @@ def add_task_arguments(parser: argparse.ArgumentParser, spec: Task) -> None:
 def _job_parsers(sub: "argparse._SubParsersAction[argparse.ArgumentParser]") -> None:
     """Commands that run as jobs (screen, nightly) and admin commands."""
     for name in ("screen", "nightly"):
-        s = sub.add_parser(name)
+        s = sub.add_parser(name, aliases=["market-daily"] if name == "nightly" else [])
         s.add_argument("--date", type=date.fromisoformat)
         s.add_argument("--export-dir", type=Path)
         add_wait(s)
@@ -327,13 +403,23 @@ def _job_parsers(sub: "argparse._SubParsersAction[argparse.ArgumentParser]") -> 
             s.add_argument("--user", help="config owner (default: $ALGOTRADE_USER or site)")
     ps = sub.add_parser(
         "post-session",
-        help="descriptions, verify and edge-eval of the last nightly-done session (ADR 0070)",
+        aliases=["enrichment"],
+        help="descriptions, verify, IBKR IV history and edge-eval of the last nightly-done "
+        "session (ADR 0070; ADR 0039's enrichment)",
     )
     ps.add_argument("--date", type=date.fromisoformat, help="session (default: last nightly-done)")
     ps.add_argument(
         "--force", action="store_true", help="run even when the session has a post-session record"
     )
     add_wait(ps)
+    rf = sub.add_parser(
+        "reference",
+        help="the weekly refresh of company details, shares, macro calendar, IBKR contracts "
+        "and ETF holdings slots (ADR 0039)",
+    )
+    rf.add_argument("--date", type=date.fromisoformat, help="session (default: last closed)")
+    rf.add_argument("--force", action="store_true", help="run even when not due")
+    add_wait(rf)
     sr = sub.add_parser(
         "serve-release",
         help="build, promote and prune the serving release (ADR 0077; a no-op while current)",
@@ -350,8 +436,8 @@ def _job_parsers(sub: "argparse._SubParsersAction[argparse.ArgumentParser]") -> 
     dh.add_argument("cmd", nargs=argparse.REMAINDER)
     sc = sub.add_parser(
         "schedule",
-        help="write the launchd agents of the nightly job, the post-session watchdog and the "
-        "monthly Tiingo fill (not installed)",
+        help="write the launchd agents of the nightly job, the reference and post-session "
+        "watchdogs and the monthly Tiingo fill (not installed)",
     )
     sc.add_argument(
         "--time",
@@ -371,6 +457,13 @@ def _job_parsers(sub: "argparse._SubParsersAction[argparse.ArgumentParser]") -> 
         default=POST_WATCHDOG_MINUTES,
         help=f"the post-session agent starts every N minutes (default {POST_WATCHDOG_MINUTES})",
     )
+    sc.add_argument(
+        "--reference-watchdog-minutes",
+        type=positive,
+        default=REFERENCE_WATCHDOG_MINUTES,
+        help=f"the reference agent starts every N minutes (default {REFERENCE_WATCHDOG_MINUTES})",
+    )
+    sc.add_argument("--reference-out", type=Path, default=Path("var") / f"{REFERENCE_LABEL}.plist")
     sc.add_argument("--export-dir", type=Path, default=Path("out"))
     sc.add_argument("--out", type=Path, default=Path("var") / f"{LABEL}.plist")
     sc.add_argument("--post-out", type=Path, default=Path("var") / f"{POST_LABEL}.plist")
@@ -423,11 +516,14 @@ def write_schedule(args: argparse.Namespace) -> int:
     args.out.write_bytes(nightly_plist(repo, hour, minute, export_dir, watchdog_s))
     args.post_out.parent.mkdir(parents=True, exist_ok=True)
     args.post_out.write_bytes(post_session_plist(repo, args.post_watchdog_minutes * 60))
+    args.reference_out.parent.mkdir(parents=True, exist_ok=True)
+    args.reference_out.write_bytes(reference_plist(repo, args.reference_watchdog_minutes * 60))
     args.monthly_out.parent.mkdir(parents=True, exist_ok=True)
     args.monthly_out.write_bytes(monthly_fill_plist(repo))
     target = Path.home() / "Library" / "LaunchAgents" / f"{LABEL}.plist"
     monthly_target = Path.home() / "Library" / "LaunchAgents" / f"{MONTHLY_LABEL}.plist"
     post_target = Path.home() / "Library" / "LaunchAgents" / f"{POST_LABEL}.plist"
+    reference_target = Path.home() / "Library" / "LaunchAgents" / f"{REFERENCE_LABEL}.plist"
     print_json(
         {
             "written": str(args.out),
@@ -440,6 +536,18 @@ def write_schedule(args: argparse.Namespace) -> int:
                 f"launchctl load {post_target}",
             ],
             "post_session_uninstall": [f"launchctl unload {post_target}", f"rm {post_target}"],
+            "reference_written": str(args.reference_out),
+            "reference_watchdog_minutes": args.reference_watchdog_minutes,
+            "reference_install": [
+                f"mkdir -p {repo / 'var' / 'logs'}",
+                f"launchctl unload {reference_target} 2>/dev/null || true",
+                f"cp {args.reference_out.resolve()} {reference_target}",
+                f"launchctl load {reference_target}",
+            ],
+            "reference_uninstall": [
+                f"launchctl unload {reference_target}",
+                f"rm {reference_target}",
+            ],
             "monthly_written": str(args.monthly_out),
             "monthly_install": [
                 f"mkdir -p {repo / 'var' / 'logs'}",
@@ -479,6 +587,7 @@ def _dispatch(args: argparse.Namespace, reader: StoreReader, writer: StoreWriter
     own = {  # no session of their own to resolve
         "schedule": lambda: write_schedule(args),
         "post-session": lambda: post_session(args, writer.backend),
+        "reference": lambda: reference(args, writer.backend),
         "serve-release": lambda: serve_release_command(writer.backend, args.rebuild, args.wait),
     }
     if args.command in own:
@@ -544,9 +653,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     load_dotenv()
     parser = _parser()
     args = parser.parse_args(argv)
+    args.command = WORKFLOW_ALIASES.get(args.command, args.command)
     check_waive(parser, args)
     code = _run(parser, args)
-    if code == 0 and args.command in ("nightly", "post-session"):  # their locks are released
+    if code == 0 and args.command in ("nightly", "post-session", "reference"):  # locks released
         start_serve_release(args)
     return code
 
@@ -566,7 +676,7 @@ def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
         resources = load_nightly(config_store(args))  # the Mac also serves the web: stay modest
         limit_threads(resources.arrow_cpu_threads, resources.arrow_io_threads)
         lower_priority(resources.nice)  # every ingest command, and the workers it spawns
-        if args.command in ("nightly", "post-session", "serve-release"):  # never a branch
+        if args.command in ("nightly", "post-session", "reference", "serve-release"):  # no branch
             ensure_main_checkout()
         if not writes(args):
             return _dispatch(args, StoreReader(backend), StoreWriter(backend))

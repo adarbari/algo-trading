@@ -47,14 +47,14 @@ D1, D = date(2026, 10, 1), date(2026, 10, 2)
 START = datetime(2026, 10, 2, 22, tzinfo=UTC)
 
 
-def test_the_steps_are_the_four_that_do_not_decide_the_session_all_optional() -> None:
+def test_the_steps_are_the_five_that_do_not_decide_the_session_all_optional() -> None:
     assert (
         [s.name for s in POST_SESSION]
         == list(POST_STEPS)
-        == ["descriptions", "verify", EDGE_EVAL, EDGE_VERDICTS]
+        == ["descriptions", "verify", "ibkr-iv-history", EDGE_EVAL, EDGE_VERDICTS]
     )
     assert not any(s.critical for s in POST_SESSION)
-    assert LOCKED == ("descriptions", "verify")  # the tasks that write tables
+    assert LOCKED == ("descriptions", "verify", "ibkr-iv-history")  # the tasks that write tables
     assert EDGE_VERDICTS in registry.TASKS and EDGE_VERDICTS not in LOCKED  # after edge-eval
     assert EDGE_EVAL not in registry.TASKS  # a job step, claimed per owner, not the ingest lock
 
@@ -127,7 +127,8 @@ def test_locked_steps_run_under_the_hold_and_edge_eval_after_it_is_released(
 
     summary = run_post_session(task_ctx(writer), D, NightlySettings(), FakeEvals(events), hold=hold)
     assert events == [
-        "lock", "descriptions", "verify", "unlock", EDGE_EVAL, "lock", EDGE_VERDICTS, "unlock",
+        "lock", "descriptions", "verify", "ibkr-iv-history", "unlock",
+        EDGE_EVAL, "lock", EDGE_VERDICTS, "unlock",
     ]  # fmt: skip
     assert summary["status"] == "SUCCEEDED" and list(summary["steps"]) == [
         s.name for s in POST_SESSION
@@ -145,7 +146,7 @@ def test_the_run_leaves_a_published_record_and_is_then_a_no_op(
     record = writer.load_run(summary["run_id"])
     assert record is not None and record.job == "post-session" and record.session_date == D
     assert record.status is RunStatus.COMPLETE and set(record.stats["steps"]) == {
-        "descriptions", "verify", EDGE_EVAL, EDGE_VERDICTS
+        "descriptions", "verify", "ibkr-iv-history", EDGE_EVAL, EDGE_VERDICTS
     }  # fmt: skip
     assert post_done(writer, D) and pending_session(writer) is None  # nothing left to do
 
@@ -329,6 +330,7 @@ def test_the_report_gets_a_post_session_section_from_the_stored_record(
     assert [s.step for s in report.post_steps] == [
         "descriptions",
         "verify",
+        "ibkr-iv-history",
         EDGE_EVAL,
         EDGE_VERDICTS,
     ]

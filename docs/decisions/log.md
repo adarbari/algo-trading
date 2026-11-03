@@ -334,3 +334,10 @@ follow-up PR).
 - decided by: orchestrator (design call)
 - status: pending owner confirmation
 - Reasoning: each is the nearest accepted form of the brief; none changes a stored verdict of another setup.
+## 2026-11-02 | WF4: how the three ingestion workflows map onto the code
+- Question: the workflows ADR names `market-daily` / `reference` / `enrichment`; the post-session ADR already built `post-session` (descriptions, verify, edge-eval) and the `nightly` record is what reads and releases depend on. What are the three, and where does each step go?
+- Options: rename records and add a third agent; or keep `nightly` as market-daily and `post-session` as enrichment, adding only `reference`.
+- Decision: keep `nightly` and `post-session` records and jobs (aliases `market-daily`, `enrichment` for the commands); add `reference` (company-details, shares, macro-calendar, ibkr-contracts, the ETF holdings slots) as a weekly workflow; `ibkr-iv-history` joins post-session; `descriptions` stays in post-session (its Massive cap is per night, a weekly run would cut coverage 7x); per-night caps of moved steps are multiplied by 7 in the weekly run; `etf-holdings` stays nightly as the daily files only (`daily_funds` feed the flow features); a reference run yields to a pending nightly and takes the ingest lock per step.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: an architect reviewed the plan. No record is renamed, so no read, release or report changes; no second runner; the architect's blocking findings (daily ETF files, CLI lock deadlock and alias handling, nightly starvation by an unfair file lock) are each addressed in `workflows/reference/` and `cli/main.py`.
