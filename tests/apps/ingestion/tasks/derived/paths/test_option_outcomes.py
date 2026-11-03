@@ -260,14 +260,72 @@ def test_a_rule_over_a_field_with_no_rows_in_range_is_refused_and_the_check_fail
     assert failed.status == "FAIL" and "refused" in failed.detail
 
 
-def test_skip_report_in_life_is_refused_until_the_report_read_lands() -> None:
+EXPECTED = "rollups/instrument/earnings_expected@v1"
+C, D_ = "EQ:C", "EQ:D"  # C: a reporting stock with no expected date; D: a fund (files no report)
+
+
+def _reference(writer: StoreWriter, types: dict[str, str]) -> None:
+    rows = [
+        {"instrument_id": n, "symbol": n[3:], "asset_class": "EQ", "security_type": t,
+         "multiplier": 1.0, "status": "ACTIVE", "optionable": True, "is_etf": t == "ETF"}
+        for n, t in types.items()
+    ]  # fmt: skip
+    day = DAYS[0]
+    writer.write_table("instruments/reference", day, "ref", stamped(rows, day, "ref", _known(day)))
+
+
+def _expected(writer: StoreWriter, day: date, due: dict[str, date]) -> None:
+    rows = [{"instrument_id": n, "expected_report_date": d.isoformat()} for n, d in due.items()]
+    if rows:  # no partition at all is the case "not stored at D"
+        writer.write_table(EXPECTED, day, f"e-{day}", stamped(rows, day, f"e-{day}", _known(day)))
+
+
+def _skip_run(due: dict[str, date], types: dict[str, str]) -> pd.DataFrame:
+    """The rows written for the window ending END, the report read as known at D = S - 1."""
     writer, reader = _chains()
-    ctx = _ctx(writer, _configs(skip_report_in_life=True))
-    record = compute_option_outcomes(ctx, END)
-    (key,) = (w.key for w in _wanted(_configs(skip_report_in_life=True)))
-    assert record.items[key].startswith("REFUSED: skip_report_in_life")
-    assert reader.dates(TABLE) == []
-    assert check_option_outcomes(reader, END, ctx.settings)[0].status == "FAIL"
+    _reference(writer, types)
+    d = sessions_ending(END, 4)[0]  # S is 3 sessions back (hold 2), D the session before it
+    _expected(writer, d, due)
+    configs = _configs(skip_report_in_life=True, position="short_put")
+    record = compute_option_outcomes(_ctx(writer, configs), END)
+    assert record.status == RunStatus.COMPLETE, record.stats
+    rows = _rows(reader)
+    return rows[rows["window_end"] == END].set_index("instrument_id")
+
+
+def test_skip_report_in_life_skips_a_report_inside_the_life_and_writes_one_outside() -> None:
+    """A report at or before the selected expiry leaves the name UNMEASURED as REPORT_IN_LIFE;
+    one after the expiry is written; both read from the date known at D, never the actual one."""
+    rows = _skip_run(
+        {A: EXPIRY - timedelta(days=3), B: EXPIRY + timedelta(days=30)},
+        {A: "COMMON_STOCK", B: "COMMON_STOCK"},
+    )
+    assert rows.at[A, "outcome_status"] == "UNMEASURED"
+    assert str(rows.at[A, "outcome_reason"]).startswith("REPORT_IN_LIFE")
+    assert rows.at[B, "outcome_status"] != "UNMEASURED"
+
+
+def test_skip_report_in_life_is_unknown_when_a_reporting_type_has_no_date_and_never_no_report() -> (
+    None
+):
+    """No expected date for a stock (or none at all stored) is REPORT_UNKNOWN, not 'no report';
+    a fund files no report and passes (N3)."""
+    rows = _skip_run({}, {A: "COMMON_STOCK", B: "ETF"})
+    assert str(rows.at[A, "outcome_reason"]).startswith("REPORT_UNKNOWN")
+    assert rows.at[B, "outcome_status"] != "UNMEASURED"
+
+
+def test_skip_report_in_life_reads_the_date_known_at_the_decision_session_only() -> None:
+    """A date stored only at a later session (known after D) is not read: UNKNOWN, even when
+    that later partition would put the report inside the life."""
+    writer, reader = _chains()
+    _reference(writer, {A: "COMMON_STOCK", B: "COMMON_STOCK"})
+    _expected(writer, sessions_ending(END, 3)[0], {A: EXPIRY - timedelta(days=3)})  # at S, not D
+    configs = _configs(skip_report_in_life=True, position="short_put")
+    compute_option_outcomes(_ctx(writer, configs), END)
+    rows = _rows(reader)
+    rows = rows[rows["window_end"] == END].set_index("instrument_id")
+    assert str(rows.at[A, "outcome_reason"]).startswith("REPORT_UNKNOWN")
 
 
 def test_every_start_session_of_a_run_of_window_ends_is_written_for_every_name() -> None:
