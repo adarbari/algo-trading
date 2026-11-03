@@ -359,6 +359,8 @@ allowed = [
     "src/algotrade/storage/tables/schemas/events.py",  # declares the table
     "src/algotrade/services/read/events/ahead.py",  # the events-ahead read of the stored calendar (known_from <= session), a display read
     "src/algotrade/features/rollups/market/edges/conditions.py",  # names the feature input of the stored calendar (known_from <= session) for the FOMC distances (ADR 0088); reads only, the table's one writer stays macro/calendar.py
+    "src/algotrade/features/rollups/event_study/event_reaction.py",  # names the feature input of the stored calendar (known_from <= session) for the macro reaction columns (ADR 0050 EV2); computes only, never writes
+    "src/algotrade/features/rollups/event_study/market_event_reaction.py",  # names the same feature input for the S&P 500's reaction; computes only
 ]
 section = "docs/adr/0050-event-sensitivity.md#decision"
 detect = [{ call = "lagged_vintages" }, { string = "events/macro_release" }]
