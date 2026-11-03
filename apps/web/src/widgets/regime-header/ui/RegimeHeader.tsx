@@ -1,5 +1,5 @@
 /**
- * The Regime page's header: the weather word with its sentence and the three scores, and
+ * The Regime page's header: the weather word with its sentence, the three scores and the macro score's two tiers, and
  * "What changed this week": the indicators whose verdict turned on or off since five sessions
  * ago (the server's `changed`), each with its one-line meaning. Data, empty (nothing stored)
  * and error states; loading is a Skeleton.
@@ -10,10 +10,34 @@ import {
   changedIndicators,
   indicatorStatus,
   RegimeHeadline,
+  RegimeScoreMeter,
   useRegime,
   type Regime,
 } from '@/entities/regime';
 import { ExplainRegime } from '@/features/regime-explain';
+import { termHelp } from '@/features/guide-help';
+
+/** The macro score's two tiers, so a CAUTION the early tier carries shows while the cards read off. */
+function MacroTiers({ regime }: { regime: Regime }) {
+  return (
+    <Stack gap={2}>
+      <RegimeScoreMeter
+        label="Early tier"
+        caption={termHelp('macro_early')}
+        score={regime.scores.macroEarly}
+        banded
+        size="sm"
+      />
+      <RegimeScoreMeter
+        label="Confirming tier"
+        caption={termHelp('macro_confirming')}
+        score={regime.scores.macroConfirming}
+        banded
+        size="sm"
+      />
+    </Stack>
+  );
+}
 
 function WhatChanged({ regime }: { regime: Regime }) {
   const changed = changedIndicators(regime);
@@ -63,7 +87,7 @@ export function RegimeHeader() {
       {regime.isPending && <Skeleton lines={6} label="Loading the market regime" />}
       {regime.data && (
         <Stack gap={4}>
-          <RegimeHeadline regime={regime.data} />
+          <RegimeHeadline regime={regime.data} macroTiers={<MacroTiers regime={regime.data} />} />
           <WhatChanged regime={regime.data} />
           {regime.data.label !== 'UNKNOWN' && <ExplainRegime />}
         </Stack>

@@ -105,6 +105,48 @@ const RegimeQuery = graphql(`
           coverageFeature
           threshold
         }
+        macroEarly {
+          value
+          unknown {
+            code
+            kind
+            guideTerm
+            kindText
+            cause {
+              links {
+                level
+                subject
+                status
+                message
+                runId
+              }
+            }
+          }
+          feature
+          coverageFeature
+          threshold
+        }
+        macroConfirming {
+          value
+          unknown {
+            code
+            kind
+            guideTerm
+            kindText
+            cause {
+              links {
+                level
+                subject
+                status
+                message
+                runId
+              }
+            }
+          }
+          feature
+          coverageFeature
+          threshold
+        }
       }
       sizing {
         label

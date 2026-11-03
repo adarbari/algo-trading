@@ -8,6 +8,7 @@ from algotrade.data import StoreReader
 from algotrade.data.prices import (
     adjusted_bars,
     bar_stamps,
+    flagged_bars,
     frame_to_series,
     load_price_data,
     session_bars,
@@ -139,6 +140,16 @@ def _flagged_store(*flag_runs: tuple[str, str, datetime]) -> MemoryBackend:
         flags = stamped(_flag_rows(status), FDAYS[-1], run_id, knowledge)
         writer.write_table("events/bar_flag", FDAYS[-1], run_id, flags)
     return backend
+
+
+def test_flagged_bars_lists_flags_a_later_clear_retracts() -> None:
+    flagged = flagged_bars(StoreReader(_flagged_store(FLAG)), FDAYS[0], FDAYS[2])
+    assert list(zip(flagged["instrument_id"], flagged["event_date"], strict=True)) == [
+        ("EQ:A", FLAGGED_DAY)
+    ]
+    cleared = ("f2", "CLEARED", datetime(2026, 10, 6, 22, tzinfo=UTC))
+    assert flagged_bars(StoreReader(_flagged_store(FLAG, cleared)), FDAYS[0], FDAYS[2]).empty
+    assert flagged_bars(StoreReader(_flagged_store()), FDAYS[0], FDAYS[2]).empty
 
 
 def test_session_bars_drops_flagged() -> None:

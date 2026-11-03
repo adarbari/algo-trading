@@ -125,6 +125,7 @@ class NightlySettings:
     max_catch_up: int = 5
     max_duration_minutes: float = 40.0
     post_max_duration_minutes: float = 360.0  # [post]: the post-session workflow's duration alert
+    edge_eval_target_s: float = 60.0  # [post]: the nightly edge-eval's target (ADR 0063), reported
     notify_enabled: bool = True
     notify_desktop: bool = True
     summary_path: str = "var/logs/nightly-latest.json"
@@ -188,7 +189,7 @@ class NightlySettings:
         steps = {n: steps_table.table(n, ["deadline", "settle_minutes"]) for n in declared}
         sessions = root.table("sessions", ["settle_minutes", "max_catch_up"])
         alerts = root.table("alerts", ["max_duration_minutes"])
-        post = root.table("post", ["max_duration_minutes"])
+        post = root.table("post", ["max_duration_minutes", "edge_eval_target_s"])
         notify = root.table("notify", ["enabled", "desktop", "summary_path", "email"])
         email = notify.table("email", ["enabled", "smtp_host", "smtp_port", "max_examples"])
         resources = root.table(
@@ -234,6 +235,7 @@ class NightlySettings:
             post_max_duration_minutes=post.number(
                 "max_duration_minutes", d.post_max_duration_minutes, 0
             ),
+            edge_eval_target_s=post.number("edge_eval_target_s", d.edge_eval_target_s, 0),
             notify_enabled=notify.boolean("enabled", d.notify_enabled),
             notify_desktop=notify.boolean("desktop", d.notify_desktop),
             summary_path=notify.text("summary_path", d.summary_path),
