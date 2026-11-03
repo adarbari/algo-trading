@@ -5,13 +5,15 @@
  * the feature table (ADR 0038), so a fact not stored yet is UNKNOWN with its reason, never a
  * blank. Says nothing about direction.
  */
-import { formatValue, Banner, EmptyState, Stack, Text } from '@algotrade/ui';
+import { formatValue, Banner, EmptyState, Stack } from '@algotrade/ui';
 import { useMemo, useState } from 'react';
 
 import { earningsWeek, gapLines, useEventCalendar } from '@/entities/event';
 import { feature } from '@/shared/api';
 import { CalendarSourcePicker, useCalendarSource } from '@/features/calendar-source';
 import { FeatureTable } from '@/widgets/feature-table';
+
+import { GapNotes } from './GapNotes';
 
 /**
  * Report date and time, the expiry used, the priced move, the mean of the past 12 moves, priced
@@ -70,17 +72,7 @@ export function EarningsWeek() {
             onChange={source.setValue}
           />
           {source.message !== null && <Banner tone="info">{source.message}</Banner>}
-          {gaps.length > 0 && (
-            <Banner tone="info">
-              <Stack gap={0.5}>
-                {gaps.map((line) => (
-                  <Text key={line} size="sm">
-                    {line}
-                  </Text>
-                ))}
-              </Stack>
-            </Banner>
-          )}
+          <GapNotes lines={gaps} />
         </Stack>
       }
       emptyMessage="No report in the next five sessions for these names."

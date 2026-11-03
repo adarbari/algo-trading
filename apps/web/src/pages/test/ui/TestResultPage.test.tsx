@@ -11,7 +11,6 @@ vi.mock('@/widgets/screener-edge-line', () => ({
     <Text>{`edge line of ${screenerId}`}</Text>
   ),
 }));
-vi.mock('@/widgets/pick-detail', () => ({ PickDetail: () => null }));
 vi.mock('@/widgets/price-chart-panel', () => ({ PriceChartPanel: () => null }));
 
 const hooks = vi.hoisted(() => ({ runs: vi.fn(), mine: vi.fn() }));

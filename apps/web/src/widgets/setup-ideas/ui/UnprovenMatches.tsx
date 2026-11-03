@@ -31,7 +31,7 @@ import {
 } from '@/entities/idea';
 import { decisionLabel } from '@/entities/screen';
 
-import { ideaColumns } from '../model/columns';
+import { ideaColumns } from '../model/match-columns';
 
 /** The surface of the filter bar: its definitions are `config/site/filters/ideas.toml`. */
 const SURFACE = 'ideas';
@@ -46,15 +46,15 @@ function labelsOf(screeners: readonly { id: string; name: string }[]): LabelOf {
 }
 
 /** The page's search params: the column set and the filter bar's `f`. */
-export type TopIdeasSearch = IdeasSearch & FilterSearch;
-export type TopIdeasSearchPatch = IdeasSearchPatch & { f?: string | undefined };
+export type UnprovenSearch = IdeasSearch & FilterSearch;
+export type UnprovenSearchPatch = IdeasSearchPatch & { f?: string | undefined };
 
-export interface TopIdeasProps {
+export interface UnprovenMatchesProps {
   /** The tab whose screeners make the list (its Unproven section, ADR 0083). */
   tab?: IdeaTab;
   /** The page's search params: the column set and the filters in force. */
-  search: TopIdeasSearch;
-  onSearchChange: (patch: TopIdeasSearchPatch) => void;
+  search: UnprovenSearch;
+  onSearchChange: (patch: UnprovenSearchPatch) => void;
   onCompare: (search: IdeaCompareSearch) => void;
   /** Open a ticker in Explore, with the screener (config id) that surfaced it. */
   onOpen: (symbol: string, via: string) => void;
@@ -64,7 +64,7 @@ export interface TopIdeasProps {
   onOpenSettings: () => void;
 }
 
-export function TopIdeas({
+export function UnprovenMatches({
   tab,
   search,
   onSearchChange,
@@ -72,7 +72,7 @@ export function TopIdeas({
   onOpen,
   onScreeners,
   onOpenSettings,
-}: TopIdeasProps) {
+}: UnprovenMatchesProps) {
   const filters = useFilterState(search.f, (f) => {
     onSearchChange({ f });
   });

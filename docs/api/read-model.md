@@ -488,7 +488,7 @@ hundreds of concurrent requests, no hacks, and no UX trade-off that costs the cu
   - Ideas ranking is unchanged otherwise: priority place (unlisted screeners share the last
     place), then score, tie-break, screener id; `Ideas.screeners[].top` (the run's 3 best picks
     by rank) keeps the ranking panel's "best finds" a server fact.
-  - The Ideas Earnings cell (`widgets/top-ideas/model/facts.ts`): `next_earnings_date`, else
+  - The Ideas Earnings cell (`widgets/setup-ideas/model/facts.ts`, the Unproven matches): `next_earnings_date`, else
     muted "Last <d MMM>" from `last_earnings_date`, else "Unknown"; the reason is the tooltip.
     The earnings filter counts `days_to_earnings` in sessions ("Hide earnings within 14
     sessions"). IV30 is `feature.vrp_iv30` by name; the screens' other display columns are

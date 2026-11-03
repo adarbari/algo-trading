@@ -15,7 +15,7 @@ import {
 import { gql, TestQueryProvider } from '@/shared/api';
 import { expectNoA11yViolations, fakeQuery, stubElementSize } from '@/shared/lib/testing';
 
-import { TopIdeas, type TopIdeasProps, type TopIdeasSearch } from './TopIdeas';
+import { UnprovenMatches, type UnprovenMatchesProps, type UnprovenSearch } from './UnprovenMatches';
 
 vi.mock('@/shared/api', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -172,12 +172,12 @@ function Held({
   handlers,
   initial,
 }: {
-  handlers: Omit<TopIdeasProps, 'search' | 'onSearchChange'>;
-  initial: TopIdeasSearch;
+  handlers: Omit<UnprovenMatchesProps, 'search' | 'onSearchChange'>;
+  initial: UnprovenSearch;
 }) {
   const [search, setSearch] = useState(initial);
   return (
-    <TopIdeas
+    <UnprovenMatches
       {...handlers}
       search={search}
       onSearchChange={(patch) => {
@@ -192,7 +192,7 @@ function Held({
   );
 }
 
-function setup(initial: TopIdeasSearch = {}) {
+function setup(initial: UnprovenSearch = {}) {
   const handlers = {
     onCompare: vi.fn(),
     onOpen: vi.fn(),
@@ -293,7 +293,7 @@ beforeEach(() => {
   );
 });
 
-describe('TopIdeas', () => {
+describe('UnprovenMatches', () => {
   it('shows each ticker with its name and sector, why it is here, price and move', () => {
     const { grid } = setup();
     const aapl = within(grid()).getByRole('row', { name: /AAPL/ });
@@ -628,7 +628,7 @@ describe('TopIdeas', () => {
   });
 });
 
-describe('TopIdeas field headers', () => {
+describe('UnprovenMatches field headers', () => {
   it('puts the Guide help button in the field headers and every Ideas column, not in the rank or ticker', async () => {
     const { grid } = setup({ columns: 'options' });
     const help = (name: RegExp) =>

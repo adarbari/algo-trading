@@ -11,7 +11,7 @@ import { createRoute, useNavigate } from '@tanstack/react-router';
 
 import { filterSearch } from '@/features/filter-bar';
 import { parseIdeasSearch, type IdeaTab } from '@/entities/idea';
-import type { TopIdeasSearch, TopIdeasSearchPatch } from '@/widgets/top-ideas';
+import type { UnprovenSearch, UnprovenSearchPatch } from '@/widgets/setup-ideas';
 
 import { traderRoute } from './layout-route';
 import { pageRoute } from '../page-loader';
@@ -27,7 +27,7 @@ const loading = pageRoute(IdeasPage, (page, client, deps: { tab: IdeaTab | undef
 });
 
 /** The search params after a patch: `undefined` removes a key. */
-function patched(previous: TopIdeasSearch, patch: TopIdeasSearchPatch): TopIdeasSearch {
+function patched(previous: UnprovenSearch, patch: UnprovenSearchPatch): UnprovenSearch {
   const merged: Record<string, unknown> = { ...previous, ...patch };
   return validateSearch(
     Object.fromEntries(Object.entries(merged).filter(([, value]) => value !== undefined)),
@@ -35,7 +35,7 @@ function patched(previous: TopIdeasSearch, patch: TopIdeasSearchPatch): TopIdeas
 }
 
 /** The page's own params (the column set) and the filter bar's `f`. */
-function validateSearch(raw: Record<string, unknown>): TopIdeasSearch {
+function validateSearch(raw: Record<string, unknown>): UnprovenSearch {
   return { ...parseIdeasSearch(raw), ...filterSearch(raw) };
 }
 

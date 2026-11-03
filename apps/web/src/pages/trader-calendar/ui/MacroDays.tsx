@@ -3,14 +3,16 @@
  * quarter-end dates) on one timeline, with the parts the session does not know said above it.
  * What an event is and when it is known from are the API's.
  */
-import { Banner, EventTimeline, Panel, Stack, Text } from '@algotrade/ui';
+import { EventTimeline, Panel, Stack } from '@algotrade/ui';
 import { useMemo } from 'react';
 
 import { gapLines, macroItems, useEventCalendar } from '@/entities/event';
 import { SCOPE_SOURCE } from '@/features/calendar-source';
 import { termHelp } from '@/features/guide-help';
 
-export function MacroCalendar() {
+import { GapNotes } from './GapNotes';
+
+export function MacroDays() {
   const calendar = useEventCalendar([], true, true);
   const items = useMemo(() => (calendar.data ? macroItems(calendar.data) : []), [calendar.data]);
   const gaps = useMemo(
@@ -27,17 +29,7 @@ export function MacroCalendar() {
       onRetry={() => void calendar.refetch()}
     >
       <Stack gap={3}>
-        {gaps.length > 0 && (
-          <Banner tone="info">
-            <Stack gap={0.5}>
-              {gaps.map((line) => (
-                <Text key={line} size="sm">
-                  {line}
-                </Text>
-              ))}
-            </Stack>
-          </Banner>
-        )}
+        <GapNotes lines={gaps} />
         <EventTimeline
           label={`Market-wide events, next 90 days (${SCOPE_SOURCE})`}
           events={items}

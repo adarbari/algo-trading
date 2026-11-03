@@ -511,18 +511,19 @@ describe('ScreenerResults', () => {
     expect(asked()[1]).toMatchObject({ page: 2 });
   });
 
-  it('renders the detail of the row under review beside the table', () => {
-    const renderDetail = vi.fn(() => null);
-    setup({ renderDetail, focusId: 'EQ:KO' });
-    const [focus] = renderDetail.mock.lastCall as unknown as [{ row: { symbol: string } }];
-    expect(focus.row.symbol).toBe('KO');
+  it('shows the pick under review beside the table, with the page content under it', () => {
+    const renderBesidePick = vi.fn(() => 'price chart');
+    setup({ renderBesidePick, focusId: 'EQ:KO' });
+    const [row] = renderBesidePick.mock.lastCall as unknown as [{ symbol: string }];
+    expect(row.symbol).toBe('KO');
+    expect(screen.getByRole('group', { name: 'Pick actions' })).toBeInTheDocument();
   });
 
   it('on a phone opens the chosen row in a sheet, never the first-row fallback', async () => {
     vi.stubGlobal('innerWidth', 375);
     try {
-      const renderDetail = vi.fn(() => 'pick detail');
-      const { props, rerender } = setup({ renderDetail });
+      const renderBesidePick = vi.fn(() => 'pick detail');
+      const { props, rerender } = setup({ renderBesidePick });
       expect(screen.queryByRole('dialog')).toBeNull();
       rerender(
         <TestQueryProvider>
