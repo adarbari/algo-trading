@@ -98,6 +98,7 @@ ATTRIBUTION_EVENTS = fixed(
     "evidence string!",
     "evidence_ref string",
     runs="merge",
+    key=("instrument_id", "ts", "source"),  # a model row never overwrites a filing row
 )
 
 # L1: the 8-K and 8-K/A filings of the scoped companies (ADR 0050), one row per instrument and

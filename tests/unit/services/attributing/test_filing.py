@@ -26,7 +26,7 @@ def test_the_item_names_the_cause_with_high_confidence() -> None:
         {"EQ:A"}, _filings(("EQ:A", "2.02,9.01", S, "0001-26-1")), S
     )
     row = out.iloc[0]
-    assert (row["cause_class"], row["confidence"]) == (taxonomy.RESULTS, filing.SINGLE)
+    assert (row["cause_class"], row["confidence"]) == (taxonomy.RESULTS, 0.9)
     assert row["evidence_ref"] == "0001-26-1" and row["known_from"] == S
     assert row["ts"] == pd.Timestamp(S, tz="UTC")
 
@@ -52,3 +52,13 @@ def test_two_filings_for_one_mover_keep_the_most_specific() -> None:
     both = _filings(("EQ:A", "8.01", S, "a"), ("EQ:A", "2.01", S, "b"))
     out = filing.attribute_from_filings({"EQ:A"}, both, S)
     assert list(out["cause_class"]) == [taxonomy.ACQUISITION] and list(out["evidence_ref"]) == ["b"]
+
+
+def test_a_catch_all_item_carries_less_confidence_and_the_latest_of_equals_stays() -> None:
+    row = filing.attribute_from_filings({"EQ:A"}, _filings(("EQ:A", "8.01", S, "x")), S).iloc[0]
+    assert row["confidence"] == taxonomy.CONFIDENCE[taxonomy.OTHER_EVENT] == 0.6
+    early = _filings(("EQ:A", "2.02", S, "early"))
+    late = _filings(("EQ:A", "2.02", S, "late"))
+    late["ts"] = pd.Timestamp("2026-10-02T22:00:00Z")
+    out = filing.attribute_from_filings({"EQ:A"}, pd.concat([early, late]), S)
+    assert list(out["evidence_ref"]) == ["late"]

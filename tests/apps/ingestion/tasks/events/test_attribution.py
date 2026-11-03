@@ -5,9 +5,12 @@ session with no rollup is skipped, and a rerun stores the same rows."""
 from datetime import date
 
 import pandas as pd
+import pytest
 
 from algotrade.data import StoreReader
 from algotrade.storage.backends.memory import MemoryBackend
+from algotrade.storage.tables.schemas import ATTRIBUTION_EVENTS
+from algotrade.storage.tables.schemas.registry import table_key
 from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.tasks.events import attribution
 from algotrade_ingestion.tasks.events.attribution import TABLE, ingest_attribution
@@ -60,6 +63,7 @@ def test_the_big_mover_with_an_8k_gets_its_cause_and_the_rest_get_none() -> None
     assert row["evidence_ref"] == "a1" and row["confidence"] == 0.9
     assert pd.Timestamp(row["known_from"]).date() == SESSION  # public from its reaction session
     assert record.stats["movers"] == 3 and record.stats["rows"] == 1  # BIG, NEWS, BARE moved
+    assert len(record.stats["missing"]) == attribution.LOOKBACK - 1  # earlier sessions: no rollup
 
 
 def test_big_movers_read_either_flag_and_a_null_flag_is_no_move() -> None:
@@ -83,3 +87,30 @@ def test_a_rerun_stores_the_same_rows() -> None:
     first = _stored(writer)[["cause_class", "evidence_ref"]]
     ingest_attribution(task_ctx(writer), SESSION)
     pd.testing.assert_frame_equal(_stored(writer)[["cause_class", "evidence_ref"]], first)
+
+
+def test_the_table_merges_on_source_so_a_model_row_never_overwrites_a_filing_row() -> None:
+    assert table_key(ATTRIBUTION_EVENTS, ["instrument_id", "ts", "source"]) == [
+        "instrument_id", "ts", "source"
+    ]  # fmt: skip
+
+
+def test_an_earlier_sessions_late_filing_is_attributed_by_the_lookback() -> None:
+    writer = _store()
+    earlier = date(2026, 10, 2)  # a Friday: its rollup is stored, the 8-K lands for it too
+    rows = [{"instrument_id": BARE, "big_move_5pct_today": 1.0, "big_move_2x_today": 0.0}]
+    writer.write_table(attribution.REACTION, earlier, "rr0", stamped(rows, earlier, "rr0"))
+    late = [
+        {"instrument_id": BARE, "ts": pd.Timestamp("2026-10-02T14:00:00Z"), "known_from": earlier,
+         "cik": "1", "form": "8-K", "accession": "late", "filing_date": earlier, "items": "1.01"}
+    ]  # fmt: skip
+    writer.write_table(attribution.FILINGS, earlier, "f0", stamped(late, earlier, "f0"))
+    ingest_attribution(task_ctx(writer), SESSION)
+    stored = StoreReader(writer._backend).table(TABLE, earlier)
+    assert stored is not None and list(stored["instrument_id"]) == [BARE]
+    assert list(stored["cause_class"]) == ["agreement"]
+
+
+def test_a_rollup_with_neither_flag_column_is_an_error_not_no_movers() -> None:
+    with pytest.raises(ValueError, match="none of the columns"):
+        attribution.big_movers(pd.DataFrame({"instrument_id": ["a"]}))
