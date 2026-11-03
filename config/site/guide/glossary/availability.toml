@@ -227,3 +227,13 @@ Fundamentals stores a row for every name with a close or a share count. A compan
 """
 next = "It clears when the name trades or files; a long list is a problem for the owner to check."
 see_also = ["known_gap"]
+
+[[term]]
+id = "completeness_states"
+term = "Completeness states"
+short = "Each cell of the completeness grid is complete, partial, failed or not collected for one dataset and session."
+body = """
+A cell shows the share of expected rows present for one dataset on one session. Not collected means the session is before the dataset's first stored session, so nothing was expected. Failed means rows are missing after the dataset was being collected. Partial means some rows are present. Select a cell to drill into the rows behind it. A full cell counts rows, not values: a table can be complete while many of its values are empty.
+"""
+next = "Select a failed cell to see what is missing."
+see_also = ["unavailable_not_stored"]
