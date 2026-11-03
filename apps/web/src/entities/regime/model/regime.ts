@@ -167,7 +167,14 @@ export interface Regime {
   session: string;
   label: RegimeLabel;
   headline: string;
-  scores: { macroRisk: RegimeScore; marketStress: RegimeScore; fragility: RegimeScore };
+  scores: {
+    macroRisk: RegimeScore;
+    marketStress: RegimeScore;
+    fragility: RegimeScore;
+    /** The macro score's two tiers: macro risk is the higher of them. */
+    macroEarly: RegimeScore;
+    macroConfirming: RegimeScore;
+  };
   indicators: readonly RegimeIndicator[];
   sizing: RegimeSizing;
   /** Why the regime is not computed (UNKNOWN), else null. */
