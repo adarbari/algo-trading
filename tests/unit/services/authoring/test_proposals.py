@@ -120,7 +120,8 @@ def test_a_proposed_edge_never_sets_its_own_status(site: MemoryConfigWriter) -> 
     """Fitness: a study's proposal is never saved as a candidate (ADR 0053: ML proposes, never
     judges); moving it is the owner's ``set_status``."""
     p = edge_proposal("WS_4", stats())
-    for extra in ({"status": "candidate"}, {"audit": {"labels": []}}):
+    extras: list[dict[str, Any]] = [{"status": "candidate"}, {"audit": {"labels": []}}]
+    for extra in extras:
         with pytest.raises(ConfigurationError, match="sets no status"):
             edges.save_proposed_edge(site, "alice", "x", p.edge | extra, today=TODAY)
 
