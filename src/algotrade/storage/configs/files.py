@@ -10,6 +10,9 @@ site/field_guide/<group>/<file>.toml       L3 field guide, one folder per theme 
                                            ``field_guide``, ADR 0041; the file name is unique)
 site/regime/{cards,episodes}.toml          L3 regime cards, crash episodes (kind ``regime``)
 site/events/{scope,releases}.toml          L3 event scope, macro releases (kind ``events``)
+admin/events/scope.toml                    the admin scope's changes over the site event list
+                                           (kind ``events``, git-ignored; ADR 0029 amendment
+                                           2026-11-03; no other kind lives in this scope)
 site/guide/sections.toml                   L3 Guide order, groups (kind ``guide``, ADR 0051)
 site/guide/start.toml                      L3 Guide Start here pages (kind ``guide``)
 site/guide/glossary/<theme>.toml           L3 Guide glossary, one file per theme (kind
@@ -56,6 +59,8 @@ from algotrade.storage.configs.generation import read_generation
 from algotrade.storage.configs.store import KINDS, split_version
 
 SITE = "site"
+ADMIN = "admin"  # a reserved scope beside ``site``: the admin's documents (never a user id)
+ADMIN_KINDS = ("events",)  # the only kinds the admin scope holds: ``admin/events/scope.toml``
 SCREENERS = "screeners"
 GUIDE_SCREENERS = "guide_screeners"
 USER_FILES = ("preferences", "identity")  # one document per user, never the site's
@@ -144,6 +149,11 @@ class FileConfigStore:
     def _path(self, scope: str, kind: str, name: str) -> Path:
         if kind not in KINDS:
             raise ConfigurationError(f"unknown config kind {kind!r}")
+        if scope == ADMIN:
+            return self.admin_path(kind, name)
+        return self._scoped_path(scope, kind, name)
+
+    def _scoped_path(self, scope: str, kind: str, name: str) -> Path:
         if scope == SITE:
             if kind == "defaults":
                 return self.root / SITE / "defaults.toml"
@@ -156,6 +166,12 @@ class FileConfigStore:
         if kind in USER_FILES:  # one file per user: users/<id>/<kind>.toml
             return self.root / "users" / user / f"{kind}.toml"
         return self.root / "users" / user / kind / f"{validate_id(kind, name)}.toml"
+
+    def admin_path(self, kind: str, name: str) -> Path:
+        """``admin/<kind>/<name>.toml`` for a kind in ``ADMIN_KINDS`` (the admin scope)."""
+        if kind not in ADMIN_KINDS:
+            raise ConfigurationError(f"the admin scope holds no {kind!r} documents")
+        return self.root / ADMIN / SITE_FOLDERS[kind] / f"{validate_id(kind, name)}.toml"
 
     def _site_folder_path(self, kind: str, name: str) -> Path:
         folder = self.root / SITE / SITE_FOLDERS[kind]
@@ -219,6 +235,8 @@ class FileConfigStore:
     def load(self, scope: str, kind: str, name: str) -> Mapping[str, Any] | None:
         if kind in USER_FILES and scope == SITE:  # a user's, never the site's
             return None
+        if scope == ADMIN:  # one document of a kind the scope holds, else nothing
+            return read_toml(self.admin_path(kind, name)) if kind in ADMIN_KINDS else None
         if kind in SITE_ONLY and scope != SITE:
             return None
         if kind == SCREENERS:
@@ -231,6 +249,11 @@ class FileConfigStore:
         return document
 
     def names(self, scope: str, kind: str) -> list[str]:
+        if scope == ADMIN:
+            return self._file_names(scope, kind) if kind in ADMIN_KINDS else []
+        return self._scoped_names(scope, kind)
+
+    def _scoped_names(self, scope: str, kind: str) -> list[str]:
         if kind == "settings":
             if scope != SITE:
                 return []
@@ -261,6 +284,9 @@ class FileConfigStore:
         return sorted(p.name for p in base.iterdir() if p.is_dir()) if base.exists() else []
 
     def generation(self, user: str) -> int:
+        """``user``'s config generation; ``admin``: the admin scope's (``config/admin/``)."""
+        if user == ADMIN:
+            return read_generation(self.root / ADMIN)
         return read_generation(self.root / "users" / validate_id("user", user))
 
     def overrides(self, name: str) -> list[dict[str, str]]:
@@ -291,7 +317,10 @@ class MemoryConfigStore:
         return list(self._overrides.get(name, []))
 
     def load(self, scope: str, kind: str, name: str) -> Mapping[str, Any] | None:
-        """Rule screens may be keyed ``<id>@<N>`` (versions): ``<id>`` is the latest."""
+        """Rule screens may be keyed ``<id>@<N>`` (versions): ``<id>`` is the latest. The admin
+        scope holds only the kinds of ``ADMIN_KINDS``."""
+        if scope == ADMIN and kind not in ADMIN_KINDS:
+            return None
         if kind == SCREENERS and (scope, kind, name) not in self._docs:
             base, pinned = split_version(name)
             versions = self._screen_versions(scope, base)
@@ -321,7 +350,7 @@ class MemoryConfigStore:
         return sorted({split_version(n)[0] for n in names} if kind == SCREENERS else names)
 
     def users(self) -> list[str]:
-        return sorted({s for (s, _, _) in self._docs if s != SITE})
+        return sorted({s for (s, _, _) in self._docs if s not in (SITE, ADMIN)})
 
     def generation(self, user: str) -> int:
         return 0  # a read-only store never changes; ``MemoryConfigWriter`` counts its writes

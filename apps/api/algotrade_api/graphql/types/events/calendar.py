@@ -7,7 +7,7 @@ from typing import Self
 import strawberry
 
 from algotrade.services.read.events import event_calendar
-from algotrade_api.graphql.types.events.instrument_events import AheadEvent, EventGap
+from algotrade_api.graphql.types.events.instrument_events import AheadEvent, EventGap, WatchItem
 
 
 @strawberry.type(description="A name on the calendar: its id and ticker in the session's snapshot")
@@ -36,6 +36,19 @@ class CalendarEvent:
 
 
 @strawberry.type(
+    description="An undated deep-dive dossier item (an expected window) of a name on the calendar"
+)
+class CalendarWatch:
+    instrument_id: str
+    symbol: str
+    item: WatchItem
+
+    @classmethod
+    def of(cls, d: event_calendar.CalendarWatch) -> Self:
+        return cls(instrument_id=d.instrument_id, symbol=d.symbol, item=WatchItem.of(d.item))
+
+
+@strawberry.type(
     description="A day of the window (every session, and a closed day only when an event "
     "falls on it) and its events: the names' first, in name order, then the market-wide ones"
 )
@@ -54,7 +67,8 @@ class CalendarDay:
 @strawberry.type(
     description="The calendar of `names` from the session through `end`: the days in order, "
     "the parts not known for the session (`gaps`), the asked ids the reference snapshot lacks "
-    "(`missing`) and the scope list's symbols it does not know (`unresolved`)"
+    "(`missing`), the scope list's symbols it does not know (`unresolved`) and the names' "
+    "undated dossier items still open (`watch`)"
 )
 class EventCalendar:
     session: dt.date
@@ -64,6 +78,7 @@ class EventCalendar:
     gaps: list[EventGap]
     missing: list[str]
     unresolved: list[str]
+    watch: list[CalendarWatch]
 
     @classmethod
     def of(cls, d: event_calendar.EventCalendar) -> Self:
@@ -75,4 +90,5 @@ class EventCalendar:
             gaps=[EventGap.of(g) for g in d.gaps],
             missing=list(d.missing),
             unresolved=list(d.unresolved),
+            watch=[CalendarWatch.of(w) for w in d.watch],
         )

@@ -21,7 +21,13 @@ from datetime import date, timedelta
 from algotrade.data.chains import OPTION_QUOTES
 from algotrade.services.read.availability.cause import feature_cause, table_cause
 from algotrade.services.read.context import ReadContext, partition
-from algotrade.services.read.events.ahead import AheadEvent, EventGap, load_ahead, order
+from algotrade.services.read.events.ahead import (
+    AheadEvent,
+    EventGap,
+    WatchItem,
+    load_ahead,
+    order,
+)
 from algotrade.services.read.events.filings import Filing, load_filings
 from algotrade.services.read.events.ladder import LADDER_DAYS, LadderRung, ladder
 from algotrade.services.read.events.reference import FundReference
@@ -39,8 +45,9 @@ class InstrumentEvents:
     """What is coming for ``instrument_id`` as of ``session``: the events of the next ``days``
     calendar days (oldest first), the filings of the last ``months`` (newest first), the expiry
     ladder (7 to 90 days, its spans over every event ahead through its last rung), the fund's
-    reference (None: not a leveraged or inverse fund, or not known: see ``gaps``) and the parts
-    not known for the session (``gaps``)."""
+    reference (None: not a leveraged or inverse fund, or not known: see ``gaps``), the parts
+    not known for the session (``gaps``) and the dossier's undated watch items still open
+    (``watch``; its dated occurrences are in ``ahead``)."""
 
     instrument_id: str
     session: date
@@ -51,6 +58,7 @@ class InstrumentEvents:
     ladder: tuple[LadderRung, ...]
     reference: FundReference | None
     gaps: tuple[EventGap, ...]
+    watch: tuple[WatchItem, ...] = ()
 
 
 def _no_chain(ctx: ReadContext, underlying_id: str) -> Unknown:
@@ -106,5 +114,6 @@ def load_instrument_events(
             ladder=ladder(chain.expiries, events) if chain is not None else (),
             reference=ahead.references.get(iid),
             gaps=tuple(gaps),
+            watch=ahead.watch[iid],
         )
     return out

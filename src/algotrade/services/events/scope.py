@@ -4,7 +4,10 @@
 
 - ``tier``: the names whose ``option_liquidity@v1`` row on the newest stored session on or
   before the asked one has ``short_put_ok`` (put tier A or B: the short-put names);
-- ``list``: the symbols of the site list ``config/site/events/scope.toml``;
+- ``list``: the symbols of the effective list: the site list ``config/site/events/scope.toml``
+  plus the admin's additions minus the admin's removals (``config/admin/events/scope.toml``,
+  ADR 0029 amendment 2026-11-03; ``effective_list``). A removal drops only this reason: a name
+  still in a tier keeps its ``tier`` reason, and nothing stored is deleted;
 - ``requested``: symbols the caller adds (the ``--symbols`` of a task), treated like the list;
 - ``reference``: the stock a scoped leveraged or inverse fund tracks
   (``fund_reference@v1.reference_instrument_id`` of the newest stored session on or before the
@@ -20,7 +23,7 @@ from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from datetime import date
 
-from algotrade.config.site.events.scope import Documents, load_event_scope
+from algotrade.config.site.events.scope import Documents, effective_list
 from algotrade.core.model.fields import rollup_table
 from algotrade.data import StoreReader
 from algotrade.data.reference import resolver
@@ -122,7 +125,7 @@ def scoped_instruments(
     unknown = sorted(set(reasons) - set(REASONS))
     if unknown:
         raise ValueError(f"unknown scope reasons {unknown}: expected a subset of {list(REASONS)}")
-    listed = load_event_scope(configs).symbols if configs is not None and LIST in reasons else ()
+    listed = effective_list(configs).symbols if configs is not None and LIST in reasons else ()
     found: dict[str, list[str]] = {}  # instrument id -> reasons, in order of first appearance
 
     def add(instrument_id: str, reason: str) -> None:

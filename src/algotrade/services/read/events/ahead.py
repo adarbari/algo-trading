@@ -11,12 +11,17 @@ end date, each an ``AheadEvent`` with its label, time, source and ``known_from``
   (``known_from``, ADR 0050 decision 3) still ``scheduled`` in their latest version known by it
   (a ``released`` row is behind us; a ``moved`` row is a date FRED no longer lists, its new
   date being a row of its own);
+- ``factor``: the dated occurrences of the name's deep-dive dossier (``data.dossier``, EV5: the
+  latest import run known by the session, ``known_from <= S``; a retired factor's dates are not
+  shown) on or after the session; its undated watch windows still open are ``WatchItem`` rows
+  of their own, never events;
 - ``market_structure``: the monthly and quarterly option expiries, quarter ends and the Russell
   reconstitution, by rule (``market_days``).
 
 Catalogue values carry no ``known_from`` (the session's value is what the session knew); a
-rule-based day has none either. What could not be read is a gap (``EventGap``: the part and
-its UNKNOWN), never an empty list passed off as "nothing ahead"."""
+rule-based day has none either. The dossier's rows carry the import's session. What could not be
+read is a gap (``EventGap``: the part and its UNKNOWN), never an empty list passed off as
+"nothing ahead"."""
 
 import datetime as dt
 from collections.abc import Sequence
@@ -26,6 +31,7 @@ from datetime import date
 import pandas as pd
 
 from algotrade.config.site.events.links import load_event_links
+from algotrade.data.dossier.reading import RETIRED, Dossier, dossiers_as_of
 from algotrade.data.events import ALL_TIME, known_from, read_events
 from algotrade.services.read.availability.cause import table_cause
 from algotrade.services.read.context import ReadContext
@@ -37,14 +43,18 @@ from algotrade.services.read.instruments.identity import load_instruments
 from algotrade.services.read.values import Unknown, UnknownCode
 
 OWN_EARNINGS, REFERENCE_EARNINGS = "own_earnings", "reference_earnings"
+FACTOR = "factor"
 MACRO_RELEASE, MARKET_STRUCTURE = "macro_release", "market_structure"
-KINDS = (OWN_EARNINGS, REFERENCE_EARNINGS, MACRO_RELEASE, MARKET_STRUCTURE)
+KINDS = (OWN_EARNINGS, REFERENCE_EARNINGS, FACTOR, MACRO_RELEASE, MARKET_STRUCTURE)
 REFERENCE = "reference"  # the gap part of a fund whose reference is not known
 NEXT_DATE = "rollup.earnings@v1.next_earnings_date"
 EARNINGS_TIME = "rollup.earnings@v1.earnings_time"
 CONFIRMED = "rollup.earnings@v1.date_confirmed"
 EARNINGS = (NEXT_DATE, EARNINGS_TIME, CONFIRMED)
 MACRO_TABLE = "events/macro_release"
+FACTOR_TABLE = "events/factor_occurrence"
+DOSSIER_SOURCE = "dossier"  # the source of a factor event: the owner-reviewed deep dive
+UNDATED = "unknown"  # the time of a factor event: a dossier dates a day, not an hour
 SCHEDULED = "scheduled"
 # earnings@v1.earnings_time -> the event's time (the 8-K rows' intraday passes through).
 TIMES = {"pre": "pre_market", "post": "after_hours", "intraday": "intraday"}
@@ -77,13 +87,29 @@ class AheadEvent:
     known_from: dt.date | None
     expiry: bool = False
     source_url: str | None = None
+    factor_id: str | None = None
+    factor_kind: str | None = None
+
+
+@dataclass(frozen=True)
+class WatchItem:
+    """An undated item of a dossier factor: it is expected in ``expected_from..expected_to`` (not
+    over before the session); ``known_from`` the import's session."""
+
+    instrument_id: str
+    factor_id: str
+    factor_kind: str
+    label: str
+    expected_from: date
+    expected_to: date
+    known_from: date
 
 
 @dataclass(frozen=True)
 class EventGap:
     """A part of the events read that is not known for the session: ``part`` is the kind of
-    event (own_earnings, reference_earnings, macro_release), ``reference``, ``filings`` or
-    ``ladder``; ``instrument_id`` None for a market-wide part (the macro calendar)."""
+    event (own_earnings, reference_earnings, macro_release, factor), ``reference``, ``filings``
+    or ``ladder``; ``instrument_id`` None for a market-wide part (the macro calendar)."""
 
     instrument_id: str | None
     part: str
@@ -94,7 +120,8 @@ class EventGap:
 class Ahead:
     """What is ahead through ``end``: each name's own events (``own_earnings``,
     ``reference_earnings``), the market-wide ones (macro releases, market-structure days), the
-    funds' references, each name's gaps and the market-wide gaps (``instrument_id`` None)."""
+    funds' references, each name's gaps and the market-wide gaps (``instrument_id`` None), and each
+    name's open dossier watch items."""
 
     end: date
     by_name: dict[str, tuple[AheadEvent, ...]]
@@ -102,6 +129,7 @@ class Ahead:
     references: dict[str, FundReference]
     gaps: dict[str, tuple[EventGap, ...]]
     market_gaps: tuple[EventGap, ...]
+    watch: dict[str, tuple[WatchItem, ...]]
 
 
 def order(event: AheadEvent) -> tuple[date, int, str]:
@@ -140,7 +168,7 @@ def _earnings(
     )
 
 
-def _macro(ctx: ReadContext, end: date) -> tuple[tuple[AheadEvent, ...], Unknown | None]:
+def macro_releases(ctx: ReadContext, end: date) -> tuple[tuple[AheadEvent, ...], Unknown | None]:
     """The scheduled macro releases of ``session..end`` known by the session; UNKNOWN when
     the calendar has nothing known by the session at all (NO_PARTITION), or no scheduled
     release dated on or after the session (NO_ROW: the calendar is not current)."""
@@ -179,6 +207,53 @@ def _macro(ctx: ReadContext, end: date) -> tuple[tuple[AheadEvent, ...], Unknown
     return events, None
 
 
+def _factor_events(
+    dossier: Dossier, start: date, end: date
+) -> tuple[list[AheadEvent], list[WatchItem]]:
+    """The dated occurrences in ``start..end`` and the watch windows still open at ``end`` of the
+    active factors of one dossier (a past date is behind us; a retired factor is not a driver)."""
+    kinds = {f.factor_id: f.kind for f in dossier.factors if f.status != RETIRED}
+    events = [
+        AheadEvent(
+            date=o.date,
+            time=UNDATED,
+            kind=FACTOR,
+            label=o.label,
+            name=f"{o.label} ({kinds[o.factor_id]}: {o.factor_id})",
+            subject_id=dossier.instrument_id,
+            source=DOSSIER_SOURCE,
+            known_from=dossier.known_from,
+            factor_id=o.factor_id,
+            factor_kind=kinds[o.factor_id],
+        )
+        for o in dossier.occurrences
+        if o.factor_id in kinds and start <= o.date <= end
+    ]
+    watch = [
+        WatchItem(
+            dossier.instrument_id,
+            w.factor_id,
+            kinds[w.factor_id],
+            w.label,
+            w.expected_from,
+            w.expected_to,
+            dossier.known_from,
+        )
+        for w in dossier.watch
+        if w.factor_id in kinds and start <= w.expected_to and w.expected_from <= end
+    ]
+    return events, watch
+
+
+def _dossier_gap(ctx: ReadContext) -> EventGap:
+    """No dossier row is known by the session: none was imported by then (NO_PARTITION)."""
+    day = ctx.session.date
+    message = f"no deep-dive dossier is known by the session {day.isoformat()}"
+    code = UnknownCode.NO_PARTITION
+    cause = table_cause(FACTOR_TABLE, message, code.value, day)
+    return EventGap(None, FACTOR, Unknown(code, cause, None, ctx.kind_of(code, FACTOR_TABLE)))
+
+
 def _market(day: MarketDay) -> AheadEvent:
     return AheadEvent(
         day.date, CLOSE, MARKET_STRUCTURE, day.label, day.name, None, RULE, None, day.expiry
@@ -211,7 +286,17 @@ def load_ahead(ctx: ReadContext, instrument_ids: Sequence[str], end: date) -> Ah
             by_name[iid].append(found)
         elif isinstance(found, Unknown):
             gaps[iid].append(EventGap(iid, kind, found))
-    macro, macro_gap = _macro(ctx, end)
+    macro, macro_gap = macro_releases(ctx, end)
+    dossiers = dossiers_as_of(ctx.reader, start, ids)
+    watch: dict[str, tuple[WatchItem, ...]] = {}
+    for iid in ids:
+        events, items = (
+            _factor_events(dossiers.dossiers[iid], start, end)
+            if iid in dossiers.dossiers
+            else ([], [])
+        )
+        by_name[iid].extend(events)
+        watch[iid] = tuple(items)
     rules = (_market(d) for d in market_days(start, end))
     market = tuple(sorted((*macro, *rules), key=order))
     return Ahead(
@@ -220,5 +305,9 @@ def load_ahead(ctx: ReadContext, instrument_ids: Sequence[str], end: date) -> Ah
         market=market,
         references=references,
         gaps={iid: tuple(found) for iid, found in gaps.items()},
-        market_gaps=(EventGap(None, MACRO_RELEASE, macro_gap),) if macro_gap else (),
+        market_gaps=(
+            *((EventGap(None, MACRO_RELEASE, macro_gap),) if macro_gap else ()),
+            *(() if dossiers.known else (_dossier_gap(ctx),)),
+        ),
+        watch=watch,
     )

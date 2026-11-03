@@ -92,7 +92,7 @@ def _repo(tmp_path: Path) -> Path:
     _git(repo, "init", "-q", "-b", "main")
     _git(repo, "remote", "add", "origin", str(origin))
     (repo / ".gitignore").write_text(
-        "*.local.toml\n/var\nvar/\n/config/users\n.env\n.env.local\n.env.*.local\n"
+        "*.local.toml\n/var\nvar/\n/config/users\n/config/admin\n.env\n.env.local\n.env.*.local\n"
     )
     (repo / "a.txt").write_text("a\n")
     _git(repo, "add", ".")
@@ -467,7 +467,7 @@ def test_the_release_tree_is_clean_and_the_overlay_links_stay_out_of_git_status(
     assert site.run("--auto").returncode == 0
     assert _git(site.tree, "status", "--porcelain") == ""  # untracked and ignored: nothing at all
     assert _git(site.tree, "status", "--porcelain", "-uno") == ""
-    for name in ("var", ".env", "config/users", "config/site/llm.local.toml"):
+    for name in ("var", ".env", "config/users", "config/admin", "config/site/llm.local.toml"):
         assert (site.tree / name).is_symlink(), name
     assert (site.tree / "var").resolve() == (site.repo / "var").resolve()
     assert site.run("--auto").returncode == 0  # the links are checked each cycle, not recreated

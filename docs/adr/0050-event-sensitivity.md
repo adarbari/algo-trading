@@ -256,3 +256,31 @@ with `status = retired`. `instruments/factors` is a `reference`-grain merge tabl
 (highest source wins on read; the key includes `known_from`, so an earlier review survives a later import). All rows are `known_from` the import session, never the reaction
 session or the review date. Chosen by the implementing session; the first import on the scope list is
 the owner's run.
+
+## Amendment 2026-11-03: the dossier on the forward calendar and the admin's scope list (EV8a)
+
+- **Forward calendar.** The dossier's dated occurrences join `ahead.load_ahead` as `factor` events
+  (`label` the occurrence's, `factor_id` / `factor_kind`, `source = dossier`, `known_from` the
+  import's session), so `InstrumentEvents` and `EventCalendar` show them; only the active
+  factors' dates on or after the session count (a past instance and a retired factor's date are not
+  ahead), and a `factor` event spans an expiry like an earnings or macro event (it is not
+  market-structure). The undated watch windows still open are a separate `watch` list of both
+  objects, never events. The read is `data/dossier` (`dossiers_as_of`): per instrument the rows of
+  the latest import run known by the session. A session where no dossier row is known at all is a
+  market-wide `factor` gap (NO_PARTITION); a name without a dossier in a populated table is not a gap.
+- **Scope list.** The effective list is the site names plus the admin's additions minus its removals
+  (`config/admin/events/scope.toml`, ADR 0029 amendment 2026-11-03), layered once in
+  `config/site/events/scope.py` (`effective_list`; the use-case packages `services.events` and
+  `services.authoring` may not import each other, so the config layer owns the layering and both
+  call it). A removal drops only the `list` reason, never `tier`, and deletes no stored data. The
+  Admin screen's read is `Query.eventScope` (admin only): per listed name its reasons, the source of
+  its list entry, the last dossier review known by the session (stale after 90 days or never),
+  and the share of its 20 largest moves of the last 252 sessions that have an attribution known by
+  the session (any source; null under a year of bars), with the admin's removals, the unresolved
+  symbols and the macro calendar's next 90 days count.
+- **The attributed share is an admin coverage view, not a catalogue fact.** `moves` of
+  `Query.eventScope` (the share of a name's 20 largest moves with an attribution) is computed at read
+  time from `bars/1d` and `events/attribution`, an exception to ADR 0038 ("per-instrument stored values
+  are catalogue features") because it is an admin-only operational figure about our own coverage, not a
+  fact about the stock. It lives only in the admin-only `ops` GraphQL type and in no trader-visible type
+  or feature; a trader-facing attribution figure would be a feature first.

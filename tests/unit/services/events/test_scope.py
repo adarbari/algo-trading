@@ -2,7 +2,7 @@
 with its reasons; symbols resolve through the reference snapshot and the ones it does not know
 are reported."""
 
-from datetime import date
+from datetime import UTC, date, datetime
 
 import pytest
 
@@ -109,3 +109,33 @@ def test_a_subset_of_reasons_leaves_the_rest_out() -> None:
     assert reasons(listed) == {"AAA": ("requested",), "ZZZ": ("requested",)}  # the list is out
     with pytest.raises(ValueError, match="unknown scope reasons"):
         scoped_instruments(reader, configs, D3, reasons=("tiers",))
+
+
+ADMIN_AT = datetime(2026, 11, 3, 9, 30, tzinfo=UTC)
+
+
+def admin_doc(added: tuple[str, ...] = (), removed: tuple[str, ...] = ()) -> dict:
+    def rows(symbols: tuple[str, ...]) -> list[dict]:
+        return [{"symbol": s, "by": "arvinder", "at": ADMIN_AT, "note": "why"} for s in symbols]
+
+    return {"added": rows(added), "removed": rows(removed)}
+
+
+def test_a_removal_drops_only_the_list_reason() -> None:
+    """AAA is a short-put name and in the site list: removed from the list it stays in scope by
+    its tier; TSLL (list only) leaves; an added name arrives with the list reason."""
+    reader, _ = world(tiers={D2: {"AAA": True}})
+    configs = MemoryConfigStore(
+        {**LIST, ("admin", "events", "scope"): admin_doc(("CCC",), ("AAA", "TSLL"))}
+    )
+    found = scoped_instruments(reader, configs, D3)
+    assert reasons(found) == {"AAA": ("tier",), "CCC": ("list",)}
+    assert found.unresolved == ("NOPE",)
+
+
+def test_no_admin_document_changes_nothing() -> None:
+    reader, configs = world()
+    assert reasons(scoped_instruments(reader, configs, D3, reasons=("list",))) == {
+        "TSLL": ("list",),
+        "AAA": ("list",),
+    }

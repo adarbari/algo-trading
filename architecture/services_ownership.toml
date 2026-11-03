@@ -166,15 +166,17 @@ detect = [{ call = "evaluate_time_series" }, { call = "evaluate_sleeve" }, { cal
 
 [[responsibility]]
 id = "event-scope"
-description = "Which names the event-sensitivity study covers (ADR 0050 decision 2) as of a session: the tier A / B short-put names (option_liquidity@v1.short_put_ok), the site list config/site/events/scope.toml and the stocks the scoped leveraged funds track (fund_reference@v1), each with its reason; list symbols become ids only through SymbolResolver of the session's reference snapshot and the unknown ones are returned, never dropped or built; tasks call scoped_instruments and never load the scope list themselves"
+description = "Which names the event-sensitivity study covers (ADR 0050 decision 2) as of a session: the tier A / B short-put names (option_liquidity@v1.short_put_ok), the site list config/site/events/scope.toml and the stocks the scoped leveraged funds track (fund_reference@v1), each with its reason; list symbols become ids only through SymbolResolver of the session's reference snapshot and the unknown ones are returned, never dropped or built; the list is the effective one: the site file plus the admin's additions minus removals (config/admin/events/scope.toml, layered once in config/site/events/scope.py effective_list; ADR 0029 amendment 2026-11-03); tasks call scoped_instruments and never load the scope list themselves"
 owner = ["src/algotrade/services/events/*"]
 allowed = [
-    "src/algotrade/config/site/events/scope.py",  # the typed loader of the list's file (ADR 0050); the owner is its one caller
+    "src/algotrade/config/site/events/scope.py",  # the typed loader of the list's file and of the admin's changes, and their one layering (ADR 0050; the owner is its caller)
+    "src/algotrade/services/authoring/event_scope.py",  # the admin write reads the same layered list to stay idempotent (use-case packages may not import each other)
+    "src/algotrade/services/read/event_scope/event_scope.py",  # the Admin screen's read of the list: source of each entry, its removals
     "src/algotrade/features/rollups/options/option_liquidity.py",  # declares short_put_ok
     "src/algotrade/services/screening/exports.py",  # the export's column of the flag
 ]
 section = "docs/adr/0050-event-sensitivity.md#decision"
-detect = [{ call = "load_event_scope" }, { string = "fund_reference@v1" }, { string = "short_put_ok" }]
+detect = [{ call = "load_event_scope" }, { call = "effective_list" }, { string = "fund_reference@v1" }, { string = "short_put_ok" }]
 
 [[responsibility]]
 id = "feedback-retention"

@@ -12,6 +12,7 @@ from fastapi import APIRouter
 
 from algotrade_api.routes import chains, health, jobs
 from algotrade_api.routes.authoring import edges as edge_writes
+from algotrade_api.routes.authoring import event_scope as event_scope_writes
 from algotrade_api.routes.authoring import preferences, screeners, user_features
 from algotrade_api.routes.authoring import users as user_onboarding
 from algotrade_api.routes.drafting import screeners as screen_drafting
@@ -42,4 +43,5 @@ ROUTERS: tuple[APIRouter, ...] = (
     preferences.router,
     edge_writes.router,
     user_onboarding.router,
+    event_scope_writes.router,
 )

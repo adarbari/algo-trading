@@ -3426,6 +3426,44 @@
         "title": "SavedFeature",
         "type": "object"
       },
+      "ScopeChange": {
+        "properties": {
+          "changed": {
+            "description": "the change was recorded; false: the list already was as asked (a repeat)",
+            "title": "Changed",
+            "type": "boolean"
+          },
+          "listed": {
+            "description": "the symbol is on the effective scope list now",
+            "title": "Listed",
+            "type": "boolean"
+          },
+          "symbol": {
+            "description": "the ticker as stored (upper case)",
+            "title": "Symbol",
+            "type": "string"
+          }
+        },
+        "required": [
+          "symbol",
+          "listed",
+          "changed"
+        ],
+        "title": "ScopeChange",
+        "type": "object"
+      },
+      "ScopeNameBody": {
+        "properties": {
+          "note": {
+            "default": "",
+            "description": "why the name is added (optional, at most 200 characters)",
+            "title": "Note",
+            "type": "string"
+          }
+        },
+        "title": "ScopeNameBody",
+        "type": "object"
+      },
       "ScreenDraft": {
         "properties": {
           "document": {
@@ -4150,6 +4188,117 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/admin/events/scope/{symbol}": {
+      "delete": {
+        "operationId": "remove_name_admin_events_scope__symbol__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "symbol",
+            "required": true,
+            "schema": {
+              "title": "Symbol",
+              "type": "string"
+            }
+          },
+          {
+            "description": "why it is removed (optional)",
+            "in": "query",
+            "name": "note",
+            "required": false,
+            "schema": {
+              "default": "",
+              "description": "why it is removed (optional)",
+              "title": "Note",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScopeChange"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Name",
+        "tags": [
+          "admin"
+        ]
+      },
+      "put": {
+        "operationId": "add_name_admin_events_scope__symbol__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "symbol",
+            "required": true,
+            "schema": {
+              "title": "Symbol",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ScopeNameBody"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScopeChange"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Name",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/chains/{underlying_id}/live": {
       "get": {
         "description": "Live quotes from IB Gateway (read-only, cached briefly); the stored delayed chain with\na status when the gateway cannot answer. Each live answer is recorded (``live/*``).",

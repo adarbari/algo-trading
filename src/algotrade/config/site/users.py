@@ -32,6 +32,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
+from algotrade.config.site.events.scope import ADMIN_SCOPE
 from algotrade.config.site.fields import Table
 from algotrade.config.site.macro import HELD_LICENCES
 from algotrade.config.user import DEFAULT_USER, SITE_USER, validate_id
@@ -71,6 +72,10 @@ class UserRecord:
 
     def __post_init__(self) -> None:
         validate_id("user", self.user_id)
+        if self.user_id == ADMIN_SCOPE:
+            raise ConfigurationError(
+                f"user '{ADMIN_SCOPE}': a reserved config scope, not a user id"
+            )
         unknown = sorted(set(self.licences) - set(HELD_LICENCES))
         if unknown:
             raise ConfigurationError(f"user '{self.user_id}' licences: unknown {unknown}")

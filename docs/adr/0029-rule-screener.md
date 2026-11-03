@@ -188,3 +188,15 @@ the screener object (not read from the Guide at request time), for presets and u
   a draft or preview one. Versions are immutable, so editing a sentence finalises version N+1 with
   the same hash. Duplicating a preset seeds the draft with the preset's description as a starting
   point; a rebase keeps the user's.
+
+## Amendment 2026-11-03: an `admin` config scope (EV8)
+
+A third config scope, `admin`, beside `site` and a user id: reserved (never a user id: the writer
+and onboarding refuse it), git-ignored (`config/admin/`, on the Mac only; `docs/hosting.md` backs
+it up with `config/users/`), limited to the `events` kind: the one document
+`config/admin/events/scope.toml` (`[[added]]` / `[[removed]]`, each a `symbol`, `by`, `at` in UTC
+and a `note`), the admin's changes to the site's event-study scope list. `FileConfigStore` /
+`MemoryConfigStore` read it (`load("admin", "events", "scope")`); `ConfigWriter.save_admin_document`
+replaces it atomically; only `services/authoring/event_scope.py` calls it, under the admin role, for a
+symbol spelled as the site loader requires and resolvable through the session's reference snapshot
+(a removal needs only the spelling). Site presets still change only by PR. Decision log 2026-11-03.

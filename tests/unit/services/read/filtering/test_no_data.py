@@ -22,7 +22,7 @@ from tests.unit.services.read.screens.conftest import D1, IDEAS_FILTERS, context
 
 USERS = {
     "user": [
-        {"id": "admin", "role": "admin"},
+        {"id": "boss", "role": "admin"},
         {"id": "bare", "role": "trader"},
         {"id": "full", "role": "trader", "licences": ["personal", "yahoo"]},
     ]

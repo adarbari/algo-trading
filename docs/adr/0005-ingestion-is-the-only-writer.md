@@ -46,3 +46,10 @@ ingestion is, beside the API, a writer of `usage/llm_calls`: the same recorder, 
 "attributing"`, the site user, the run's id. It writes nothing else of the model's (no cache, no
 draft). Decided on the owner's behalf by a Fable agent; pending owner confirmation
 ([decisions log](../decisions/log.md)).
+
+## Amendment 2026-11-03: the admin's event-scope document (EV8)
+
+The API's write list gains one document: `config/admin/events/scope.toml`, written by an admin
+through `services/authoring` (`PUT` / `DELETE /admin/events/scope/{symbol}`; ADR 0029 amendment
+2026-11-03). It is configuration, not market data: ingestion still writes every market and feature
+table, and an added name's data is fetched by the next nightly's own budgeted fill.

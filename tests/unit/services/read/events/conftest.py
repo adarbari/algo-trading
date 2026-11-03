@@ -3,7 +3,9 @@ with bars): a stock (AAA, optionable), a leveraged fund tracking it (AAAU) and a
 (ETFX) in the reference snapshot of D0; ``earnings@v1`` and ``fund_reference@v1`` partitions
 for D0 (older, never shown for D1) and D1; the macro calendar with a release known before D1,
 one learned after it, one released and one moved; AAA's 8-Ks (one accepted after D1); an
-option chain of AAA for D1 only. ``store_with(*writes)`` adds more."""
+option chain of AAA for D1 only; a dossier of an unlisted name (so the dossier tables are "known"
+and a name without one is no gap). ``store_with(*writes)`` adds more (``dossier_write``: a
+dossier of AAA)."""
 
 from collections.abc import Callable
 from datetime import UTC, date, datetime, time
@@ -110,11 +112,50 @@ def _chain(writer: StoreWriter) -> None:
     write_chains(writer, D1, rows, {"EQ:AAA": 100.0})
 
 
+def _other_dossier(writer: StoreWriter) -> None:
+    write_dossier(writer, D0, "dossier-other", [factor_row("peer", "EQ:ZZZ", D0)], [])
+
+
+def factor_row(
+    factor_id: str, instrument_id: str, known: date, status: str = "active", kind: str = "commodity"
+) -> dict[str, object]:
+    return {"instrument_id": instrument_id, "factor_id": factor_id, "known_from": known,
+            "kind": kind, "status": status, "description": f"why {factor_id} moves it",
+            "reviewed_on": known}  # fmt: skip
+
+
+def occurrence_row(
+    factor_id: str,
+    day: date,
+    known: date,
+    label: str = "SK Hynix results",
+    last: date | None = None,
+) -> dict[str, object]:
+    return {"instrument_id": "EQ:AAA", "ts": pd.Timestamp(day, tz="UTC"), "known_from": known,
+            "factor_id": factor_id, "label": label,
+            "date_kind": "window" if last else "dated", "window_end": last}  # fmt: skip
+
+
+def write_dossier(
+    writer: StoreWriter,
+    stored: date,
+    run: str,
+    factors: list[dict[str, object]],
+    occurrences: list[dict[str, object]],
+) -> None:
+    """One import run (known from the end of ``stored``): its factors and its dates."""
+    knowledge = datetime.combine(stored, time(23), UTC)
+    writer.write_table("instruments/factors", stored, run, stamped(factors, stored, run, knowledge))
+    if occurrences:
+        table = "events/factor_occurrence"
+        writer.write_table(table, stored, run, stamped(occurrences, stored, run, knowledge))
+
+
 def store_with(*writes: Callable[[StoreWriter], None]) -> StoreReader:
     """This store plus what each of ``writes`` writes."""
     backend = MemoryBackend()
     writer = StoreWriter(backend)
-    for write in (_reference, _rollups, _macro, _filings, _chain, *writes):
+    for write in (_reference, _rollups, _macro, _filings, _chain, _other_dossier, *writes):
         write(writer)
     return StoreReader(backend)
 

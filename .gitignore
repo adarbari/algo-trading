@@ -231,6 +231,10 @@ datasets/golden/store/
 /config/users
 config/users/
 
+# the admin scope: the admin's changes to the event scope list (ADR 0029 amendment 2026-11-03)
+/config/admin
+config/admin/
+
 # per-worktree PYTHONPATH written by scripts/worktree.sh
 worktree.env
 

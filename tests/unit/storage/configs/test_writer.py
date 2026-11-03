@@ -117,7 +117,7 @@ def test_user_documents_have_a_user_a_known_kind_and_a_strict_id(
         writer.save_user_document(user, kind, name, {})
 
 
-@pytest.mark.parametrize("user", ["site", "../x", "Alice", "a/b", "a\n", ""])
+@pytest.mark.parametrize("user", ["site", "admin", "../x", "Alice", "a/b", "a\n", ""])
 def test_writes_are_user_scoped_with_strict_ids(writer: Any, user: str) -> None:
     with pytest.raises(ConfigurationError):
         writer.save_draft(user, "mine", DOC)
@@ -222,3 +222,46 @@ def test_an_exclusive_identity_write_never_replaces_one(writer: Any) -> None:
     with pytest.raises(FileExistsError):
         writer.save_identity("alice", {"email": "b@example.com"}, exclusive=True)
     assert writer.load("alice", "identity", "identity") == {"email": "a@example.com"}
+
+
+def test_the_admin_document_is_replaced_whole_and_read_back(writer: Any) -> None:
+    doc = {"added": [{"symbol": "MU", "by": "arvinder", "at": datetime(2026, 11, 3, tzinfo=UTC)}]}
+    writer.save_admin_document("events", "scope", doc)
+    assert writer.load("admin", "events", "scope") == doc
+    writer.save_admin_document("events", "scope", {})
+    assert writer.load("admin", "events", "scope") in ({}, None)
+    assert writer.names("admin", "events") in (["scope"], [])
+    assert writer.users() == []  # the admin scope is no user
+
+
+@pytest.mark.parametrize(
+    ("kind", "name"), [("screeners", "x"), ("features", "x"), ("events", "../x")]
+)
+def test_the_admin_scope_holds_only_events_with_a_strict_id(
+    writer: Any, kind: str, name: str
+) -> None:
+    with pytest.raises(ConfigurationError):
+        writer.save_admin_document(kind, name, {})
+
+
+def test_the_admin_scope_reads_nothing_but_its_kind(writer: Any) -> None:
+    writer.save_admin_document("events", "scope", {"removed": []})
+    assert writer.load("admin", "regime", "cards") is None
+    assert writer.load("admin", "settings", "users") is None
+    assert writer.names("admin", "settings") == []
+
+
+def test_the_file_admin_document_lives_under_config_admin(tmp_path: Path) -> None:
+    FileConfigWriter(tmp_path).save_admin_document("events", "scope", {"removed": []})
+    assert (tmp_path / "admin" / "events" / "scope.toml").is_file()
+    assert not (tmp_path / "site").exists() and not (tmp_path / "users").exists()
+    assert [p.name for p in (tmp_path / "admin" / "events").iterdir()] == ["scope.toml"]  # no temp
+
+
+def test_an_admin_write_moves_the_admin_generation_and_no_users(writer: Any) -> None:
+    assert writer.generation("admin") == 0
+    writer.save_admin_document("events", "scope", {"removed": []})
+    assert writer.generation("admin") == 2  # odd while writing, even after
+    writer.save_admin_document("events", "scope", {})
+    assert writer.generation("admin") == 4
+    assert writer.generation("alice") == 0
