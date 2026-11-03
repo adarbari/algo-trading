@@ -349,7 +349,12 @@ def create_app(
     users = load_users(app.state.store.configs)
     app.state.users = users
     if authenticator is None:
-        authenticator = open_authenticator(settings.auth, users, settings.user)
+        authenticator = open_authenticator(
+            settings.auth,
+            users,
+            settings.user,
+            current=lambda: app.state.users,  # ID5
+        )
     app.state.authenticator = authenticator
     text_model_off = TEXT_MODEL_OFF
     if text_model is None and settings.live:

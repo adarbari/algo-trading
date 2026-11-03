@@ -887,7 +887,7 @@ export type TraderPreferencesQuery = { traderPreferences: { defaultTab: string |
 export type UserRegistryQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type UserRegistryQuery = { userRegistry: { people: Array<{ id: string, name: string, role: string, licences: Array<string>, scheduled: boolean }> } | null };
+export type UserRegistryQuery = { userRegistry: { people: Array<{ id: string, name: string, role: string, licences: Array<string>, scheduled: boolean, pendingProvider: boolean }> } | null };
 
 export type VerificationQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -5381,6 +5381,7 @@ export const UserRegistryDocument = new TypedDocumentString(`
       role
       licences
       scheduled
+      pendingProvider
     }
   }
 }

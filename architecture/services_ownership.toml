@@ -468,6 +468,13 @@ section = "docs/adr/0088-setups-as-positions-and-rules.md#decision"
 detect = [{ call = "trade_frame" }, { call = "series_trades" }, { call = "book_trades" }, { call = "capital_basis_of" }, { call = "tail_measures" }]
 
 [[responsibility]]
+id = "user-onboarding"
+description = "Onboard a trader (ID5, ADR 0040, decision log 2026-11-02): the admin-only write of a new user's config/users/<id>/identity.toml (email, name, declared_by, declared_at in UTC) through the ConfigWriter, refusing an invalid id, `site`, an id or an email the registry already holds and any caller who is not an admin; the role is always trader, no licences (admin and licences change by PR to users.toml); no identity-provider call, the result carries the one remaining provider step as data (services/authoring/onboarding.py)"
+owner = ["src/algotrade/services/authoring/onboarding.py"]
+section = "docs/adr/0040-identity-and-roles.md#decision"
+detect = [{ call = "save_identity" }]
+
+[[responsibility]]
 id = "virtual-feature-reads"
 description = "Read expression features on read (selections, FeatureView, series): load only the stored columns their formulas need (data.rollups.feature_rows, column-pruned) and evaluate them through the FeatureSet"
 owner = ["src/algotrade/services/features.py", "src/algotrade/data/rollups.py"]
