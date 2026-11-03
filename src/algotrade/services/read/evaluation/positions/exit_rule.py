@@ -51,6 +51,7 @@ from algotrade.config.edges.positions.spec import (
     PositionSpec,
     exits_digest,
 )
+from algotrade.config.edges.schedules.events import entry_delay
 from algotrade.config.site.settings import site_document
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import next_session, sessions_to
@@ -285,7 +286,8 @@ def _from_option(
     winners' ``max_adverse``, UNKNOWN below ``min_winners`` (the module docstring). An UNKNOWN
     rule publishes no declared exit, only the hold (as a share setup's keeps its hold)."""
     assert outcome.position is not None  # declared_outcome returns only an outcome with one
-    hold = _option_hold(ctx, outcome.start_offset_sessions, summary.basis_horizon or 0, expiry)
+    delay = entry_delay(edge.schedule, outcome.start_offset_sessions)
+    hold = _option_hold(ctx, delay, summary.basis_horizon or 0, expiry)
     base = ExitRule(edge.id, None, hold, expiry=expiry)
     if hold is None:
         why = f"the expiry {expiry} is not after the entry session"

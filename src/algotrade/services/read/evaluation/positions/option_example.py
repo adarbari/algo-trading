@@ -30,6 +30,7 @@ import pandas as pd
 
 from algotrade.config.edges.document import Outcome
 from algotrade.config.edges.positions.templates import SHARES
+from algotrade.config.edges.schedules.events import entry_delay
 from algotrade.core.time.calendar import is_session, next_session, session_on_or_before
 from algotrade.engines.structures.trades import collateral_of
 from algotrade.features.rollups.options.wing_search import LegSelection, select_legs
@@ -183,7 +184,7 @@ def _one(
     if spot is None:
         why = f"no underlying price captured with the chain at {day}"
         return _none(edge, underlying, day, UnknownCode.NO_ROW, why)
-    entry = _advance(day, outcome.start_offset_sessions)
+    entry = _advance(day, entry_delay(edge.schedule, outcome.start_offset_sessions))
     picked = select_legs(
         quotes, spec.legs, spot, day, int(outcome.tenor_days or 0), spec.expiry_cycle,
         not_before=_advance(entry, cap),

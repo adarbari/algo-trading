@@ -35,6 +35,7 @@ from enum import StrEnum
 
 from algotrade.config.edges.portfolio import PORTFOLIO_KIND
 from algotrade.config.edges.positions.exit_rule import ExitRuleSettings
+from algotrade.config.edges.schedules.events import entry_delay
 from algotrade.config.site.settings import site_document
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import last_session_of_month, next_session
@@ -268,6 +269,7 @@ def load_setup_examples(
     sides = {} if night is None else night.sides
     book = outcome.kind == PORTFOLIO_KIND
     picks = [PickInput(i, sides.get(i, LONG), book) for i in instrument_ids]
+    delay = entry_delay(edge.schedule, outcome.start_offset_sessions)
     return load_example_positions(
-        ctx, edge, picks, outcome.start_offset_sessions, entry_condition=outcome.entry is not None
+        ctx, edge, picks, delay, entry_condition=outcome.entry is not None
     )
