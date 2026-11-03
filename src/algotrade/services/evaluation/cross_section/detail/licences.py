@@ -142,7 +142,8 @@ def trial_licences(
     those of every screener of its grid, the strictest; a time-series or sleeve trial has no
     screener: ``configs`` empty); ``iv_licence``: its implied-vol field's (None: the outcome
     reads none); ``outcome``: that of the outcome rows joined; ``floor``: the least licence of the
-    rules (``fitted_floor``)."""
+    rules (``fitted_floor``; in an option edge's history slice also the splice's ``read_licence``:
+    a trial that read a chain group from the option-history root is personal)."""
     score = strictest(_of(features, screen_fields(c, edge)) for c in configs)
     universe_licence = _of(features, selection_fields(universe))
     rules = strictest((_of(features, rule_fields(edge)), floor))
