@@ -211,6 +211,18 @@ allowed_importers = [
     "algotrade_ingestion.tasks.options_history",
     "algotrade_ingestion.tasks.verification",
 ]
+# the splice is the one module the cross-section harness may import (F7, ADR 0088 decision 11)
+ignore_imports = ["algotrade.services.evaluation.cross_section.** -> algotrade.data.option_history.splice"]
+unmatched_ignore_imports_alerting = "none"  # the harness wiring of the splice is a later slice
+
+[[tool.importlinter.contracts]]
+name = "The history chain-group splice is read only by the cross-section harness and the task that computes the groups (ADR 0088 decision 11)"
+type = "protected"
+protected_modules = ["algotrade.data.option_history.splice"]
+allowed_importers = [
+    "algotrade.services.evaluation.cross_section",
+    "algotrade_ingestion.tasks.options_history",
+]
 
 [[tool.importlinter.contracts]]
 name = "Time-series evaluation reads outcomes only through its harness seam (ADR 0073)"

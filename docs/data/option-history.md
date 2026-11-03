@@ -94,6 +94,27 @@ which).
    the RMS is of roll-to-roll returns and reported only (`option-history-put-check` keeps the daily
    5 bp test).
 
+## Chain feature groups from the history (F7, ADR 0088 decision 11), after the outcomes
+
+The nine chain groups (`iv30`, `iv_history`, `implied_move`, `option_liquidity`, `iv_term`, `skew`,
+`nearest_expiry`, `put_wing`, `call_wing`) for the sessions before 2026-10-02, written to the
+**history root** under the same names (personal licence; read only through the splice,
+`data/option_history/splice.py`, by the cross-section harness). Same pure computes as the nightly,
+same runner; the chain tables of a history session are built from the history's quotes and the
+vendor's IV and delta are never fed in. The Treasury curve, dividend yield and earnings come from
+the main store (the same D8 coverage as the outcomes). One year first, then everything (resumable: a
+session with the group's partition stored is skipped, `--force` recomputes; it takes the history
+store's own lock, the nightly keeps running):
+
+```bash
+algotrade-ingest run option-history-features --from 2008-01-02 --to 2008-12-31
+nohup algotrade-ingest run option-history-features --from 2002-01-02 --to 2026-10-01 > var/logs/option-history-features.log 2>&1 &
+```
+
+The run record lists, per group, sessions, rows, skipped, `no_input` sessions and seconds (estimated
+3-6 GB on the drive for all nine groups; measured on the first year). Single-name rows rest on the
+importer's as-of-session `underlying_id`; names that died have none until PR #968's listing history.
+
 ## First replication of Cboe's PUT index (the 2019-08 sample, measured 2026-10-25)
 
 One roll only: the sample holds 22 sessions (2019-08-01 to 08-30), so the put sold at the 2019-08-16

@@ -32,6 +32,9 @@ def chain_option_quotes(quotes: pd.DataFrame) -> pd.DataFrame:
         out[column] = kept[column] if column in kept.columns else np.nan
     for column in ("iv", "delta"):  # the vendor's, a cross-check only (ADR 0084 decision 4)
         out[column] = np.nan
+    for column in COMMON:  # the partition's own stamps (session, write instant, run)
+        if column in kept.columns:
+            out[column] = kept[column]
     return out.reset_index(drop=True)
 
 
@@ -50,6 +53,7 @@ def chain_underlying_quotes(
                     "symbol": have["symbol"],
                     "ts": pd.NaT,
                     "price": have["close"],
+                    **{c: have[c] for c in COMMON if c in have.columns},
                     **{c: have[c] for c in ("open", "high", "low", "close", "volume")},
                 }
             )
@@ -78,9 +82,30 @@ def chain_underlying_quotes(
             )
         )
     if not frames:
-        return pd.DataFrame(columns=list(UNDERLYING_COLUMNS))
+        return pd.DataFrame(columns=[*UNDERLYING_COLUMNS, *COMMON])
     both = pd.concat(frames, ignore_index=True).drop_duplicates("instrument_id", keep="first")
-    for column in UNDERLYING_COLUMNS:
+    if quotes is not None and not quotes.empty:  # the vendor's day has no time: the snapshot's
+        both["ts"] = both["ts"].fillna(quotes["ts"].min())
+    for column in (*UNDERLYING_COLUMNS, *COMMON):
         if column not in both.columns:
             both[column] = np.nan
-    return both[list(UNDERLYING_COLUMNS)].reset_index(drop=True)
+    return both[[*UNDERLYING_COLUMNS, *COMMON]].reset_index(drop=True)
+
+
+def chain_status(quotes: pd.DataFrame) -> pd.DataFrame:
+    """The ``chains/status`` rows of a session: every underlying with quotes is ``OK`` (a history
+    has no feed to be stale or to fail), tier ``core``."""
+    named = quotes[quotes["underlying_id"].notna()]
+    first = named.drop_duplicates("underlying_id")
+    out = pd.DataFrame(
+        {
+            "instrument_id": first["underlying_id"].astype(str),
+            "symbol": first["symbol"],
+            "status": "OK",
+            "tier": "core",
+        }
+    )
+    for column in COMMON:
+        if column in first.columns:
+            out[column] = first[column]
+    return out.reset_index(drop=True)

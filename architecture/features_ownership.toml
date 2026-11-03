@@ -90,6 +90,9 @@ owner = [
     "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py",
     "apps/ingestion/algotrade_ingestion/tasks/derived/market_rollups.py",  # the market entity's task
 ]
+allowed = [
+    "apps/ingestion/algotrade_ingestion/tasks/options_history/features.py",  # the nine chain groups for the bought history, the same runner over the splice reader, stored in the history root (ADR 0088 decision 11, F7)
+]
 section = "docs/data/layers.md#rollups-as-built"
 detect = [{ call = "compute_sessions" }, { call = "compute_one" }, { call = "FeatureGroup" }]
 
