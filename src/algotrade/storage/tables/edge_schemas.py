@@ -306,7 +306,7 @@ EDGE_LEGS = fixed(
 # features); ``value_licence``, ``score_licence`` and ``adv_licence`` are the licences of those
 # columns (``value`` with ``gross_value``, ``reference`` and ``touch``): a reader redacts a
 # per-name value by them, never by column name (ADR 0064 decision 10). Kept 45 days, but for the
-# runs the purge spares (``runs.ledger_keep``).
+# runs the purge spares (``edge_ledger.keep.ledger_keep``).
 # ``exit_kind``, ``capital_basis``, ``return_on_capital`` (at the document's cost) and
 # ``price_source`` are the trade contract's columns, ``max_adverse`` its worst loss as a share of
 # capital (a share long: the window's dip, a short's null; an option's: the stored one), ADR 0088

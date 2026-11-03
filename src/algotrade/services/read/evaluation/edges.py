@@ -15,8 +15,10 @@ from algotrade.config.edges.follow import AUDIT
 from algotrade.config.edges.follow import KEY as FOLLOW
 from algotrade.config.edges.portfolio import benchmark_words
 from algotrade.config.edges.verdict import resolve_profile
+from algotrade.config.site.settings import load_users
 from algotrade.config.user import SITE_USER
 from algotrade.core.time.windows import window_name
+from algotrade.services.licences import held_by
 from algotrade.services.read.context import Stores, once_per_request
 from algotrade.storage.configs.generation import is_stable
 
@@ -371,3 +373,9 @@ def load_edge_problems(ctx: Stores) -> tuple[EdgeProblem, ...]:
     """The user's own edge files left out (or only partly read) by ``load_edges``, by id."""
     found = loading.edge_problems(ctx.configs, ctx.user.user_id)
     return tuple(EdgeProblem(i, found[i]) for i in sorted(found))
+
+
+def held_licences(ctx: Stores) -> frozenset[str]:
+    """The viewer's held licences, once per request."""
+    key = ("held-licences", ctx.user.user_id)
+    return once_per_request(ctx, key, lambda: held_by(load_users(ctx.configs), ctx.user.user_id))

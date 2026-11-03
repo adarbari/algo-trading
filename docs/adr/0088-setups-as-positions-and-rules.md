@@ -141,6 +141,19 @@ store; the Cboe chains are stored from 2026-10-02 and the bought history is pers
     the fields it is read from (a market trigger's date and age, an event class's fields) are rule
     fields too; the rules' licence and the outcome rows' together are the evidence licence, recorded for
     cross-section, time-series and named-sleeve trials alike (`cross_section/detail/licences.py`).
+    *Amendment 2026-11-02 (the price-source split, decisions 11 and 20):* an edge that reads option trade
+    rows (an `option_pnl` outcome or variant, or a `position:<template>` baseline with an option leg;
+    named sleeves, ladder and wheel included) is evaluated as two runs (`cross_section/run/sources.py`):
+    the open run over decision sessions from `FIRST_CBOE_CHAIN_SESSION`, Cboe rows only, and the history
+    run before it (a decision before the cutover whose entry is after it counts as history), recorded
+    under the run job `edge-eval:<edge>:<user>:option_history` with its own trial log and
+    `price_source`. Only the open job is read by the verdict, Ideas, `evidence_visible` and the trial
+    count; the history run is served only to a viewer holding its evidence licence
+    (`runs.load_history_runs`). Each run is its own atomic publish: a history failure after the open run
+    committed leaves the open run intact and fails the job. A combined run from before the split (an
+    option edge's record with no `price_source`) is shown only to a viewer holding its licence and is
+    ignored by `evidence_visible`. An open run whose trials joined a non-open outcome licence is
+    refused before it publishes. Guarded by `tests/architecture/options/test_source_split.py`.
 21. **Rules reading a fitted score (P2):** owner-only until one scored setup has a forward record, then
     shown as any setup; decided again at slice E14.
 22. **Short picks are shown as "short" (borrow assumed, stop UNKNOWN in P1); books in rank order with the

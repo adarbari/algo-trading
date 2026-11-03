@@ -20,12 +20,12 @@ import re
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, NoReturn
 
-from algotrade.config.edges.positions.templates import RETURN_KINDS
+from algotrade.config.edges.positions.templates import RETURN_KINDS, Templates
 from algotrade.config.site.fields import Table
 from algotrade.core.model.errors import ConfigurationError
 
 if TYPE_CHECKING:
-    from algotrade.config.edges.document import Outcome
+    from algotrade.config.edges.document import Edge, Outcome
 
 STRUCTURES = ("put", "call", "strangle")  # an expires_otm outcome's short option(s)
 # An option_model_pnl outcome's position: one at-the-money straddle held to the horizon's close,
@@ -34,6 +34,7 @@ MODEL_STRUCTURES = (
     "atm_straddle_long", "atm_straddle_short", "delta_hedged_atm", "delta_hedged_atm_short",
 )  # fmt: skip
 CHAIN_KIND = "option_pnl"
+OPTION_HISTORY = "option_history"  # the run job suffix of an option edge's history slice (d11)
 # Every outcome kind of an option setup (ADR 0088 decision 15: no verdict before its unseen
 # holdout): a priced chain P&L, a model P&L of a position, and a short option's not-assigned hit
 # (decided by Fable for the owner, 2026-11-02: a short-premium verdict is an option verdict
@@ -99,6 +100,16 @@ def grain_name(o: "Outcome") -> str:
     if o.kind == CHAIN_KIND:
         return "chain"
     return "share_path" if reads_share_path(o) else "stock"
+
+
+def reads_chain(edge: "Edge", templates: Templates) -> bool:
+    """Whether evaluating ``edge`` reads option trade rows (the ``chain`` grain): its outcome or a
+    variant's, or a ``position:<template>`` baseline holding an option leg (``templates``: the
+    site's). The one test of an edge whose evaluation splits by price source (ADR 0088 d11)."""
+    outcomes = [edge.outcome, *(v.outcome for v in edge.variants)]
+    if any(grain_name(o) == "chain" for o in outcomes):
+        return True
+    return any(t in templates and templates[t].has_option for t in edge.position_baselines)
 
 
 def check_kinds(where: str, outcomes: Sequence["Outcome"]) -> None:

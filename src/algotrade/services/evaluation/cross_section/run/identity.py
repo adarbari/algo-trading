@@ -79,15 +79,18 @@ def effective_split(run: date | None, edge: Edge) -> tuple[date | None, bool]:
 
 
 def prior_trials(
-    writer: ResultWriter, edge_id: str, user_id: str
+    writer: ResultWriter, edge_id: str, user_id: str, source: str = ""
 ) -> set[tuple[str, str, str, int]]:
     """(edge variant, variant, config hash, horizon) of earlier runs; a trial logged before
     edge variants existed is the edge's own ("main"). The site's log includes the runs recorded
     under ``LEGACY_SITE_OWNERS``, so the deflated Sharpe ratio still counts them. A logged
-    baseline is not a trial."""
+    baseline is not a trial. ``source``: the history slice's job suffix, so its trials are
+    counted apart from the open verdict's (ADR 0088 decision 11)."""
     found: set[tuple[str, str, str, int]] = set()
-    records = list(writer.runs_for(job_name(edge_id, user_id)))
-    if user_id == SITE_USER:  # the legacy owners' records from before the cutoff only
+    records = list(writer.runs_for(job_name(edge_id, user_id, source)))
+    if (
+        user_id == SITE_USER and not source
+    ):  # the legacy owners' records from before the cutoff only
         for legacy in LEGACY_SITE_OWNERS:
             records += [
                 r

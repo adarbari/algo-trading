@@ -440,10 +440,10 @@ LEGACY_SITE_OWNERS = ("local",)
 LEGACY_SITE_CUTOFF = datetime(2026, 10, 11, tzinfo=UTC)
 
 
-def job_name(edge_id: str, user_id: str) -> str:
-    """The run-record ``job`` whose records hold one owner's trial log of an edge (ADR 0015):
-    written by the harness, read by the read model."""
-    return f"edge-eval:{edge_id}:{user_id}"
+def job_name(edge_id: str, user_id: str, source: str = "") -> str:
+    """The run-record ``job`` of one owner's trial log of an edge (ADR 0015); ``source``: the
+    history slice's suffix (``chain.OPTION_HISTORY``, ADR 0088 d11)."""
+    return f"edge-eval:{edge_id}:{user_id}" + (f":{source}" if source else "")
 
 
 def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
