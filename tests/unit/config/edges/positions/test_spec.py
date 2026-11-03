@@ -186,11 +186,11 @@ def test_a_position_is_refused_where_it_would_lose_a_leg_or_an_override() -> Non
 
 # Site setups written with ADR 0088's keys from the start (no stored hash of theirs can change).
 # X1; X2 (vrp_short_premium's new version and its iv_rank_high twin); X3; X4 (B2); X1's ladder;
-# X7 (the wheel); ibs_rsi3_etf_swing (a share position with a declared exit)
+# X7 (the wheel); ibs_etf_swing_recovery (a share position with a declared exit)
 BORN_WITH_THE_KEYS = (
     "index_put_write", "vrp_short_put", "iv_rank_short_put", "covered_call_strike_tenor",
     "high_vol_call_write", "low_vol_put_write", "index_put_ladder", "index_put_wheel",
-    "ibs_rsi3_etf_swing",
+    "ibs_etf_swing_recovery",
 )  # fmt: skip
 
 
@@ -335,18 +335,19 @@ def test_a_sleeve_values_long_shares_beside_its_trades_and_no_option_template() 
             check_edge(sleeve(refused), WHERE, TEMPLATES)
 
 
-def test_the_ibs_swing_edge_is_the_studys_filtered_rule_entered_a_close_late() -> None:
-    """ibs_rsi3_etf_swing (Pagonidis 2013): the entry is no earlier than D + 1, the hold ends when
-    Cutler RSI(3) is above 40 (read after S by the share path walker), the universe is the study's
-    list without the local-exchange funds, and each variant is one more condition on that list."""
+def test_the_ibs_swing_edge_is_the_studys_weak_close_rule_entered_a_close_late() -> None:
+    """ibs_etf_swing_recovery (Pagonidis 2013, Kinlay 2016), built from stored fields only: the
+    entry is no earlier than D + 1, the hold ends once the close has recovered (read after S by
+    the share path walker), the universe is the study's list without the local-exchange funds
+    and SPY, and each variant is one more condition on that list."""
     edges = {e.id: e for e in load_edges(FileConfigStore(REPO_ROOT / "config"))}
-    edge = edges["ibs_rsi3_etf_swing"]
+    edge = edges["ibs_etf_swing_recovery"]
     assert edge.outcome.start_offset_sessions == 1 and reads_share_path(edge.outcome)
     exit_when = edge.outcome.position.exit.when
     assert [(r.field, r.op, r.value) for r in exit_when.rules()] == [
-        ("rollup.cutler_rsi@v1.rsi_3", "gt", 40)
+        ("rollup.trend_stats@v2.close_range_pos", "gt", 0.8)
     ]
-    assert edge.screeners == ("etf_rsi3_weak_close", "etf_low_ibs")
+    assert edge.screeners == ("etf_low_ibs",)
     listed = edge.universe.where.rules()[0]
     symbols = set(listed.value)
     assert {"QQQ", "IWM", "EFA", "EEM"} <= symbols and len(symbols) == 25
@@ -357,5 +358,5 @@ def test_the_ibs_swing_edge_is_the_studys_filtered_rule_entered_a_close_late() -
         rules = v.universe.where.rules()
         assert rules[0] == listed and len(rules) == 2
     assert edge.holdout_from is not None and edge.frozen_from.isoformat() == "2026-04-01"
-    assert "ibs_rsi3_etf_swing" in edges["ibs_etf_mean_reversion"].notes  # the two cite each other
+    assert "ibs_etf_swing_recovery" in edges["ibs_etf_mean_reversion"].notes  # they cite each other
     assert "ibs_etf_mean_reversion" in edge.notes

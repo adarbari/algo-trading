@@ -76,7 +76,7 @@ Each edge's full section is on its family page (docs/edges/).
 | Above the earnings-anchored VWAP (capital-gains overhang proxy) (`anchored_vwap_reversion_retest`) | candidate | [family G](edges/g.md) |
 | Reversal into earnings (`earnings_neutral_reversal`) | candidate | [family G](edges/g.md) |
 | Index ETF weak-close reversal (`ibs_etf_mean_reversion`) | candidate | [family G](edges/g.md) |
-| Index ETF sell-off swing (`ibs_rsi3_etf_swing`) | candidate | [family G](edges/g.md) |
+| Index ETF weak-close swing (`ibs_etf_swing_recovery`) | candidate | [family G](edges/g.md) |
 | Residual reversal on names with no news (`news_conditioned_reversal`) | candidate | [family G](edges/g.md) |
 | Momentum winners in a volatility squeeze (`volatility_contraction_expansion`) | candidate | [family G](edges/g.md) |
 | BDC price to NAV reversion (`bdc_price_to_nav_reversion`) | candidate | [family H](edges/h.md) |

@@ -475,25 +475,6 @@ Sources: Moskowitz and Grinblatt (1999), Do Industries Explain Momentum?, Journa
 
 Sources: Grinblatt and Keloharju, NBER working paper 8745, on year-end selling of the year's losers: https://www.nber.org/papers/w8745.pdf
 
-### `rollup.cutler_rsi@v1.rsi_3`
-
-**How to read it.** Cutler's RSI over the last 3 sessions, 0 to 100: the share of the last three days' movement that was up, with simple averages (not Wilder's smoothing). Under 10 means almost all of it was down, a sharp short sell-off; over 90 almost all up. It times a hold of days and is not a trend. Pagonidis (2013) bought index ETFs under 10 with a weak close and held while it stayed at or under 40.
-
-**The criterion per intent**
-
-| Intent | Criterion | Mode | Near-miss band | How to combine it |
-|---|---|---|---|---|
-| a short, deep sell-off (swing reversal entry) | `lt 10` | soft | 3 | with rollup.trend_stats@v2.close_range_pos lte 0.5 and, for a safer read, feature.pct_vs_sma_200 gt 0 |
-| the sell-off has relaxed (the reversal hold ends) | `gt 40` | soft | 5 | the exit side of the same rule: leave when it is no longer oversold |
-
-**When the reading lies**
-
-- It is not rollup.momentum@v1.rsi_14 with a shorter window. Cutler's simple averages and Wilder's smoothing give different numbers, and three days swing between 0 and 100 on one big session. Do not carry a 14-day threshold over; 10 to enter and 40 to leave are the study's.
-- A deep three-day drop in a falling market keeps falling. The reversal is documented on index ETFs and faded after about 2011; on single stocks it is mixed with the news behind the drop. Pair it with feature.pct_vs_sma_200 gt 0 as the trend gate. Read the setup's measured result.
-- Null after a gap among the last 4 sessions or a shorter history. Also null when the close never moved. A hard criterion then rejects the name.
-
-Sources: Pagonidis (2013), The IBS Effect: Mean Reversion in Equity ETFs, NAAIM: RSI(3) under 10 with a bar strength of at most 0.5, held while RSI(3) is at most 40; Connors and Alvarez (2009), Short Term Trading Strategies That Work: the short-RSI reversal rules
-
 ### `rollup.bands@v2.band_walk`
 
 **How to read it.** How many consecutive sessions the close has sat outside the Bollinger bands: positive counts closes above the upper band, negative below the lower, 0 inside. A walk of 3 or more up the band is the signature of a strong trend (Bollinger: 'a tag of the upper band is not a sell signal'); a walk down the lower band is a persistent sell-off. Most walks end within a week; 10 and above is a run that usually ends in a climax.
@@ -887,3 +868,20 @@ Sources: Clenow (2015), Stocks on the Move: the exponential regression slope x R
 - Null after a gap in the last 90 sessions or a shorter history.
 
 Sources: Clenow (2015), Stocks on the Move
+
+### `feature.clenow_momentum_90d`
+
+**How to read it.** Clenow's momentum score: the annualised regression slope over 90 sessions times its R-squared, so a smooth 40%-a-year trend scores about 0.36 while a jerky one with the same slope scores half that. Rank the universe by it and buy the top decile (Clenow's rule, with the 100-day average and a 15% gap filter); above about 0.25 is a candidate in an ordinary year, negative is a downtrend.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| momentum ranking (smooth and fast) | `gte 0.25` | score | 0.1 | the gate is feature.pct_vs_sma_200 gt 0 (or sma_100 in Clenow's book) and market.market_trend@v2.spx_close_vs_sma200 gt 0 |
+
+**When the reading lies**
+
+- A one-day gap inside the window lowers the R-squared more than it raises the slope, so gap-driven names rank low; that is the intended filter, but check rollup.price_moves@v1.one_day_move when a strong name is missing.
+- Null when either input is unknown (a gap among the last 90 sessions, or a flat close).
+
+Sources: Clenow (2015), Stocks on the Move: the ranking formula and the 90-day window

@@ -92,7 +92,6 @@ from algotrade.features.rollups.options import (
     option_liquidity,
     put_wing,
 )
-from algotrade.features.rollups.oscillators import cutler_rsi
 from algotrade.features.rollups.patterns import candle
 from algotrade.features.rollups.positioning import (
     chain_flow,
@@ -188,7 +187,6 @@ GROUPS: dict[str, FeatureGroup] = {
             call_wing.GROUP,
             short_premium.GROUP,
             price_moves.GROUP,
-            cutler_rsi.GROUP,
             max_return.GROUP,
             session_returns.GROUP,
             signed_volume.GROUP,

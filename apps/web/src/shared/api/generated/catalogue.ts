@@ -265,7 +265,6 @@ export const SITE_FEATURES = [
   'rollup.short_premium@v1.call_breakeven',
   'rollup.short_premium@v1.call_yield_ann',
   'rollup.price_moves@v1.one_day_move',
-  'rollup.cutler_rsi@v1.rsi_3',
   'rollup.max_return@v1.max_ret_21d',
   'rollup.session_returns@v1.overnight_ret_20d',
   'rollup.session_returns@v1.intraday_ret_20d',

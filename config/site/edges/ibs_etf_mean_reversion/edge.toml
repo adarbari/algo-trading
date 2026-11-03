@@ -30,9 +30,9 @@ invested session against the same days of the benchmark, which the weights recor
 and the verdict does not read: the read of the result needs that care (flagged for review). (3) One-
 session holds, a fund held at half when only one passes, the other half cash; cost_bps 4 a round
 trip assumed; the source's long-short version is not built. The idea is a timing overlay for other
-edges' entries, weak alone. SAME IDEA, TESTED AGAIN: ibs_rsi3_etf_swing builds the study's filtered multi-day
-version (RSI(3) under 10, held while it is at or under 40) over 26 of its funds against every eligible fund of the
-list, not an always-invested mix; read its result for the idea, and this one only as the one-day diagnostic."""
+edges' entries, weak alone. SAME IDEA, TESTED AGAIN: ibs_etf_swing_recovery builds the study's weak-close rule as a multi-day hold (exit when
+the close has recovered) over 25 of its funds against every eligible fund of the list, not an always-invested
+mix; read its result for the idea, and this one only as the one-day diagnostic."""
 
 [universe.where]
 all = [

@@ -322,11 +322,6 @@ purpose = "feature groups from option chains and implied volatility: one module 
 contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
 
 [[dir]]
-path = "src/algotrade/features/rollups/oscillators"
-purpose = "bounded short-window momentum oscillator feature groups from daily bars (Cutler's RSI over a few sessions): one module per group, its documented FEATURES, a pure compute and its GROUP declaration"
-contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
-
-[[dir]]
 path = "src/algotrade/features/rollups/patterns"
 purpose = "bar-shape and candlestick pattern feature groups from daily bars (body and wick shares, two-bar relations, the named candles a screen thresholds): one module per group, its documented FEATURES, a pure compute and its GROUP declaration"
 contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
