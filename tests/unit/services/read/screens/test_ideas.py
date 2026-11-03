@@ -714,3 +714,58 @@ def test_a_watchlist_counts_only_watched_paused_picks(
     found = load_ideas(context(reader, _watching("EQ:DDD")), 10, tab="stocks")
     assert found.paused_total == 1
     assert [p.instrument_id for p in found.paused] == ["EQ:DDD"]
+
+
+# ---------------------------------------------------------------- cells (the feature-table route)
+EARNINGS = "rollup.earnings@v1.days_to_earnings"
+
+
+def _cells(found: Ideas, name: str) -> dict[str, object]:
+    j = [c.name for c in found.columns].index(name)
+    return {i.instrument_id: found.rows[n][j] for n, i in enumerate(found.items)}
+
+
+def test_ideas_serve_the_catalogue_columns_asked_for_aligned_on_every_page(
+    filter_backend: MemoryBackend,
+) -> None:
+    """The Unproven list on the feature table: ``columns`` come back columnar over ``items``
+    (page two's cells are page two's names), a value not stored for a name is UNKNOWN."""
+    ctx = view(filter_backend)
+    whole = load_ideas(ctx, 50, columns=[VOLUME, EARNINGS, VOLUME])
+    assert [c.name for c in whole.columns] == [VOLUME, EARNINGS]  # in order, repeats dropped
+    assert len(whole.rows) == len(whole.unknown) == len(whole.kinds) == len(whole.items)
+    first = load_ideas(ctx, 3, columns=[VOLUME])
+    second = load_ideas(ctx, 3, first.next_cursor, columns=[VOLUME])
+    expected = _cells(whole, VOLUME)
+    for page in (first, second):
+        assert _cells(page, VOLUME) == {i: expected[i] for i in _ids(page)}
+    j = 1
+    for n, item in enumerate(whole.items):
+        value, code = whole.rows[n][j], whole.unknown[n][j]
+        assert (value is None) == (code is not None), item.instrument_id
+    assert any(code is not None for code in (row[j] for row in whole.unknown))  # S006.. none
+
+
+def test_a_personal_column_is_licence_for_a_non_holder(filter_backend: MemoryBackend) -> None:
+    holder = load_ideas(view(filter_backend, "full"), 50, columns=[IV])
+    other = load_ideas(view(filter_backend, "bare"), 50, columns=[IV])
+    assert any(v is not None for v in _cells(holder, IV).values())
+    assert all(v is None for v in _cells(other, IV).values())
+    assert {row[0] for row in other.kinds} == {"LICENCE"}
+
+
+def test_an_unknown_column_is_refused_before_any_read(
+    filter_backend: MemoryBackend, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from algotrade.services.read.instruments.catalogue import UnknownFeatureError  # noqa: PLC0415
+    from algotrade.services.read.screens import ideas as ideas_module  # noqa: PLC0415
+
+    monkeypatch.setattr(ideas_module, "load_screeners", lambda *_: pytest.fail("read"))
+    with pytest.raises(UnknownFeatureError):
+        load_ideas(view(filter_backend), 5, columns=["rollup.nope@v1.nothing"])
+
+
+def test_no_columns_is_no_cells(ctx: ReadContext) -> None:
+    found = load_ideas(ctx, 10)
+    assert found.columns == () and found.items
+    assert set(found.rows) == set(found.unknown) == {()}  # one empty row per idea

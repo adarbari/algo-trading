@@ -99,6 +99,30 @@ def test_ideas_rank_the_runs_of_the_session_and_serve_the_best_pick(graph: Graph
     assert second["instrument"]["features"][0]["unknown"]["code"] in {"NO_ROW", "NULL"}
 
 
+CELLS = """query IdeaCells($columns: [FeatureName!]) {
+  ideas(first: 10, columns: $columns) {
+    items { instrumentId }
+    columns { name }
+    rows unknown kinds kindTexts { kind text }
+  }
+}"""
+
+
+def test_ideas_serve_the_columns_asked_for_as_feature_table_cells(graph: Graph) -> None:
+    """The Unproven list on the feature table: `columns` come back as cells over `items`, the
+    same values the per-instrument read gives, an UNKNOWN cell with its code."""
+    body = graph(CELLS, {"columns": NAMES})
+    assert "errors" not in body, body
+    ideas = body["data"]["ideas"]
+    assert [c["name"] for c in ideas["columns"]] == NAMES
+    first, second = ideas["rows"][0], ideas["unknown"][1]
+    assert first[0] == "2022-12-01" and ideas["unknown"][0][0] is None
+    assert second[0] in {"NO_ROW", "NULL"} and ideas["rows"][1][0] is None
+    assert len(ideas["rows"]) == len(ideas["items"])
+    bad = graph(CELLS, {"columns": ["rollup.nope@v1.nothing"]})
+    assert bad["errors"][0]["extensions"]["code"] == "UNKNOWN_FEATURE"
+
+
 def test_an_earlier_session_has_its_own_runs_and_limit_caps(graph: Graph) -> None:
     before = graph(IDEAS, {"first": 10, "names": [], "date": "2022-11-22"})["data"]["ideas"]
     assert before["session"] == "2022-11-22"
