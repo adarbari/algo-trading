@@ -98,3 +98,20 @@ def test_setups_qualify_or_are_left_out_by_kind(monkeypatch: pytest.MonkeyPatch)
     assert setups.in_tab(CTX, "stocks")("scr") and not setups.in_tab(CTX, "premium")("scr")
     assert setups.in_tab(CTX, "stocks")("own_screen")  # one no setup lists: Stocks
     assert not setups.in_tab(CTX, "premium")("own_screen")
+
+
+def test_a_screen_behind_only_a_study_proposal_is_in_no_unproven_tab(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """ED6 W5: a study's proposed edge is the viewer's own and researching; its screens run
+    nightly, but an ML proposal is not an idea. Catches: a proposal's matches shown under
+    Unproven. A screen a site setup also lists keeps that setup's tab."""
+    audit = SimpleNamespace(labels=("proposed_by_study",))
+    proposed = SimpleNamespace(
+        id="ws_1", owner="me", audit=audit, screeners=("ws_1_t1", "scr"), outcome=None
+    )
+    monkeypatch.setattr(setups, "parsed_edges", lambda ctx, user: (proposed, _doc("site_e")))
+    for tab in ("stocks", "premium"):
+        assert not setups.in_tab(CTX, tab)("ws_1_t1")
+    assert setups.in_tab(CTX, "stocks")("scr")
+    assert setups.in_tab(CTX, "stocks")("own_screen")

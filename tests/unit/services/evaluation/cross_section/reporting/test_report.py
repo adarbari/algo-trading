@@ -3,7 +3,10 @@ and slice with the independent sessions beside the numbers; a missing number rea
 
 from algotrade.config.user import UserContext
 from algotrade.services.evaluation.cross_section.harness import evaluate_edge
-from algotrade.services.evaluation.cross_section.reporting.report import render_edge_report
+from algotrade.services.evaluation.cross_section.reporting.report import (
+    proposed_line,
+    render_edge_report,
+)
 from algotrade.services.evaluation.cross_section.results import (
     edge_eval_frame,
     historical_identity,
@@ -107,3 +110,11 @@ def test_each_decoy_reads_as_a_line_with_its_overlap_and_spread_gap() -> None:
         and "-0.0100 out of sample NOT MEASURED" in line
         for line in lines
     )
+
+
+def test_a_proposed_edge_says_its_in_sample_slice_is_the_discovery_sample() -> None:
+    """ED6 W5. Catches: a study's proposal reported like any edge, its in-sample numbers read as
+    evidence."""
+    line = proposed_line("ws_1", "140 features searched.")
+    assert line.startswith("PROPOSED BY A STUDY: ws_1") and "discovery sample" in line
+    assert "140 features searched." in line

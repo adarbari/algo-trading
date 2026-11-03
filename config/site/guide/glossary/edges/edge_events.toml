@@ -26,6 +26,16 @@ next = "Open the edge's report and check how many names were left out for an unk
 see_also = ["base_rate", "out_of_sample", "event_class_earnings_reaction"]
 
 [[term]]
+id = "event_class_earnings_reaction_expected"
+term = "Before the reaction day of an expected report"
+short = "The edge starts before the session an expected report will move the price, from its known time of day."
+body = """
+The trigger is an expected report and the session the market will react to it, worked out ahead from what the decision session knew. A report due before the open has its reaction that same day. A report due after the close has it the next session. The date is the expected one, and the time of day is the one the earnings calendar gave by the decision session for that same date. A report with no known time is left out and counted, never guessed. A time changed after the decision session does not change the trade. So the edge can enter at the close before the reaction, whichever time the company reports. Compare the picks with other names that reported in the same weeks.
+"""
+next = "Open the edge's report and check how many names were left out for an unknown report time."
+see_also = ["event_class_earnings_expected", "event_class_earnings_reaction_session"]
+
+[[term]]
 id = "event_class_earnings_expected"
 term = "Before an expected earnings report"
 short = "The edge starts before a report that is scheduled or expected from last year's date."
