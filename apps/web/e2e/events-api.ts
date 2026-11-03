@@ -138,6 +138,32 @@ function calendar(ids: string[], scope: boolean): unknown {
   };
 }
 
+/** Earnings week's filter definitions (`FilterSet`, surface `calendar_week`, V8c): one of the real ones. */
+const CALENDAR_WEEK_FILTERS = {
+  data: {
+    filterSet: {
+      surface: 'calendar_week',
+      label: 'Earnings week',
+      filters: [
+        {
+          id: 'report_time',
+          label: 'Report time',
+          group: 'COMING_UP',
+          kind: 'PICK',
+          guide: 'term:filter_report_time',
+          options: [
+            { value: 'pre', label: 'Before the open' },
+            { value: 'post', label: 'After the close' },
+            { value: 'unknown', label: 'Time not given' },
+          ],
+          bins: [],
+          windowUnit: null,
+        },
+      ],
+    },
+  },
+};
+
 export interface EventsMock {
   /** The variables of every `EventCalendar` read. */
   calendarAsked: { instrumentIds: string[]; scope: boolean }[];
@@ -171,6 +197,11 @@ export async function mockEventsApi(page: Page): Promise<EventsMock> {
       const scope = variables.scope === true;
       mock.calendarAsked.push({ instrumentIds: ids, scope });
       await route.fulfill({ json: { data: { eventCalendar: calendar(ids, scope) } } });
+    } else if (
+      /query\s+FilterSet\b/.test(query) &&
+      (variables as { surface?: string }).surface === 'calendar_week'
+    ) {
+      await route.fulfill({ json: CALENDAR_WEEK_FILTERS });
     } else await route.fallback();
   });
   return mock;

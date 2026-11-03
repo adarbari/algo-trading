@@ -16,7 +16,13 @@ const VIEWS: readonly TabItem[] = [
   { id: 'macro', label: 'Macro' },
 ];
 
-export function CalendarPage() {
+export interface CalendarPageProps {
+  /** Earnings week's filters in force (the `f` search param) and their writer (the route's). */
+  f: string | undefined;
+  onFilterChange: (f: string | undefined) => void;
+}
+
+export function CalendarPage({ f, onFilterChange }: CalendarPageProps) {
   const [view, setView] = useState('week');
   return (
     <Stack gap={3}>
@@ -28,7 +34,7 @@ export function CalendarPage() {
         </Text>
       </Stack>
       <Tabs label="Calendar views" items={VIEWS} value={view} onChange={setView}>
-        {view === 'week' && <EarningsWeek />}
+        {view === 'week' && <EarningsWeek f={f} onFilterChange={onFilterChange} />}
         {view === 'ahead' && <EventsAhead />}
         {view === 'macro' && <MacroDays />}
       </Tabs>

@@ -23,8 +23,10 @@ narrow the WHOLE population before it is sorted and paged, from one masked pass 
 every offered filter's field (read under the viewer's licences: a field the viewer may not use has
 no filter and no value, so a count never leaks it). ``total`` counts the rows passing the filters
 and ``q``; ``FeatureTable.facets`` the counts of the population before ``q`` (``facets.total``:
-every row; None for ``keys``, a list the caller chose, unless a filter is set). The pass is cached
-per population, filters, viewer and published state; the sort and ``q`` come after it."""
+every row; None for ``keys`` on the universe surface, a list the caller chose, unless a filter is
+set). ``surface`` picks the definitions (``SURFACES``): Earnings week (``calendar_week``) filters
+the keyed list of the week's reports by its own bar, with its counts always. The pass is cached
+per population, surface, filters, viewer and published state; the sort and ``q`` come after it."""
 
 from collections.abc import Hashable, Mapping, Sequence
 from dataclasses import dataclass
@@ -53,6 +55,9 @@ from algotrade.services.read.session import Session
 from algotrade.services.read.values import UnknownCode, to_scalar
 
 SURFACE = "universe"  # config/site/filters/universe.toml
+# The surfaces whose filters are catalogue fields of instruments, so a table filters by them: the
+# universe, and Earnings week (a keyed list: the names reporting in the next five sessions).
+SURFACES = (SURFACE, "calendar_week")
 SYMBOL = "symbol"  # the ticker column's sort key
 _SYMBOL = "instrument.symbol"
 _NAME = "instrument.name"
@@ -241,6 +246,7 @@ def _passing(
     inputs: Sequence[FilterInput],
     keyed: bool,
     seq: Hashable,
+    surface: str = SURFACE,
 ) -> _Passing:
     """The population's ids that pass the filters (``f``'s attributes and ``inputs``), their
     facets, and the tables the SET filters read with nothing for the session (cached per
@@ -248,6 +254,7 @@ def _passing(
     nothing). ``FilterRefusedError`` for a filter the viewer is not offered."""
     key = (
         "table_passing",
+        surface,
         ctx.session.date,
         population.ids if keyed else None,
         (f.security_type, f.sector, f.liquidity_class, f.leveraged, f.optionable),
@@ -259,7 +266,7 @@ def _passing(
     found = ctx.cache.get(key)
     if found is not None:
         return found  # type: ignore[no-any-return]
-    resolved = load_list_filters(ctx, SURFACE, [i.id for i in inputs]).resolved
+    resolved = load_list_filters(ctx, surface, [i.id for i in inputs]).resolved
     resolved.check(i.id for i in inputs)
     ids = population.ids if keyed else None
     offered = list(dict.fromkeys(d.field for d in resolved.offered))
@@ -276,7 +283,7 @@ def _passing(
     ]  # fmt: skip
     if set_fields:
         missing = catalogue_values(ctx, list(dict.fromkeys(set_fields)), ids)[1]
-    shown = None if keyed and not set_fields else facets
+    shown = None if keyed and not set_fields and surface == SURFACE else facets
     found = _Passing(tuple(str(frame.index[i]) for i in facets.matched_rows), missing, shown)
     ctx.cache.put(key, found)
     return found
@@ -290,12 +297,14 @@ def _ordered(
     sort: str | None,
     keyed: bool,
     seq: Hashable,
+    surface: str = SURFACE,
 ) -> _Order:
     """The ids that pass the filters and ``q``, in ``sort`` order, and the tables the filters,
     the search and the sort read with nothing for the session (cached per query and published
     state ``seq``)."""
     key = (
         "table",
+        surface,
         ctx.session.date,
         population.ids if keyed else None,
         f,
@@ -308,7 +317,7 @@ def _ordered(
     found = ctx.cache.get(key)
     if found is not None:
         return found  # type: ignore[no-any-return]
-    passing = _passing(ctx, population, f, inputs, keyed, seq)
+    passing = _passing(ctx, population, f, inputs, keyed, seq, surface)
     column = None if sort is None else sort.removeprefix("-")
     field = _SYMBOL if column == SYMBOL else column
     fields = list(dict.fromkeys([_SYMBOL, _NAME, *([field] if field else [])]))
@@ -341,14 +350,17 @@ def load_table(
     size: int = DEFAULT_SIZE,
     keys: Sequence[str] | None = None,
     inputs: Sequence[FilterInput] = (),
+    surface: str = SURFACE,
 ) -> FeatureTable:
     """Page ``page`` (1-based, ``size`` rows) of the universe for ``ctx.session`` (or of the
     instruments ``keys`` name) x ``columns`` (catalogue names, in order, repeats dropped),
     filtered by ``filters`` and sorted by ``sort`` (``symbol`` or a catalogue name, ``-``:
-    descending; default: symbol, or the keys' order); ``inputs``: the ``universe`` filters
-    (ADR 0082). ``UnknownFeatureError`` for a column or sort field outside the caller's
-    catalogue; ``NotFoundError`` for a key naming nothing; ``FilterRefusedError`` for a filter
-    the viewer is not offered."""
+    descending; default: symbol, or the keys' order); ``inputs``: the filters of ``surface``
+    (ADR 0082; one of ``SURFACES``, else ``ValueError``). ``UnknownFeatureError`` for a
+    column or sort field outside the caller's catalogue; ``NotFoundError`` for a key naming nothing;
+    ``FilterRefusedError`` for a filter the viewer is not offered."""
+    if surface not in SURFACES:
+        raise ValueError(f"no table surface {surface!r}: one of {', '.join(SURFACES)}")
     wanted = list(dict.fromkeys(columns))
     infos = feature_infos(ctx.features, wanted)
     keyed = keys is not None
@@ -362,7 +374,7 @@ def load_table(
     else:
         population = _keyed(ctx, keys) if keys is not None else _universe(ctx, seq)
     order_ = _ordered(
-        ctx, population, filters or UniverseFilter(), tuple(inputs), order, keyed, seq
+        ctx, population, filters or UniverseFilter(), tuple(inputs), order, keyed, seq, surface
     )
     ordered = order_.ids
     shown = list(ordered[(page - 1) * size : page * size])

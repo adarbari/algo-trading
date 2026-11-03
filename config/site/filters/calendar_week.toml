@@ -1,0 +1,134 @@
+# L3 site setting: the filters of the Calendar's Earnings week list (ADR 0082, docs/ui/filtering.md;
+# slice V8c of docs/ui/evening-desk-plan.md). The rows are the names reporting in the next five
+# sessions (the calendar's own_earnings events for the scope list or one screener's picks); these
+# filters narrow that list on the server (`Query.table(surface: "calendar_week", keys: ...)`).
+# Typed by src/algotrade/config/filters/definitions.py; fitness tests:
+# tests/unit/config/filters/. Every field is a catalogue name; the table has no [[column]] of its
+# own. Every filter's `guide` entry is in config/site/guide/glossary/filters.toml.
+#
+# Not here, because the fact is not stored (listed in the PR as "needs new data"): the report's
+# confirmed / estimated status (the earnings calendar stores one date per report, not its source).
+
+label = "Earnings week"
+
+# ------------------------------------------------------------------------------------ coming up
+
+[[filter]]
+id = "earnings"
+label = "Reports within"
+group = "coming_up"
+kind = "window"
+field = "rollup.earnings@v1.days_to_earnings"
+window_unit = "sessions"
+guide = "term:filter_earnings"
+
+[[filter]]
+id = "report_time"
+label = "Report time"
+group = "coming_up"
+kind = "pick"
+field = "rollup.earnings@v1.earnings_time"
+options = "static"
+guide = "term:filter_report_time"
+
+[[filter.option]]
+value = "pre"
+label = "Before the open"
+
+[[filter.option]]
+value = "post"
+label = "After the close"
+
+[[filter.option]]
+value = "unknown"
+label = "Time not given"
+
+# ------------------------------------------------------------------------------------ setup
+
+[[filter]]
+id = "implied_move"
+label = "Priced move"
+group = "setup"
+kind = "range"
+field = "rollup.implied_move@v1.implied_move"
+unit = "percent"
+bins = [0, 0.02, 0.04, 0.06, 0.08, 0.1, 0.15, 0.25, 2]
+guide = "term:filter_implied_move"
+
+[[filter]]
+id = "move_vs_usual"
+label = "Priced against usual"
+group = "setup"
+kind = "pick"
+field = "feature.earnings_move_vs_usual"
+options = "static"
+guide = "term:filter_move_vs_usual"
+
+[[filter.option]]
+value = "above"
+label = "Above usual"
+
+[[filter.option]]
+value = "in line"
+label = "In line"
+
+[[filter.option]]
+value = "below"
+label = "Below usual"
+
+[[filter]]
+id = "sector"
+label = "Sector"
+group = "setup"
+kind = "pick"
+field = "instrument.sector"
+options = "values"
+guide = "term:filter_sector"
+
+# ------------------------------------------------------------------------------------ tradeable
+
+[[filter]]
+id = "liquidity_class"
+label = "Liquidity class"
+group = "tradeable"
+kind = "pick"
+field = "feature.liquidity_class"
+options = "static"
+guide = "term:filter_liquidity_class"
+
+[[filter.option]]
+value = "HIGH"
+label = "High"
+
+[[filter.option]]
+value = "MEDIUM"
+label = "Medium"
+
+[[filter.option]]
+value = "LOW"
+label = "Low"
+
+[[filter]]
+id = "option_tier"
+label = "Option liquidity class"
+group = "tradeable"
+kind = "pick"
+field = "feature.option_tier"
+options = "static"
+guide = "term:filter_option_tier"
+
+[[filter.option]]
+value = "A"
+label = "A"
+
+[[filter.option]]
+value = "B"
+label = "B"
+
+[[filter.option]]
+value = "C"
+label = "C"
+
+[[filter.option]]
+value = "D"
+label = "D"
