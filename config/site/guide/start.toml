@@ -736,6 +736,7 @@ summary = "Admins: the names the event study covers, how fresh each one's review
 links = [
   { kind = "term", id = "event_scope_reasons" },
   { kind = "term", id = "event_scope_stale" },
+  { kind = "term", id = "event_scope_last_review" },
   { kind = "term", id = "event_scope_moves" },
   { kind = "term", id = "event_scope_macro" },
 ]
@@ -743,7 +744,7 @@ links = [
 [[page.section]]
 title = "What the page lists"
 body = """
-Each row is one name of the scope list. It shows why the name is in scope, where its entry came from, the date of its last deep-dive review and the share of its biggest moves with a known cause. The strip above counts the listed names, the stale ones, the other names in scope by a rule and the macro releases ahead.
+Each row is one name of the scope list. It shows why the name is in scope and where its entry came from. It also shows the date of its last deep-dive review and the share of its biggest moves with a known cause. The strip above counts the listed names, the stale ones, the other names in scope by a rule and the macro releases ahead.
 """
 
 [[page.section]]

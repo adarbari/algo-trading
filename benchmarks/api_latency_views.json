@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-02 16:09 UTC",
+ "generated": "2026-11-03 11:26 UTC",
  "views": {
   "(shell)": {
    "route": "/ideas",
@@ -20,6 +20,23 @@
    "interaction": [],
    "source": "static",
    "shell": true
+  },
+  "/admin/event-scope": {
+   "route": "/admin/event-scope",
+   "search": {},
+   "clicks": [],
+   "params": {},
+   "ops": [
+    "EventScope",
+    "GuideHelpField"
+   ],
+   "uncertain": [
+    "GuideHelpField"
+   ],
+   "interaction": [
+    "GuideEntries"
+   ],
+   "source": "static"
   },
   "/admin/feature-requests": {
    "route": "/admin/feature-requests",

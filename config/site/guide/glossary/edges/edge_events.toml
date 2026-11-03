@@ -347,8 +347,8 @@ id = "event_scope_moves"
 term = "Big moves attributed"
 short = "Of a name's largest moves in the last year, the share with a known cause."
 body = """
-The server takes the name's largest moves of the last year and counts how many have an attribution known by the session, from any source: a filing, a headline or a dossier. The column shows that count over the total as a percent.
-A dash means unknown, for example a name with under a year of bars. A share of three attributed out of four is 75%, but four moves are too few to read: compare names only when each has about twenty big moves. A high share says the moves were explained, not that the explanation is right.
+The server takes the name's largest moves of the last year. It counts how many have an attribution known by the session, from any source. A source is a filing, a headline or a dossier. The column shows that count over the total as a percent.
+A dash means unknown, for example a name with under a year of bars. A share of three attributed out of four is 75%, but four moves are too few to read. Compare names only when each has about twenty big moves. A high share says the moves were explained, not that the explanation is right.
 """
 next = "Look at the names with a low share first: their unscheduled moves are the least explained."
 see_also = ["event_scope_stale", "event_scope_last_review"]
@@ -391,7 +391,7 @@ id = "event_scope_add"
 term = "Add a scope ticker"
 short = "Put a ticker in the event study; the server resolves it and answers an error when it cannot."
 body = """
-Type the ticker as listed, such as AAPL or BRK.B, with an optional note of up to 200 characters about why. The server resolves it and records who added it. Adding a name already listed changes nothing and says so.
+Type the ticker as listed, such as AAPL or MSFT, with an optional note of up to 200 characters about why. The server resolves it and records who added it. Adding a name already listed changes nothing and says so.
 A new name has no review and no attribution share until its data is read for a session.
 """
 next = "Check the table after the add: the name shows as Admin source, with no review yet."
