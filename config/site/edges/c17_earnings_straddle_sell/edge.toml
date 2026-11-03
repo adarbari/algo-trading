@@ -14,7 +14,7 @@ and the payoff is a short jump tail: one 30% gap erases the premium of many trad
 sits out the market regimes where gaps cluster (STRESS, CRISIS) and is judged on its tail
 (CVaR against the unconditioned sale), not its win rate."""
 family = "C"
-schedule = "on_event:earnings_expected"
+schedule = "on_event:earnings_reaction_expected"
 top_k = 20
 base = "event"
 screeners = ["earnings_move_rich"]
@@ -40,17 +40,16 @@ CONDITIONAL, in two parts: (1) the screener is earnings_move_rich (S3: the repor
 reporting name is the decoy; (2) the gate pauses the setup when market.regime@v3.label is STRESS or
 CRISIS (the ADR 0049 rule; an unknown label never passes). A report inside the stress window is
 therefore never sold.
-THE ANCHOR, as built (F10, not as the plan words it): the plan wanted the reaction-session class
-entered one session ahead using the report time known at D. The class as built,
-on_event:earnings_reaction_session, is known only when the reaction session has come (its fields
-read after the event), and the document parser refuses an entry before such an event, so it cannot
-open a trade across the report. This document uses the schedule that is announced ahead,
-on_event:earnings_expected (SCHEDULED dates only, as of D), and the next report's stored time of day
-(rollup.earnings@v1.earnings_time, known at D): a pre-market report is entered at the close before
-the report session (offset -1; the base universe is pre-market reports only), an after-close report at the report session's own close (the
-after_hours variant, offset 0), both held one session, to the close of the reaction session. A
-report with an unknown time is not entered. The reaction-session anchor stays the right one for the
-post-event setups; projecting it ahead (a follow-up, F10b) would replace the two offsets by one.
+THE ANCHOR (F10b, 2026-11-03): on_event:earnings_reaction_expected, the reaction session projected
+ahead from the expected report date (earnings_expected@v1, SCHEDULED dates only, as of D) and the
+report's time of day stored at D for that same date (rollup.earnings@v1.earnings_time): the report
+session for a before-open report, the next session for an after-close one. Offset -1 enters at the
+close before the reaction session for both, held one session to the reaction's close. A report with
+an unknown time (or a time stored for another date) is not entered and is counted; a time revised
+after D does not change D's trade. Until F10b the document used on_event:earnings_expected with
+offset -1 for before-open names and an after_hours variant at offset 0; one anchor replaces both
+(the edge is blocked, so no run used them). The F10 class on_event:earnings_reaction_session stays
+the anchor for post-event setups: it is known only once the reaction has come.
 Data: history from 2018 is the bought chains (E5, F7); the frozen period is that whole history, the
 paper sample ending before it (the source's 1996-2013 sample is the straddle purchase of c16, the
 sale is its practitioner mirror). The 3-month holdout (ADR 0088 d15) starts 2026-10-26 and is not
@@ -63,7 +62,7 @@ all = [
   { field = "market.regime@v3.label", op = "in", value = ["CALM", "CAUTION"] },
 ]
 
-# Before-open reports only: the offset below is the close before the report session.
+# Every time of day: the schedule projects the reaction session and skips an unknown time.
 [universe.where]
 all = [
   { field = "instrument.security_type", op = "in", value = ["COMMON_STOCK", "ADR"] },
@@ -72,7 +71,6 @@ all = [
   { field = "rollup.price_stats@v2.close", op = "gt", value = 5 },
   { field = "rollup.price_stats@v2.adv_usd_20d", op = "gte", value = 50_000_000 },
   { field = "rollup.earnings_expected@v1.expected_basis", op = "eq", value = "SCHEDULED" },
-  { field = "rollup.earnings@v1.earnings_time", op = "eq", value = "pre" },
 ]
 
 [outcome]
@@ -89,24 +87,6 @@ id = "iron_fly"
 [variants.outcome]
 position = "iron_fly"
 
-# An after-close report: the close before the reaction session is the report session's own.
-# Variants may set the universe and the outcome's shared keys; the time of day is a universe rule.
-[[variants]]
-id = "after_hours"
-[variants.outcome]
-start_offset_sessions = 0
-[variants.universe]
-[variants.universe.where]
-all = [
-  { field = "instrument.security_type", op = "in", value = ["COMMON_STOCK", "ADR"] },
-  { field = "instrument.status", op = "eq", value = "ACTIVE" },
-  { field = "instrument.optionable", op = "eq", value = true },
-  { field = "rollup.price_stats@v2.close", op = "gt", value = 5 },
-  { field = "rollup.price_stats@v2.adv_usd_20d", op = "gte", value = 50_000_000 },
-  { field = "rollup.earnings_expected@v1.expected_basis", op = "eq", value = "SCHEDULED" },
-  { field = "rollup.earnings@v1.earnings_time", op = "eq", value = "post" },
-]
-
 [quality_bar]
 outcome = """The short at-the-money straddle's return on its Reg-T collateral from the close before the report
 to the close of the reaction session, net of the site's option cost levels (verdict.toml [option_costs]);
@@ -114,8 +94,9 @@ the tails profile weighs the return, its bootstrap t, the probabilistic Sharpe r
 the worst trades against the unconditioned sale. The distribution, not the win rate, is the result."""
 trigger_timing = """The expected report date and its time of day are known weeks ahead (earnings_expected@v1,
 earnings@v1.earnings_time, known_from <= D); the screen (earnings_move_rich) and the regime gate are
-read at the close of D and the entry is the next close, S = D + 1: S is the report session minus one
-for a before-open report and the report session for an after-close one. A date taken from last year
+read at the close of D and the entry is the next close, S = D + 1, the session before the reaction
+session the schedule projects (on_event:earnings_reaction_expected): the report session minus one
+for a before-open report, the report session for an after-close one. A date taken from last year
 (PRIOR_YEAR) is a guess; a report whose time is unknown is skipped, never guessed. The straddle is
 chosen on S's chain."""
 replication = """The practitioner rule: at the close before the report sell the at-the-money straddle (or a

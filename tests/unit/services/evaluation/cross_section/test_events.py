@@ -20,6 +20,7 @@ from algotrade.services.evaluation.cross_section.events import (
     EVENT_FIELDS,
     NO_EVENT_ROW,
     NOT_KNOWN_AT_D,
+    TIME_UNKNOWN,
     EventField,
     event_field,
     read_events,
@@ -325,3 +326,83 @@ def test_the_document_and_the_harness_agree_on_which_classes_are_announced_ahead
     """The two lists drifted once (``ipo_lockup`` was read ahead by the harness but refused a
     negative offset by the document): kept equal here, as config cannot import services."""
     assert set(ANNOUNCED_AHEAD) == {k for k, v in EVENT_FIELDS.items() if v.announced_ahead}
+
+
+EXPECTED = "rollups/instrument/earnings_expected@v1"
+EARNINGS = "rollups/instrument/earnings@v1"
+
+
+def _reports(w: Any, day: date, rows: dict[str, tuple[int, date, str, date | None]]) -> None:
+    """At ``day``: each name's sessions to its expected report, that date, and the time of day
+    ``earnings@v1`` stores for its next report date (the last item; None: no next date)."""
+    w.write_rollup(EXPECTED, day, [
+        {"instrument_id": i, "sessions_to_expected_report": n, "expected_report_date": e,
+         "expected_basis": "SCHEDULED"}
+        for i, (n, e, _, _) in rows.items()
+    ])  # fmt: skip
+    w.write_rollup(EARNINGS, day, [
+        {"instrument_id": i, "earnings_time": t, "next_earnings_date": nxt}
+        for i, (_, _, t, nxt) in rows.items()
+    ])  # fmt: skip
+
+
+def test_the_reaction_session_is_projected_from_the_report_time_known_at_d() -> None:
+    """F10b: offset -1 enters at the close before the reaction session R, so D = R - 2. A
+    before-open report's R is its own session (two sessions to the report at D), an after-close
+    one's the next (one session to it); an unknown time, or a time stored for another date, is
+    UNKNOWN, counted once on the session its earliest shift reaches, never guessed."""
+    w = build_world()
+    d, e1, e2, other = DAYS[1], DAYS[3], DAYS[2], DAYS[6]
+    _reports(w, d, {
+        IDS[0]: (2, e1, "pre", e1),  # R = report session = D + 2: the event
+        IDS[1]: (1, e2, "post", e2),  # R = the session after the report = D + 2: the event
+        IDS[2]: (2, e1, "post", e1),  # R = D + 3: not this session
+        IDS[3]: (2, e1, "unknown", e1),  # the earliest shift (pre) reaches the target: UNKNOWN
+        IDS[4]: (1, e2, "pre", e2),  # R = D + 1: not this session
+        IDS[5]: (2, e1, "pre", other),  # a time for another report date: UNKNOWN
+        IDS[6]: (1, e2, "unknown", e2),  # only post reaches it: UNKNOWN on D - 1, not again
+        IDS[7]: (2, e1, None, None),  # no next date (a PRIOR_YEAR guess): UNKNOWN
+    })  # fmt: skip
+    found = read_events(w.reader, "earnings_reaction_expected", -1, [d], lambda _: ALL)
+    assert found.names == {d: frozenset({IDS[0], IDS[1]})}
+    assert found.unknown[d] == {TIME_UNKNOWN: 3, NO_EVENT_ROW: 12}
+    # The plain class reads the same count unprojected: it is unchanged.
+    plain = read_events(w.reader, "earnings_expected", -1, [d], lambda _: ALL)
+    assert plain.names == {d: frozenset({IDS[0], IDS[2], IDS[3], IDS[5], IDS[7]})}
+    spec = EVENT_FIELDS["earnings_reaction_expected"]
+    assert spec.announced_ahead and spec.target(-1) == 2
+    assert {"rollup.earnings@v1.earnings_time", "rollup.earnings@v1.next_earnings_date"} <= set(
+        spec.fields()
+    )
+
+
+def test_a_report_time_revised_after_d_does_not_change_the_projection_at_d() -> None:
+    w = build_world()
+    d, nxt, e = DAYS[1], DAYS[2], DAYS[3]
+    _reports(w, d, {IDS[0]: (2, e, "pre", e), IDS[1]: (2, e, "unknown", e)})
+    # The next session's calendar moves N00 after the close and gives N01 a time.
+    _reports(w, nxt, {IDS[0]: (1, e, "post", e), IDS[1]: (1, e, "pre", e)})
+    at_d = read_events(w.reader, "earnings_reaction_expected", -1, [d], lambda _: ALL)
+    assert at_d.names == {d: frozenset({IDS[0]})}
+    assert at_d.unknown[d][TIME_UNKNOWN] == 1  # N01 stays unknown at D: never the later time
+    # Read on the next session, the revised time decides there (N00's R is now e + 1).
+    later = read_events(w.reader, "earnings_reaction_expected", -1, [nxt], lambda _: ALL)
+    assert later.names == {nxt: frozenset({IDS[0]})}
+
+
+def test_a_report_with_an_unknown_time_is_counted_unknown_once() -> None:
+    """Its count reaches the target on two decision sessions (before-open, then after-close);
+    an UNKNOWN name is not deduplicated, so it is counted only on the earlier one."""
+    w = build_world()
+    d, nxt, e = DAYS[1], DAYS[2], DAYS[3]
+    _reports(w, d, {IDS[0]: (2, e, "unknown", e), IDS[1]: (2, e, "pre", e)})
+    _reports(w, nxt, {IDS[0]: (1, e, "unknown", e), IDS[2]: (2, DAYS[4], "pre", DAYS[4])})
+    found = read_events(w.reader, "earnings_reaction_expected", -1, [d, nxt], lambda _: ALL)
+    assert found.unknown_total()[TIME_UNKNOWN] == 1
+
+
+def test_every_class_anchored_on_an_expected_report_carries_the_containment_diagnostic() -> None:
+    """Architect review (F10b): the harness keyed the report-containment diagnostic on the
+    literal ``earnings_expected``, so a projected class silently lost it."""
+    ahead = {k for k, v in EVENT_FIELDS.items() if v.announced_ahead and k.startswith("earnings")}
+    assert set(events.REPORT_ANCHORED) == ahead
