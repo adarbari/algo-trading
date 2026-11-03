@@ -26,7 +26,7 @@ from algotrade.services.evaluation.cross_section.random_picks import (
 from algotrade.services.evaluation.cross_section.reads import session as session_reads
 from algotrade.services.evaluation.cross_section.results import edge_eval_frame
 from algotrade.services.evaluation.cross_section.run.evaluation import EdgeEvaluation, RandomPicks
-from tests.helpers.stored_frames import stamped
+from tests.helpers.stored_frames import stamped_at_close
 from tests.unit.services.evaluation.cross_section.conftest import (
     AS_OF,
     DAYS,
@@ -290,7 +290,7 @@ def sectored(world: Any) -> Any:
          "sector": "Technology" if i < 10 else "Energy", "fetched_on": snap}
         for i, iid in enumerate(WORLD_IDS)
     ]  # fmt: skip
-    world.writer.write_table("instruments/company", snap, "c1", stamped(rows, snap, "c1"))
+    world.writer.write_table("instruments/company", snap, "c1", stamped_at_close(rows, snap, "c1"))
     return world
 
 

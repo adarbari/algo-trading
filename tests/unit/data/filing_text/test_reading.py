@@ -22,7 +22,7 @@ from algotrade.data.filing_text.reading import (
 )
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.writers import StoreWriter
-from tests.helpers.stored_frames import T0, stamped
+from tests.helpers.stored_frames import T0, stamped, stamped_at_close
 
 TABLE = "events/filing_text"
 ACCEPTED = pd.Timestamp("2026-02-10T21:30:00Z")  # 16:30 New York: public from 2026-02-11
@@ -62,7 +62,10 @@ def reader(
         writer.write_table(TABLE, FIRST, name, frame)
     if companies:
         writer.write_table(
-            "instruments/company", SNAPSHOT, "co", stamped(company(*companies), SNAPSHOT, "co")
+            "instruments/company",
+            SNAPSHOT,
+            "co",
+            stamped_at_close(company(*companies), SNAPSHOT, "co"),
         )
     return StoreReader(writer._backend)
 
@@ -140,7 +143,10 @@ def test_since_bounds_the_acceptance_session_partitions_read() -> None:
         frame = stamped(rows, day, f"r{day}", T0, "sec_edgar")
         writer.write_table(TABLE, day, f"r{day}", frame)
     writer.write_table(
-        "instruments/company", SNAPSHOT, "co", stamped(company(("EQ:AAA", "1")), SNAPSHOT, "co")
+        "instruments/company",
+        SNAPSHOT,
+        "co",
+        stamped_at_close(company(("EQ:AAA", "1")), SNAPSHOT, "co"),
     )
     store = StoreReader(writer._backend)
     on = date(2026, 10, 2)
@@ -172,7 +178,7 @@ def two_filers(companies: tuple[tuple[str, str], ...] = (("EQ:AAA", "1"),)) -> S
     for day, name, rows_ in parts:
         writer.write_table(TABLE, day, name, stamped(rows_, day, name, T0, "sec_edgar"))
     if companies:
-        frame = stamped(company(*companies), SNAPSHOT, "co")
+        frame = stamped_at_close(company(*companies), SNAPSHOT, "co")
         writer.write_table("instruments/company", SNAPSHOT, "co", frame)
     return StoreReader(writer._backend)
 
@@ -202,7 +208,7 @@ def test_a_read_before_the_first_snapshot_uses_the_earliest_and_discloses_it() -
         "instruments/company",
         date(2026, 6, 1),
         "co2",
-        stamped(company(("EQ:AAB", "1")), SNAPSHOT, "co2"),
+        stamped_at_close(company(("EQ:AAB", "1")), SNAPSHOT, "co2"),
     )
     seen = filing_text(late, ["EQ:AAA"], date(2026, 2, 12))  # the 2026-01-01 snapshot stands
     assert seen["instrument_id"].tolist() == ["EQ:AAA"] and seen.attrs["pre_snapshot"] is False
