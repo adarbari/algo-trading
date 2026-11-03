@@ -174,6 +174,17 @@ the model and prompt version for a model row, `known_from` = the session it was 
 `run_id`). The read takes, per (instrument, session), the highest source, then the latest.
 The `attributing` nightly step is non-critical (ADR 0039).
 
+**As built (EV4a, 2026-11-02; architect review):** the `attribution` task (after `rollups` and `filings`)
+re-reads the last 5 sessions each run and attributes **every** big mover (an earnings day too: its Item 2.02
+is the cause, `results`), not only the ones with no calendared event; the unscheduled statistics of
+`event_reaction@v1` are unchanged (they classify by the calendar, not by this table). Confidence is by
+class (results, acquisition, restatement, delisting 0.9; agreement, management 0.8; guidance, other events
+0.6) and at most 0.7 when a filing names several. The table's merge key is instrument, session and source.
+**EV4b** (Massive headlines capped to the movers, classified through the `TextModel`) is its own slice: the
+seam is wired in the API today (ADR 0041) and its usage log is the API's (ADR 0058), so ingestion's use
+needs a decision on where the model and its ledger live (an ADR 0005 amendment); never the `only_users`
+Claude-login adapter; a model row's `known_from` is the session it ran on; `model` / `prompt_version` columns.
+
 ### 4.6 The deep dive (periodic, a skill the owner runs)
 
 Finding the **true drivers** of a name is analyst work, not a nightly formula: for MU it is
