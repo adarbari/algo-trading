@@ -378,3 +378,11 @@ follow-up PR).
 - decided by: orchestrator (design call)
 - status: pending owner confirmation
 - Reasoning: the document is blocked until the history exists, so (a) costs nothing and keeps the point-in-time rule (the date and time of day are known by D, `known_from <= D`); (b) is a feature and schedule change with its own review; (c) is not the thesis.
+
+## 2026-11-03 | EV8 | How an admin changes the event-study scope list
+- Question: the Admin screen must add / remove scope tickers; `config/site/events/scope.toml` is site config (changes by PR; the config writer refuses site writes). Where do the admin's changes live?
+- Options: (A) a new admin-owned, git-ignored document `config/admin/events/scope.toml` (reserved scope `admin`, `[[added]]` / `[[removed]]` with `by`, `at`, `note`) layered over the site list at load; (B) the API rewrites the site file; (C) a small table the API writes.
+- Decision: (A). Effective list = site names + admin added - admin removed, resolved once in `services/events/scope.py`; a removal drops only the `list` reason (never the tier reason) and deletes no stored data; written through `services/authoring` (admin role), symbol checked by the site loader's rule and `SymbolResolver`. A change is only recorded: the next nightly's budgeted fill picks added names up. ADR 0029 (an `admin` config scope), 0005 (API write list), 0015 (the admin layer) and 0050 are amended in the EV8 PR; the admin file lives on the Mac only, so `docs/hosting.md` lists it in the backup.
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: keeps "site by PR" intact, no git-tracked file dirtied on the host, one new document kind instead of a store.
