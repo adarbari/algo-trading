@@ -53,8 +53,16 @@ def _inputs(
     bars: pd.DataFrame,
     releases: list[dict[str, object]],
     reports: list[dict[str, object]] | None = None,
+    calendar: bool = True,
 ) -> dict[str, pd.DataFrame | None]:
-    rel = stamped(releases, SESSION, "m") if releases else None
+    # the calendar must cover the window (its first release at the grid's start) or the residual
+    # and the shares are unknown (``calendar`` False: no calendar at all)
+    covering = [_release("ISM_SERVICES", GRID[1], GRID[0])] if calendar else []
+    rel = (
+        stamped([*covering, *releases], SESSION, "m")
+        if (releases or calendar) and calendar
+        else None
+    )
     rows = [{"instrument_id": A, "ts": pd.Timestamp(date(2020, 1, 1), tz="UTC"), "time": "unknown",
              "known_from": date(2020, 1, 1), "reported": True}, *(reports or [])]  # fmt: skip
     return {earnings.EVENTS: stamped(rows, SESSION, "e"), "bars/1d": bars,
@@ -75,7 +83,7 @@ def test_a_macro_release_is_read_in_normal_days_on_its_reaction_session() -> Non
     assert row["macro_cpi_n"] == 1
     assert row["macro_cpi_multiple_median"] > 5  # an 8% fall over a 1% day
     assert row["macro_cpi_down_worst"] == pytest.approx(np.expm1(-SPIKE))
-    assert pd.isna(row["macro_ppi_multiple_median"]) and row["macro_ppi_n"] == 0
+    assert pd.isna(row["macro_ppi_multiple_median"]) and pd.isna(row["macro_ppi_n"])  # not listed
     assert row["reaction_status"] == er.OK
 
 
@@ -98,10 +106,11 @@ def test_a_reaction_after_the_session_a_later_known_release_and_a_moved_date_are
     ]
     out = er.compute(_inputs(_bars(), rel), SESSION, None)
     row = _a(out)
-    assert row["macro_cpi_n"] == 0 and row["macro_gdp_n"] == 0
+    assert row["macro_cpi_n"] == 0  # listed, its reaction session not here yet
+    assert pd.isna(row["macro_gdp_n"])  # its only date moved away: no release known
     assert row["macro_ppi_n"] == 1  # known by the session itself
     earlier = er.compute(_inputs(_bars(), rel), previous_session(SESSION), None)
-    assert _a(earlier)["macro_ppi_n"] == 0
+    assert pd.isna(_a(earlier)["macro_ppi_n"])  # not known yet: UNKNOWN
 
 
 def test_earnings_by_report_time_and_an_unknown_time_is_left_out_of_the_multiples() -> None:
@@ -175,3 +184,17 @@ def test_the_market_group_reads_the_index_level() -> None:
 def test_every_column_is_declared_in_order() -> None:
     out = er.compute(_inputs(_bars(), []), SESSION, None)
     assert list(out.columns) == ["instrument_id", *er.COLUMNS]
+
+
+def test_a_missing_or_short_calendar_is_unknown_never_event_free() -> None:
+    bars = _bars(spike_days=(GRID[-20],))
+    none = _a(er.compute(_inputs(bars, [], calendar=False), SESSION, None))
+    assert pd.isna(none["macro_cpi_n"]) and pd.isna(none["unattributed_big_moves_252d"])
+    assert pd.isna(none["share_of_top_moves_unscheduled"])
+    assert none["big_moves_252d"] == 1  # the big move itself does not need the calendar
+    # a calendar that starts 30 sessions ago covers neither the year nor the window
+    short = _inputs(bars, [_release("CPI", CPI_DAY, GRID[0])], calendar=False)
+    short[er.MACRO_RELEASE] = stamped([_release("CPI", CPI_DAY, GRID[0])], SESSION, "m")
+    row = _a(er.compute(short, SESSION, None))
+    assert row["macro_cpi_n"] == 1 and pd.isna(row["macro_ppi_n"])  # a key never listed: UNKNOWN
+    assert pd.isna(row["unattributed_share_252d"]) and pd.isna(row["share_of_top_moves_macro"])

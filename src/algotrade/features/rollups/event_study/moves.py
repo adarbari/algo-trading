@@ -119,6 +119,15 @@ def release_days(releases: pd.DataFrame | None, session: date) -> list[tuple[str
     )
 
 
+def calendar_cover(grid: list[date], releases: list[tuple[str, date, str]]) -> int | None:
+    """The first position on ``grid`` the release calendar covers: its earliest known release
+    (the calendar is stored from a start date, so earlier sessions are unknown, not event-free);
+    None when no release is known."""
+    if not releases:
+        return None
+    return bisect_left(grid, min(day for _, day, _ in releases))
+
+
 def reaction_position(grid: list[date], day: date, time_et: str | None = CLOSE_ET) -> int | None:
     """The position on ``grid`` (sessions ending at S, oldest first) of the session an event on
     ``day`` reacts on, or None when it is not on the grid (before the first session, after S, or

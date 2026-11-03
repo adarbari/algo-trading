@@ -8,13 +8,17 @@ three years is the window of this version, a longer one is a new version);
 ``earnings_reaction@v2`` reads it (``read_reactions``: the calendar rows known by the session, one
 report per quarter: the same counted reports, not a second window); ``events/macro_release`` (the
 latest version of each release known by the session, ``known_from <= S``; a ``moved`` date dropped).
-The 8-K results rows join the earnings reports with the per-quarter precedence of earnings v2.
+The 8-K results rows are not read until their per-quarter precedence is built (EV2b).
 
 An event's reaction session, the move, the normal day and the multiple are ``moves``' (log return
 of the reaction session over the stdev of the 20 returns before it); an earnings report counts when
 its time is known (``pre``: its own session, ``post``: the next), an unknown time is left out of the
 multiples and still explains a big move on its two sessions. Only reaction sessions on or before the
 session count.
+
+A session before the release calendar's first known release is unknown, not event-free: a macro
+column of a key with no release known, the unattributed counts and the top-move shares (they need
+the calendar over their window) are null until the calendar covers it (``moves.calendar_cover``).
 
 Columns, each null (UNKNOWN) and never zero when fewer than 250 sessions of the name's own bars
 stand behind them (``reaction_status`` SHORT_HISTORY):
@@ -271,6 +275,45 @@ def top_shares(returns: np.ndarray, cls: np.ndarray) -> np.ndarray:
     return out
 
 
+def big_move_columns(
+    returns: np.ndarray, mult: np.ndarray, cls: np.ndarray, cover: int | None
+) -> dict[str, np.ndarray]:
+    """The session's normal day and flags, the big-move counts of the last year, the unattributed
+    ones and the top-move shares. A session before the calendar's start (``cover``, a position) is
+    unknown, not event-free: the residual and the shares need the calendar over their window."""
+    width, size = returns.shape[1], len(returns)
+    is_big = moves.big(returns, mult)
+    year = slice(-moves.YEAR, None)
+    enough = np.isfinite(returns[year]).sum(axis=0) >= moves.YEAR  # a missing return is not "calm"
+    big_n = is_big[year].sum(axis=0)
+    unattributed = (is_big & (cls == 0))[year].sum(axis=0)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        share = np.where(big_n > 0, unattributed / big_n, np.nan)
+    unknown = np.full(width, np.nan)
+    if cover is None or cover > size - moves.YEAR:
+        unattributed, share = unknown, unknown
+    shares = top_shares(returns, cls)
+    if cover is None or cover > 1:
+        shares = np.full(shares.shape, np.nan)
+    today = returns[-1]
+    out = {
+        "normal_day_20d": moves.normal_day(returns),
+        "big_move_5pct_today": np.where(
+            np.isnan(today), np.nan, (np.abs(np.expm1(today)) > moves.BIG_PCT).astype(float)
+        ),
+        "big_move_2x_today": np.where(
+            np.isnan(mult[-1]), np.nan, (mult[-1] > moves.BIG_MULTIPLE).astype(float)
+        ),
+        "big_moves_252d": np.where(enough, big_n, np.nan),
+        "big_down_moves_252d": np.where(enough, (is_big & (returns < 0))[year].sum(axis=0), np.nan),
+        "unattributed_big_moves_252d": np.where(enough, unattributed, np.nan),
+        "unattributed_share_252d": np.where(enough, share, np.nan),
+    }
+    classes = (moves.EARNINGS, moves.MACRO, moves.STRUCTURE_CLASS, moves.UNSCHEDULED)
+    out.update({f"share_of_top_moves_{name}": shares[k] for k, name in enumerate(classes)})
+    return out
+
+
 def compute(inputs: Inputs, session: date, params: None) -> pd.DataFrame:
     read = read_reactions(inputs, session, HISTORY)
     grid, px = read.grid, read.px
@@ -295,8 +338,13 @@ def compute(inputs: Inputs, session: date, params: None) -> pd.DataFrame:
             down,
         )
 
+    seen = {key for key, _, _ in releases}
+    cover = moves.calendar_cover(grid, releases)
     for key in moves.MACRO_KEYS:
-        add_class(f"macro_{key.lower()}", *moves.class_stats(mult, returns, macro_pos[key]))
+        stats = moves.class_stats(mult, returns, macro_pos[key])
+        if key not in seen:  # no release of the key known: UNKNOWN, not "no events"
+            stats = tuple(np.full(width, np.nan) for _ in stats)  # type: ignore[assignment]
+        add_class(f"macro_{key.lower()}", *stats)
     for name in moves.STRUCTURE:
         add_class(name, *moves.class_stats(mult, returns, structure_pos[name]))
     n, med, down = np.zeros(width, dtype=np.int64), np.full(width, np.nan), np.full(width, np.nan)
@@ -304,34 +352,10 @@ def compute(inputs: Inputs, session: date, params: None) -> pd.DataFrame:
         n[col], med[col], down[col] = (
             a[0] for a in moves.class_stats(mult[:, [col]], returns[:, [col]], positions)
         )
+    n = np.where([i not in read.all_reports for i in read.ids], np.nan, n)  # no report known
     add_class("earnings", n, med, down)
 
-    is_big = moves.big(returns, mult)
-    year = slice(-moves.YEAR, None)
-    big_n = is_big[year].sum(axis=0)
-    unattributed = (is_big & (cls == 0))[year].sum(axis=0)
-    with np.errstate(divide="ignore", invalid="ignore"):
-        share = np.where(big_n > 0, unattributed / big_n, np.nan)
-    cols.update(
-        normal_day_20d=moves.normal_day(returns),
-        big_move_5pct_today=np.where(
-            np.isnan(returns[-1]),
-            np.nan,
-            (np.abs(np.expm1(returns[-1])) > moves.BIG_PCT).astype(float),
-        ),
-        big_move_2x_today=np.where(
-            np.isnan(mult[-1]), np.nan, (mult[-1] > moves.BIG_MULTIPLE).astype(float)
-        ),
-        big_moves_252d=big_n.astype(np.int64),
-        big_down_moves_252d=(is_big & (returns < 0))[year].sum(axis=0),
-        unattributed_big_moves_252d=unattributed,
-        unattributed_share_252d=share,
-    )
-    shares = top_shares(returns, cls)
-    for k, name in enumerate(
-        (moves.EARNINGS, moves.MACRO, moves.STRUCTURE_CLASS, moves.UNSCHEDULED)
-    ):
-        cols[f"share_of_top_moves_{name}"] = shares[k]
+    cols.update(big_move_columns(returns, mult, cls, cover))
 
     long_enough = np.isfinite(px).sum(axis=0) >= moves.MIN_SESSIONS
     frame = pd.DataFrame({"instrument_id": read.ids})

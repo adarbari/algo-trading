@@ -57,14 +57,17 @@ def compute(inputs: Inputs, session: date, params: None) -> pd.DataFrame:
         close[:, 0] = level.reindex(days).to_numpy(dtype=np.float64)
     returns = moves.log_returns(close)
     mult = moves.multiples(returns)
-    macro = moves.macro_positions(grid, moves.release_days(inputs.get(MACRO_RELEASE), session))
+    releases = moves.release_days(inputs.get(MACRO_RELEASE), session)
+    macro = moves.macro_positions(grid, releases)
     structure = moves.structure_positions(grid)
     row: dict[str, object] = {"instrument_id": market_id("US")}
-    enough = int(np.isfinite(close).sum()) >= moves.MIN_SESSIONS
+    has_index = int(np.isfinite(close).sum()) >= moves.MIN_SESSIONS
     classes = {f"spx_macro_{k.lower()}": macro[k] for k in moves.MACRO_KEYS}
     classes |= {f"spx_{name}": structure[name] for name in moves.STRUCTURE}
+    seen = {f"spx_macro_{k.lower()}" for k, _, _ in releases}
     for prefix, positions in classes.items():
         n, median, down = moves.class_stats(mult, returns, positions)
+        enough = has_index and (prefix in seen or not prefix.startswith("spx_macro_"))
         row[f"{prefix}_n"] = int(n[0]) if enough else pd.NA
         row[f"{prefix}_multiple_median"] = float(median[0]) if enough else np.nan
         row[f"{prefix}_down_worst"] = float(down[0]) if enough else np.nan
