@@ -62,6 +62,10 @@ export const ADMIN: Workspace = {
       label: 'Feature requests',
     },
     {
+      path: '/admin/event-scope',
+      label: 'Event scope',
+    },
+    {
       path: '/admin/screener-runs',
       label: 'Screener runs',
     },

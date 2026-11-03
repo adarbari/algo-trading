@@ -284,3 +284,115 @@ The trigger is the first session where three things hold. The VIX is at least 25
 """
 next = "Open the edge's result and read how many recoveries lie behind it."
 see_also = ["market_trigger_vix_spike", "schedule_on_market"]
+
+# ------------------------------------------------------------------ the Admin Event scope page (ADR 0050, plan 5.5)
+
+[[term]]
+id = "event_scope_name"
+term = "Scope list ticker"
+short = "A name the event study covers because the site list says so, with the reasons it is in scope."
+body = """
+The event study measures what moves a name per kind of event. It covers the names of the scope list, plus names that qualify by a rule. The table lists the names of the list, in the list's order. The strip counts the names that are in scope by a rule only.
+A ticker resolves to one instrument through the reference of the served session. A ticker the reference does not know is named in a warning above the table instead of a row.
+"""
+next = "Add a ticker to cover a name, or remove one the study should leave out."
+see_also = ["event_scope_reasons", "event_scope_source"]
+
+[[term]]
+id = "event_scope_reasons"
+term = "Why a name is in scope"
+short = "The reasons that put a name in the event study: put tier, site list, requested or fund reference."
+body = """
+Put tier: the name is optionable and its short-put side is tier A or B. Site list: the list names it. Requested: a run named it by hand, for example a task's symbols option. Fund reference: a leveraged fund maps to it, so the study reads the reference's own events.
+A name can have several reasons. Removing it from the list drops only the list reason: a name in scope by tier stays in scope, and the Removed panel shows the reasons it keeps.
+"""
+next = "Read the reasons before you remove a name: removing the list reason does not take it out of the study."
+see_also = ["event_scope_name", "event_scope_removed"]
+
+[[term]]
+id = "event_scope_source"
+term = "Scope entry source"
+short = "Where a list entry came from: the reviewed site file, or an admin who added it from this page."
+body = """
+Site file: the entry is in the reviewed config file. Admin: an admin added it here, and the column shows who and the day. An admin entry needs no change to the reviewed file.
+Removing a site file name does not edit the file. The removal is recorded beside it, and the name shows in the Removed panel until an admin adds it back.
+"""
+next = "Move an admin entry you want to keep into the site file by a reviewed change."
+see_also = ["event_scope_removed"]
+
+[[term]]
+id = "event_scope_last_review"
+term = "Last deep-dive review"
+short = "The date of the owner's last deep-dive dossier for this name that the session knew about."
+body = """
+A deep-dive review is the owner-run read of one name's biggest unexplained moves. Its dossier enters through the dossier import, and its date counts once the session knew it. A dash means no dossier is known.
+The date is the review, not the day of the moves it covered. A dossier imported late shows from the session after the import.
+"""
+next = "Run a deep dive for a stale name, then import its dossier."
+see_also = ["event_scope_stale", "event_scope_moves"]
+
+[[term]]
+id = "event_scope_stale"
+term = "Stale review"
+short = "A name with no deep-dive review in the last 90 days, or never reviewed."
+body = """
+Current: the last review is within 90 days of the served session. Stale: it is older, or the name was never reviewed. The strip counts the stale names.
+Stale does not mean wrong. It means the attribution of this name's unscheduled moves has not had a human look for a while, so read its share of attributed moves with care.
+"""
+next = "Review a stale name with the deep-dive skill, then import the dossier; the flag clears from the session after."
+see_also = ["event_scope_last_review", "event_scope_moves"]
+
+[[term]]
+id = "event_scope_moves"
+term = "Big moves attributed"
+short = "Of a name's largest moves in the last year, the share with a known cause."
+body = """
+The server takes the name's largest moves of the last year and counts how many have an attribution known by the session, from any source: a filing, a headline or a dossier. The column shows that count over the total as a percent.
+A dash means unknown, for example a name with under a year of bars. A share of three attributed out of four is 75%, but four moves are too few to read: compare names only when each has about twenty big moves. A high share says the moves were explained, not that the explanation is right.
+"""
+next = "Look at the names with a low share first: their unscheduled moves are the least explained."
+see_also = ["event_scope_stale", "event_scope_last_review"]
+
+[[term]]
+id = "event_scope_macro"
+term = "Macro releases ahead"
+short = "How many scheduled macro releases the calendar holds for the next 90 days."
+body = """
+The study tracks eight kinds of macro release: FOMC, CPI, employment, PCE, GDP, PPI, retail sales and ISM. The strip counts the releases scheduled in the window, known by the session.
+A count far below its usual level means a release is missing from the calendar, not that fewer happen. If the calendar has nothing known, the strip says why instead of a zero.
+"""
+next = "When the count looks low, check the macro calendar source before you trust the Calendar page."
+see_also = ["event_scope_name"]
+
+[[term]]
+id = "event_scope_removed"
+term = "Removed from the scope list"
+short = "Names an admin removed from the list: who, when and why, and the reasons they stay in scope."
+body = """
+A removal is recorded by the admin and never edits the site file. The panel shows the admin, the day, the note and any reason that still keeps the name in scope. An empty reasons cell means the study no longer covers the name.
+Restore adds the name back with no note. The list shows it again at once.
+"""
+next = "Restore a name removed by mistake, or leave it removed."
+see_also = ["event_scope_reasons", "event_scope_source"]
+
+[[term]]
+id = "event_scope_unresolved"
+term = "Unresolved scope tickers"
+short = "Tickers on the list that the session's reference snapshot does not know, so they have no row."
+body = """
+Each list entry resolves through the reference of the served session. A ticker it does not know gets no row: the ticker may be delisted, new, or misspelled.
+Adding a ticker that does not resolve is refused when you add it. A name already on the list can stop resolving later, and this warning is where it shows.
+"""
+next = "Fix the spelling by removing and adding the name again, or remove it if the company is gone."
+see_also = ["event_scope_name"]
+
+[[term]]
+id = "event_scope_add"
+term = "Add a scope ticker"
+short = "Put a ticker in the event study; the server resolves it and answers an error when it cannot."
+body = """
+Type the ticker as listed, such as AAPL or BRK.B, with an optional note of up to 200 characters about why. The server resolves it and records who added it. Adding a name already listed changes nothing and says so.
+A new name has no review and no attribution share until its data is read for a session.
+"""
+next = "Check the table after the add: the name shows as Admin source, with no review yet."
+see_also = ["event_scope_source", "event_scope_name"]

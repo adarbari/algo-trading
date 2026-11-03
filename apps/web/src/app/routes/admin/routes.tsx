@@ -1,9 +1,10 @@
-/** ADMIN workspace under `/admin`: Ingestion, LLM usage & cost, Edge runs, Feature requests, Screener runs & sharing, Users & configs. */
+/** ADMIN workspace under `/admin`: Ingestion, LLM usage & cost, Edge runs, Feature requests, Event scope, Screener runs & sharing, Users & configs. */
 import { createRoute } from '@tanstack/react-router';
 
 import { WorkspaceLayout } from '../../layouts';
 import { ADMIN, workspaceGuard } from '../../workspaces';
 import { rootRoute } from '../root';
+import { eventScopeRoute } from './event-scope';
 import { featureRequestsRoute } from './feature-requests';
 import { harnessRunsRoute } from './harness-runs';
 import { ingestionRoute } from './ingestion';
@@ -23,6 +24,7 @@ export const adminRoutes = adminRoute.addChildren([
   llmUsageRoute(adminRoute),
   harnessRunsRoute(adminRoute),
   featureRequestsRoute(adminRoute),
+  eventScopeRoute(adminRoute),
   screenerRunsRoute(adminRoute),
   usersRoute(adminRoute),
 ]);

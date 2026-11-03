@@ -403,6 +403,11 @@ export type ScreenerTrackRecordsQueryVariables = Exact<{ [key: string]: never; }
 
 export type ScreenerTrackRecordsQuery = { edges: Array<{ id: string, status: string }>, screeners: Array<{ id: string, trackRecords: Array<{ screenerId: string, edgeId: string, edgeName: string, runLabel: string | null, splitFrom: string | null, afterSession: boolean, notRun: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, horizons: Array<{ horizonSessions: number, hitRate: number | null, baseRate: number | null, liftPts: number | null, sessions: number | null, picks: number | null }> }> }> };
 
+export type EventScopeQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type EventScopeQuery = { eventScope: { session: string, staleDays: number, unresolved: Array<string>, otherNames: number, macroDays: number, macroReleases: number | null, names: Array<{ instrumentId: string, symbol: string, reasons: Array<string>, source: string, addedOn: string, note: string, by: string | null, at: string | null, lastReview: string | null, stale: boolean, moves: { big: number, attributed: number, share: number } | null }>, removed: Array<{ symbol: string, by: string, at: string, note: string, reasons: Array<string> }>, macroUnknown: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null } | null };
+
 export type EventCalendarQueryVariables = Exact<{
   instrumentIds: Array<string> | string;
   scope: boolean;
@@ -2028,6 +2033,58 @@ export const ScreenerTrackRecordsDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<ScreenerTrackRecordsQuery, ScreenerTrackRecordsQueryVariables>;
+export const EventScopeDocument = new TypedDocumentString(`
+    query EventScope {
+  eventScope {
+    session
+    staleDays
+    names {
+      instrumentId
+      symbol
+      reasons
+      source
+      addedOn
+      note
+      by
+      at
+      lastReview
+      stale
+      moves {
+        big
+        attributed
+        share
+      }
+    }
+    removed {
+      symbol
+      by
+      at
+      note
+      reasons
+    }
+    unresolved
+    otherNames
+    macroDays
+    macroReleases
+    macroUnknown {
+      code
+      reason
+      kind
+      guideTerm
+      kindText
+      cause {
+        links {
+          level
+          subject
+          status
+          message
+          runId
+        }
+      }
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<EventScopeQuery, EventScopeQueryVariables>;
 export const EventCalendarDocument = new TypedDocumentString(`
     query EventCalendar($instrumentIds: [String!]!, $scope: Boolean!) {
   eventCalendar(instrumentIds: $instrumentIds, scope: $scope) {
