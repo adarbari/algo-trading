@@ -7,8 +7,11 @@ with a bar among the last ``year_sessions`` sessions (the session included), so 
 did not trade on the session still has a row saying so: the read shows "No trade" for its
 close, never an older close (ADR 0036). Only bars on or before the session are read.
 
-    bar_status       TRADED (a bar on the session) or NO_TRADE (none; an earlier bar in the
-                     window). The ``null_status`` of ``price_stats.close``
+    bar_status       TRADED (a bar on the session), NO_TRADE (none; an earlier bar in the
+                     window) or BAD_BAR (none, because the bar-quality check flagged the
+                     session's bar and reads drop it, ADR 0061: a bad datum, not a day
+                     without a trade, so ``price_stats.close`` stays unexplained: UNKNOWN).
+                     The ``null_status`` of ``price_stats.close``
     last_bar_session the session of the latest bar on or before the session
     range_sessions   sessions from the first bar in the window to the session, both included
     range_status     how much history the range covers (the first that holds):
@@ -46,7 +49,9 @@ type Matrix = npt.NDArray[np.float64]
 
 NAME = "price_history"
 VERSION = 1
-TRADED, NO_TRADE = "TRADED", NullReason.NO_TRADE.value
+TRADED, NO_TRADE, BAD_BAR = "TRADED", NullReason.NO_TRADE.value, "BAD_BAR"
+FLAGS = "events/bar_flag"  # the bar-quality task's flags (ADR 0061), read by the bar's date
+FLAGGED = "FLAGGED"
 FULL, SINCE_LISTING, NO_HISTORY = "FULL", "SINCE_LISTING", "NO_HISTORY"
 NEW_LISTING, FEW_BARS = NullReason.NEW_LISTING.value, NullReason.FEW_BARS.value
 SHORT = (FEW_BARS, NEW_LISTING)  # the range statuses with no range: EXPLAINED (ADR 0046)
@@ -59,8 +64,10 @@ FEATURES = (
     Feature(
         "bar_status", "str", "category",
         "TRADED: a bar on the session; NO_TRADE: none, though the instrument has a bar among "
-        "the last year_sessions (252) sessions",
-        "never", "label", categories=(TRADED, NO_TRADE), inputs=(CLOSE,),
+        "the last year_sessions (252) sessions; BAD_BAR: none, because the session's bar was "
+        "flagged as wrong by the bar-quality check and dropped (the close is unknown, not "
+        "untraded)",
+        "never", "label", categories=(TRADED, NO_TRADE, BAD_BAR), inputs=(CLOSE,),
     ),
     Feature(
         "last_bar_session", "date", "date",
@@ -123,11 +130,16 @@ def lookback(p: PriceHistoryParams) -> int:
 
 
 def history(
-    high: Matrix, low: Matrix, close: Matrix, p: PriceHistoryParams
+    high: Matrix,
+    low: Matrix,
+    close: Matrix,
+    p: PriceHistoryParams,
+    flagged: npt.NDArray[np.bool_] | None = None,
 ) -> dict[str, npt.NDArray[np.generic]]:
     """Every column but ``last_bar_session`` (as the index of the last bar in the panel) for
     the LAST session of the panel (``listing_quiet + year_sessions`` sessions x instruments,
-    NaN: no bar), one value per instrument, for the instruments with a bar in the window.
+    NaN: no bar; ``flagged``: per instrument, the last session's bar was dropped as bad),
+    one value per instrument, for the instruments with a bar in the window.
     A session with no bar for any instrument is one the store lacks: a listing (nothing
     before the first bar) or FEW_BARS is claimed only where every session it rests on is
     stored."""
@@ -155,9 +167,10 @@ def history(
         high_avail = np.where(ranged, np.fmax.reduce(high[-year:], axis=0), np.nan)
         low_avail = np.where(ranged, np.fmin.reduce(low[-year:], axis=0), np.nan)
     last = len(close) - 1 - np.argmax(traded[::-1], axis=0)
+    dropped = np.zeros(close.shape[1], dtype=bool) if flagged is None else flagged
     return {
         "present": present,
-        "bar_status": np.where(traded[-1], TRADED, NO_TRADE),
+        "bar_status": np.where(traded[-1], TRADED, np.where(dropped, BAD_BAR, NO_TRADE)),
         "last_bar": last,
         "range_sessions": since,
         "range_status": status,
@@ -171,7 +184,11 @@ def compute(inputs: Inputs, session: date, p: PriceHistoryParams) -> pd.DataFram
     assert bars is not None  # required input
     days = sessions_ending(session, lookback(p) + 1)
     px = panel(bars, days)
-    values = history(px.high, px.low, px.close, p)
+    flags = inputs.get(FLAGS)
+    dropped = set()
+    if flags is not None and len(flags):  # the latest row of a bar wins: CLEARED retracts
+        dropped = set(flags.loc[flags["status"] == FLAGGED, "instrument_id"].astype(str))
+    values = history(px.high, px.low, px.close, p, np.isin(px.ids, list(dropped)))
     keep = values["present"]
     frame = pd.DataFrame({"instrument_id": px.ids[keep]})
     for column in ("bar_status", "range_status", "high_avail", "low_avail"):
@@ -185,7 +202,7 @@ GROUP = FeatureGroup(
     NAME,
     VERSION,
     "Whether the instrument traded on the session, and its high / low over the history it has",
-    (Input(BARS, lookback=lookback),),
+    (Input(BARS, lookback=lookback), Input(FLAGS, required=False)),
     FEATURES,
     compute,
     PriceHistoryParams(),

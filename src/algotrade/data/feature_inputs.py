@@ -56,7 +56,8 @@ in its owner here in ``algotrade.data``; ``INPUTS`` maps the table to it:
                        known then, including a declared future ex-date), with an ex-date on or
                        after the chunk's first session; ``None`` when there is none. The same
                        table as ``events/dividend``, a second read of it
-- ``events/dividend``, ``events/split``, ``events/index_change``
+- ``events/dividend``, ``events/split``, ``events/index_change``,
+                       ``events/bar_flag``
                        ``events.events_by_event_date``: events with an event date from
                        ``lookback`` sessions before the session up to the session (never a
                        later one, e.g. a declared future ex-date), with ``event_date``; an
@@ -730,6 +731,7 @@ INPUTS: Mapping[str, Loader] = {
     "events/dividend": _events_by_date("events/dividend"),
     "events/dividend_declared": _event_snapshots("events/dividend", from_first_session=True),
     "events/split": _events_by_date("events/split"),
+    "events/bar_flag": _events_by_date("events/bar_flag"),
     "events/index_change": _events_by_date("events/index_change"),
     IPO_LOCKUPS: _ipo_lockups,
     ETF_LAUNCHES: _etf_launches,

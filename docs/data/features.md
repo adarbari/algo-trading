@@ -86,11 +86,11 @@ Close, moving averages, returns, 52-week range, realised vol and dollar volume. 
 
 ## `price_history@v1`
 
-Whether the instrument traded on the session, and its high / low over the history it has. Stored as `rollups/instrument/price_history@v1`; reads `bars/1d`.
+Whether the instrument traded on the session, and its high / low over the history it has. Stored as `rollups/instrument/price_history@v1`; reads `bars/1d`, `events/bar_flag` (optional).
 
 | Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
 |---|---|---|---|---|---|---|---|---|
-| `bar_status` | label | str | category | open | TRADED, NO_TRADE | TRADED: a bar on the session; NO_TRADE: none, though the instrument has a bar among the last year_sessions (252) sessions | never | `bars/1d.close` |
+| `bar_status` | label | str | category | open | TRADED, NO_TRADE, BAD_BAR | TRADED: a bar on the session; NO_TRADE: none, though the instrument has a bar among the last year_sessions (252) sessions; BAD_BAR: none, because the session's bar was flagged as wrong by the bar-quality check and dropped (the close is unknown, not untraded) | never | `bars/1d.close` |
 | `last_bar_session` | window | date | date | open |  | The session of the latest bar on or before the session | never | `bars/1d.close` |
 | `range_sessions` | window | int | sessions | open | >= 1 | Sessions the range covers: from the first bar among the last year_sessions (252) sessions to the session, both included | never | `bars/1d.close` |
 | `range_status` | label | str | category | open | FULL, SINCE_LISTING, NEW_LISTING, FEW_BARS, NO_HISTORY | How much history the range covers: FULL (at least full_bars, 240, bars in the window), SINCE_LISTING (listed inside the window, at least min_listing_sessions, 20, sessions ago), NEW_LISTING (listed more recently), FEW_BARS (an older listing that trades too rarely), NO_HISTORY (the store lacks a session these rules need) | never | `bars/1d.close` |

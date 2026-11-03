@@ -27,8 +27,10 @@ short = "Nothing is stored for this instrument for the session, and nothing went
 body = """
 The instrument has no row in the data behind the field for that day, or the field is stored
 empty. A stock with no listed options has no option chain, a recent listing has no history,
-a company that has not reported has no report date. No failure stands behind it, so waiting
-does not change it. A screen treats it as missing data, like any other UNKNOWN value.
+a company that has not reported has no report date. A price the nightly data check rejected as
+wrong is left out the same way, so the close reads unknown rather than "no trade". No failure
+stands behind it, so waiting does not change it. A screen treats it as missing data, like any
+other UNKNOWN value.
 """
 see_also = ["unknown", "unavailable_not_applicable", "unavailable_system"]
 

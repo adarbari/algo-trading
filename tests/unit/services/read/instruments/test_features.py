@@ -260,6 +260,8 @@ def test_an_explained_status_names_its_reason() -> None:
 
 
 def test_a_status_that_explains_nothing_leaves_the_gap() -> None:
+    bad = _why({BAR_STATUS: "BAD_BAR"}, frozenset(), NO_TRADE)  # a dropped bar is no "no trade"
+    assert bad.code is UnknownCode.NO_ROW and bad.reason is None
     traded = _why({BAR_STATUS: "TRADED"}, frozenset(), NO_TRADE)
     assert (traded.code, traded.reason) == (UnknownCode.NO_ROW, None)  # a real gap stays one
     unstatused = _why({BAR_STATUS: None, STATS_ROW: "EQ:AAA"}, frozenset(), NO_TRADE)

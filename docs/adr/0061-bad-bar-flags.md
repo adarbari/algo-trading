@@ -56,10 +56,14 @@ forward outcomes above +300% at h = 60 since 2018, which the edge harness would 
   WARN naming it.
 - Rollups: a dropped bar is a missing bar, so a window needing it is null by each group's gap
   rule; groups that tolerate a few missing bars (52-week range, volume profile) use the others.
-  Known gap: `price_history` reads a flagged bar on the session as `NO_TRADE`, which is wrong (a
-  flagged bar is a bad datum, not a day without a trade) and which `price_stats` treats as an
-  explained null, hiding the gap. Follow-up (roadmap): a `BAD_BAR` `bar_status` that is
-  unexplained, so the close reads UNKNOWN with a reason.
+  `price_history.bar_status` says `BAD_BAR` (not `NO_TRADE`) for a name whose bar on the session
+  was flagged and dropped (follow-up, 2026-11-02): `price_history` reads `events/bar_flag` as an
+  optional input (the session's flagged bars; a later `CLEARED` row retracts), the status is not
+  in `price_stats.close`'s `explained_statuses`, so the close reads UNKNOWN (`NO_ROW`, public kind
+  not stored; the table and the status are the admin-only cause chain, ADR 0056) and coverage
+  counts it a gap, never an explained null. Every other reader needs no case: outcomes already
+  say `BAD_BAR` through `outcome_reason`, a rollup window needing the bar is null by its gap rule,
+  and the harness leaves out UNMEASURED rows.
 
 ## Consequences
 ## Consequences
