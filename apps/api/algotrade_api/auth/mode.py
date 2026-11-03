@@ -4,6 +4,7 @@ Supabase mode needs the project URL; its keys are fetched once here, and a faile
 logged, not fatal (an outage of the provider must not stop the API from starting: the next
 request with an unknown key fetches again). Off mode serves a declared user only."""
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import StrEnum
 from urllib.parse import urlparse
@@ -37,10 +38,15 @@ class AuthConfig:
 
 
 def open_authenticator(
-    config: AuthConfig, users: UsersSettings, user_id: str, fetch: Fetch | None = None
+    config: AuthConfig,
+    users: UsersSettings,
+    user_id: str,
+    fetch: Fetch | None = None,
+    current: Callable[[], UsersSettings] | None = None,
 ) -> Authenticator:
     """The app's authenticator: ``off`` serves ``user_id`` (a declared user); ``supabase``
-    verifies tokens with the project's keys (``fetch``: the JWKS, default over HTTPS)."""
+    verifies tokens with the project's keys (``fetch``: the JWKS, default over HTTPS) and maps
+    them through ``current()``, the registry as it is now (``users`` when none is given)."""
     if config.mode is AuthMode.OFF:
         user = users.get(user_id)
         if user is None:
@@ -58,4 +64,4 @@ def open_authenticator(
         raise ConfigurationError("SUPABASE_URL: expected https:// (http:// only on loopback)")
     keys = KeySet(fetch if fetch is not None else jwks_fetch(url))
     keys.refresh()
-    return SupabaseAuthenticator(url, users, keys, config.jwt_secret)
+    return SupabaseAuthenticator(url, current or users, keys, config.jwt_secret)

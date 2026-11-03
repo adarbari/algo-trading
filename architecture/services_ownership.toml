@@ -204,6 +204,7 @@ allowed = [
     "apps/ingestion/algotrade_ingestion/tasks/maintenance/compaction/pool.py",  # the compact-runs worker processes (spawn, their own signals and parent watch) and the in-process thread seam of its tests: an OS process pool around one partition's storage call, not a job fan-out (ADR 0078 amendment 2026-10-20)
     "apps/ingestion/algotrade_ingestion/tasks/events/filing_text_fetch.py",  # the filing-text read-ahead: download threads and spawned parse processes in front of the task's own loop, closed before the run releases the ingest lock; not a job fan-out (ADR 0050 amendment 2026-10-21)
     "apps/ingestion/algotrade_ingestion/tasks/events/filing_text_filers.py",  # the daily-index walk's download threads (same amendment): a limiter-paced read of one request a day
+    "src/algotrade/storage/backends/local.py",  # `_map_days`: a read-only bounded pool over one pinned read's partitions (file opens and Arrow decoding), joined before `read_range` returns; no write, no job (RG7, architect-reviewed 2026-11-02)
     "src/algotrade/storage/recording.py",  # the API's background batch writer (live quotes ADR 0028, usage ADR 0058): one thread draining a queue, not a job
 ]
 section = "docs/adr/0019-ownership-and-boundaries.md#r5-everything-runs-through-the-job-runner"
@@ -465,6 +466,13 @@ allowed = [
 ]
 section = "docs/adr/0088-setups-as-positions-and-rules.md#decision"
 detect = [{ call = "trade_frame" }, { call = "series_trades" }, { call = "book_trades" }, { call = "capital_basis_of" }, { call = "tail_measures" }]
+
+[[responsibility]]
+id = "user-onboarding"
+description = "Onboard a trader (ID5, ADR 0040, decision log 2026-11-02): the admin-only write of a new user's config/users/<id>/identity.toml (email, name, declared_by, declared_at in UTC) through the ConfigWriter, refusing an invalid id, `site`, an id or an email the registry already holds and any caller who is not an admin; the role is always trader, no licences (admin and licences change by PR to users.toml); no identity-provider call, the result carries the one remaining provider step as data (services/authoring/onboarding.py)"
+owner = ["src/algotrade/services/authoring/onboarding.py"]
+section = "docs/adr/0040-identity-and-roles.md#decision"
+detect = [{ call = "save_identity" }]
 
 [[responsibility]]
 id = "virtual-feature-reads"

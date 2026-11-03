@@ -10,15 +10,25 @@ site file but in the user's own git-ignored ``config/users/<id>/identity.toml`` 
 optionally ``subject``: the Supabase user id a token's ``sub`` must then equal), attached by
 ``with_identities``. ``settings.load_users`` reads the files, this module does no I/O.
 
+An identity file may also carry ``name``, ``declared_by`` (the admin's id) and ``declared_at``
+(UTC): the onboarding write (ID5, ``services.authoring.onboarding``) declares a user there. A
+user with an identity email and no ``users.toml`` entry joins the registry as a ``trader`` with
+no licences (``declared = "identity"``) only when its ``declared_by`` names an admin of the
+registry (a file without one, or from a user no longer an admin, grants nothing); a
+``users.toml`` entry always wins, and ``admin`` or a licence
+is granted only by the public file (ADR 0040, decision log 2026-11-02).
+
 ``licences`` lists the data licences a user holds beyond the open one (ADR 0064 decision 10,
 ADR 0028): ``personal`` and ``yahoo`` (Yahoo-derived analyst values, ADR 0080) are the owner's
 alone today. Only a holder is served per-name values derived from a feature under that licence;
 everyone else sees them as ``LICENCE``.
 """
 
+import logging
 import uuid
-from collections.abc import Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, replace
+from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
@@ -27,10 +37,12 @@ from algotrade.config.site.macro import HELD_LICENCES
 from algotrade.config.user import DEFAULT_USER, SITE_USER, validate_id
 from algotrade.core.model.errors import ConfigurationError
 
+log = logging.getLogger(__name__)
 WHERE = "users.toml"
 USER_KEYS = ("id", "role", "name", "licences")
 IDENTITY = "identity"  # config/users/<id>/identity.toml: the user's sign-in identity
-IDENTITY_KEYS = ("email", "subject")
+IDENTITY_KEYS = ("email", "subject", "name", "declared_by", "declared_at")
+DECLARED_BY_IDENTITY = "identity"  # ``UserRecord.declared`` of a user only an identity file names
 
 
 class Role(StrEnum):
@@ -53,6 +65,9 @@ class UserRecord:
     email: str | None = None  # lowercased; from identity.toml (never committed: ADR 0040)
     subject: str | None = None  # the pinned Supabase user id (a UUID), when set
     licences: tuple[str, ...] = ()  # data licences held beyond "open" (ADR 0064): "personal"
+    declared: str = ""  # "identity": not in users.toml, declared by the onboarding write
+    declared_by: str | None = None  # the admin who onboarded the user (identity.toml)
+    declared_at: datetime | None = None  # when (UTC; identity.toml)
 
     def __post_init__(self) -> None:
         validate_id("user", self.user_id)
@@ -112,13 +127,68 @@ class UsersSettings:
     def with_identities(self, identities: Mapping[str, "Identity"]) -> "UsersSettings":
         """These users with the identities ``identities`` maps their ids to (``identity``)."""
         none = Identity()
-        return UsersSettings(
-            tuple(
-                replace(u, email=found.email, subject=found.subject)
-                for u in self.users
-                for found in (identities.get(u.user_id, none),)
+        known = tuple(
+            replace(
+                u,
+                email=found.email,
+                subject=found.subject,
+                declared_by=found.declared_by,
+                declared_at=found.declared_at,
             )
+            for u in self.users
+            for found in (identities.get(u.user_id, none),)
         )
+        taken = {u.email for u in known if u.email is not None}
+        joined: list[UserRecord] = []
+        for uid, found in identities.items():  # an identity with an email, no users.toml entry
+            if found.email is None or uid == SITE_USER or self.get(uid) is not None:
+                continue
+            if not self._is_admin(found.declared_by):
+                continue
+            if found.email in taken:  # a later duplicate is skipped, never an error
+                log.warning("identity.toml of user folder %r repeats an email: ignored", uid)
+                continue
+            taken.add(found.email)
+            joined.append(
+                UserRecord(
+                    uid,
+                    Role.TRADER,
+                    found.name,
+                    found.email,
+                    found.subject,
+                    declared=DECLARED_BY_IDENTITY,
+                    declared_by=found.declared_by,
+                    declared_at=found.declared_at,
+                )
+            )
+        return UsersSettings(known + tuple(joined))
+
+    def _is_admin(self, user_id: str | None) -> bool:
+        """Whether ``user_id`` is an admin of this registry (``users.toml`` or the defaults)."""
+        admin = None if user_id is None or user_id == SITE_USER else self.get(user_id)
+        return admin is not None and admin.role is Role.ADMIN
+
+    def read_identities(
+        self, load: Callable[[str], Mapping[str, Any] | None], folders: Iterable[str]
+    ) -> dict[str, "Identity"]:
+        """The identity of every candidate (``identity_candidates``): strict for a declared user,
+        while a malformed file of any other folder is skipped and logged (no values), so one
+        stray file never takes the registry down."""
+        found: dict[str, Identity] = {}
+        for uid in self.identity_candidates(folders):
+            try:
+                found[uid] = identity(load(uid), uid)
+            except ConfigurationError:
+                if self.get(uid) is not None:
+                    raise
+                log.warning("identity.toml of user folder %r is malformed: ignored", uid)
+        return found
+
+    def identity_candidates(self, folders: Iterable[str]) -> list[str]:
+        """The ids whose ``identity.toml`` is read: every declared user but ``site``, then the
+        user folders that are valid ids (a stray folder is not an error)."""
+        ids = [u.user_id for u in self.users] + [f for f in folders if _valid_id(f)]
+        return [i for i in dict.fromkeys(ids) if i != SITE_USER]
 
     def role_of(self, user_id: str) -> Role:
         user = self.get(user_id)
@@ -175,6 +245,17 @@ class Identity:
 
     email: str | None = None
     subject: str | None = None
+    name: str = ""
+    declared_by: str | None = None
+    declared_at: datetime | None = None
+
+
+def _valid_id(value: str) -> bool:
+    try:
+        validate_id("user", value)
+    except ConfigurationError:
+        return False
+    return True
 
 
 def identity(doc: Mapping[str, Any] | None, user_id: str) -> Identity:
@@ -187,6 +268,13 @@ def identity(doc: Mapping[str, Any] | None, user_id: str) -> Identity:
     table = Table(doc, where)
     table.only(IDENTITY_KEYS)
     email, subject = table.raw("email"), table.raw("subject")
+    name, by, at = table.raw("name"), table.raw("declared_by"), table.raw("declared_at")
+    if name is not None and not isinstance(name, str):
+        raise ConfigurationError(f"{where} name: expected a string")
+    if by is not None and not isinstance(by, str):
+        raise ConfigurationError(f"{where} declared_by: expected a user id")
+    if at is not None and (not isinstance(at, datetime) or at.tzinfo is None):
+        raise ConfigurationError(f"{where} declared_at: expected a UTC date-time")
     if email is not None and (not isinstance(email, str) or "@" not in email):
         raise ConfigurationError(f"{where} email: expected an email address")
     if subject is not None and email is None:
@@ -194,6 +282,9 @@ def identity(doc: Mapping[str, Any] | None, user_id: str) -> Identity:
     return Identity(
         email.strip().lower() if isinstance(email, str) else None,
         _subject(subject, where) if subject is not None else None,
+        (name or "").strip(),
+        by,
+        at,
     )
 
 
