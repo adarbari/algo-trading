@@ -10,6 +10,7 @@ import pytest
 
 from algotrade.config.edges.loading import load_edges
 from algotrade.config.edges.positions.templates import (
+    holds_options,
     load_templates,
     parse_templates,
     position_of,
@@ -98,3 +99,25 @@ def test_every_site_return_edge_maps_to_known_templates() -> None:
             assert ids is not None and set(ids) <= set(templates), edge.id
             seen += 1
     assert seen > 40
+
+
+# The outcome kinds that hold no named position and no option structure: shares by construction
+# (a long / short share pair, a weighted share portfolio). A new kind fails the test below until it
+# is classified here or names a position, so no site setup falls to Stocks by default.
+SHARE_ONLY_KINDS = {"pair_spread", "portfolio_return"}
+
+
+def test_every_site_edge_is_a_share_or_an_option_setup() -> None:
+    """The Ideas tabs and the Setups Kind filter (``ideas.setups.tab_of``) read ``holds_options``:
+    every site edge names known templates, an option structure, or a share-only outcome kind."""
+    templates = load_templates(SHIPPED)
+    premium = 0
+    for edge in load_edges(SHIPPED):
+        named = position_of(edge.outcome)
+        if named is not None:
+            assert set(named) <= set(templates), edge.id
+        else:
+            structure = getattr(edge.outcome, "structure", None)
+            assert structure is not None or edge.outcome.kind in SHARE_ONLY_KINDS, edge.id
+        premium += holds_options(edge.outcome, SHIPPED)
+    assert premium >= 15  # the option setups (short puts, covered calls, straddles, ...)

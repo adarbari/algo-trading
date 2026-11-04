@@ -284,6 +284,16 @@ next = "Tick Partial to find the screeners whose picks need a second look."
 see_also = ["run", "not_run", "filter_unknown_rows"]
 
 [[term]]
+id = "filter_edge_kind"
+term = "Kind filter"
+short = "Keeps the setups that trade shares (Stocks) or options (Premium)."
+body = """
+The kind is the position a setup tests, split as the Ideas tabs are. A position made of shares is Stocks. A position with any option leg is Premium, whether it sells the option or buys it. Tick one to see only that kind; tick both, or neither, to see every setup.
+"""
+next = "Tick Premium to list only the option setups."
+see_also = ["idea_tab", "filter_edge_verdict"]
+
+[[term]]
 id = "filter_edge_verdict"
 term = "Verdict filter"
 short = "Keeps the edges whose verdict is one you tick."
