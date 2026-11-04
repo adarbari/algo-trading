@@ -490,6 +490,18 @@ section = "docs/adr/0088-setups-as-positions-and-rules.md#decision"
 detect = [{ call = "trade_frame" }, { call = "series_trades" }, { call = "book_trades" }, { call = "capital_basis_of" }, { call = "tail_measures" }]
 
 [[responsibility]]
+id = "universe-basis-stamp"
+description = "The run stamp universe_basis (ADR 0087 decision 6): a pure predicate over the data layer's counts, the thresholds of verdict.toml [universe_basis] (typed apart in config/edges/universe_basis.py: they stamp a run, never enter settings_hash or the judge), the outcomes table the run read and the grains it measured; free only with no gap, else survivors with every failed condition named and sorted (listings without an id, delisted names without bars, an unknown delisting return, a null security type, an unmerged listing history, outcomes not forward_returns@v3, a share path / residual / option chain grain with no delisting return); the verdict rule reads only the stamp, never the zero figure"
+owner = ["src/algotrade/services/evaluation/cross_section/run/universe_basis.py"]
+allowed = [
+    "src/algotrade/services/evaluation/cross_section/harness.py",  # the caller: stamps each run
+    "src/algotrade/services/evaluation/cross_section/results.py",  # writes the stamp and its gaps in the run record's stats
+    "src/algotrade/services/jobs/handlers.py",  # the job result carries it for the report
+]
+section = "docs/adr/0087-survivorship-free-listing-history.md#decision"
+detect = [{ call = "universe_basis" }, { call = "universe_basis_of" }, { call = "grains_without_delisting_return" }]
+
+[[responsibility]]
 id = "user-onboarding"
 description = "Onboard a trader (ID5, ADR 0040, decision log 2026-11-02): the admin-only write of a new user's config/users/<id>/identity.toml (email, name, declared_by, declared_at in UTC) through the ConfigWriter, refusing an invalid id, `site`, an id or an email the registry already holds and any caller who is not an admin; the role is always trader, no licences (admin and licences change by PR to users.toml); no identity-provider call, the result carries the one remaining provider step as data (services/authoring/onboarding.py)"
 owner = ["src/algotrade/services/authoring/onboarding.py"]

@@ -60,12 +60,14 @@ def test_the_leg_key_is_stable_and_follows_each_version(monkeypatch: pytest.Monk
 
 def test_leg_v5_is_a_new_key_scheme(monkeypatch: pytest.MonkeyPatch) -> None:
     """ADR 0088, E6a: a v4 leg (no trade-contract fields on its picks) is never reused: the key
-    of fixed inputs is not the v4 one, and ``LEG_VERSION`` is 5."""
-    assert key.LEG_VERSION == 5
+    of fixed inputs is not the v4 one; v6 (ADR 0087 PR6b) likewise is not v5's."""
+    assert key.LEG_VERSION == 6
     monkeypatch.setattr(key, "LEG_VERSION", 4)
     v4 = leg_key(**BASE)  # type: ignore[arg-type]
+    monkeypatch.setattr(key, "LEG_VERSION", 5)
+    v5 = leg_key(**BASE)  # type: ignore[arg-type]
     monkeypatch.undo()
-    assert leg_key(**BASE) != v4  # type: ignore[arg-type]
+    assert len({leg_key(**BASE), v4, v5}) == 3  # type: ignore[arg-type]
 
 
 DRAW_KEY = "0d63c752da98a108fe3dcbd0a776618d03207c1d0c82e7e9ffe58afb98bc6e9f"

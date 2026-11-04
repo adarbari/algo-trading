@@ -42,7 +42,7 @@ READS = "reads"
 OUTCOME = "outcome"
 NO_KEY = ""  # a key column that does not apply to a row kind
 IDENTITY = (("flag", TODAY_FLAG), ("proxy", PROXY))  # ``id_<kind>_<column>``: the paths
-HIT, DELISTED, TOUCH, SHORT = 1, 2, 4, 8  # bits of ``pick_flags``
+HIT, DELISTED, TOUCH, SHORT, ZERO_HIT = 1, 2, 4, 8, 16  # bits of ``pick_flags``
 
 
 @dataclass(frozen=True)
@@ -181,6 +181,7 @@ def _flags(pick: Pick) -> int:
         | (DELISTED if pick.delisted else 0)
         | (TOUCH if pick.touch else 0)
         | (SHORT if pick.side == "short" else 0)
+        | (ZERO_HIT if pick.zero_hit else 0)
     )
 
 
@@ -249,7 +250,22 @@ def encode_picks(picks: Sequence[Pick]) -> dict[str, list[Any] | None]:
         "pick_rocs_at": _flat_levels(picks, "rocs_at"),
         "pick_option": _flat_option(picks),
         "pick_entry": _entries(picks),
+        "pick_delisting_basis": _basis_of(picks),  # leg v6: the delisting return's basis ...
+        "pick_zero_values": _zero_values(picks),  # ... and the value with it taken out
     }
+
+
+def _basis_of(picks: Sequence[Pick]) -> list[str | None] | None:
+    """Each pick's ``delisting_basis``; None when no pick has one (a leg of names none of which
+    was delisted, or of v2 outcome rows, stores nothing new)."""
+    found = [p.delisting_basis for p in picks]
+    return found if any(b is not None for b in found) else None
+
+
+def _zero_values(picks: Sequence[Pick]) -> list[float | None] | None:
+    """Each pick's ``zero_value`` (null where none); None when no pick has one."""
+    found = [p.zero_value for p in picks]
+    return found if any(v is not None for v in found) else None
 
 
 def _entries(picks: Sequence[Pick]) -> list[date | None] | None:
@@ -278,6 +294,8 @@ def decode_picks(
     rocs = _list(row.get("pick_rocs_at"))  # E11: the return on capital at each, flat
     option = _list(row.get("pick_option"))  # E6b-3: the hedged / stock / wing figures, flat
     entries = _list(row.get("pick_entry")) or [None] * len(ids)  # E13: each pick's own S
+    bases = _list(row.get("pick_delisting_basis")) or [None] * len(ids)  # v6: null in older legs
+    zeros = _list(row.get("pick_zero_values")) or [None] * len(ids)
     split = shorts is not None
     kept = [sh for r, sh in zip(reasons, is_short, strict=True) if r == ""]  # counted picks
     short_n = sum(kept) if split else 0
@@ -316,6 +334,9 @@ def decode_picks(
                 values_at=_levels_of(levels, at),
                 rocs_at=_levels_of(rocs, at),
                 entry_session=_opt_day(entries[at]),
+                delisting_basis=_opt_str(bases[at]),
+                zero_value=_maybe(zeros[at]),
+                zero_hit=None if _maybe(zeros[at]) is None else bool(bits & ZERO_HIT),
                 **_option_of(option, at),
             )
         )

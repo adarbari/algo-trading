@@ -77,6 +77,12 @@ bootstrap_mean_block = 3   # ... and the mean block, in decision sessions (raise
 holdout_from = 2026-10-26  # ADR 0088 decision 15 (D): the first session after the option research's data; no option
 holdout_days = 92          # verdict until the run reaches holdout_from + this many days (3 months, unseen sessions)
 
+[universe_basis]           # ADR 0087 decision 6: the run stamp `universe_basis` is `free` only when all four hold
+max_no_id_share = 0.01     # qualifying listings alive in the window with no id: at most this share
+min_delisted_bars_share = 0.98 # names that delisted in the window with bars to their last bar: at least this share
+max_unknown_delisting_share = 0.05 # of those, delisting returns of unknown basis (ZERO_UNKNOWN or no event): at most this
+max_null_type_share = 0.05 # names with a null security_type: at most this share
+
 [option_costs]             # design 2.4: the option cost levels, `mid` (no spread), `effective`, `full` (all of it)
 levels = ["mid", "effective", "full"] # fixed names, in this order
 commission_usd = 0.65      # per contract on each side (none at expiry)

@@ -99,6 +99,11 @@ def _picks(
                 values_at=(leveled := level_values(levels, i) if counted else None),
                 rocs_at=level_rocs(leveled, stored, i) if side == LONG else None,  # E11
                 entry_session=entry.get(i) if isinstance(entry, Mapping) else None,
+                delisting_basis=_none_if_null(r["delisting_basis"]) if counted else None,
+                zero_value=_finite(r["zero_value"]) if counted and r["delisted"] else None,
+                zero_hit=bool(r["zero_hit"])
+                if counted and r["delisted"] and _finite(r["zero_value"]) is not None
+                else None,
                 **(figures.get(i, {}) if counted else {}),
             )
         )

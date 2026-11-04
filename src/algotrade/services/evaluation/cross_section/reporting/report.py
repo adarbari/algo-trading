@@ -51,6 +51,37 @@ def _gap(value: float | None) -> str:
     return "-" if value is None else f"{value:+.4f}"
 
 
+def _delisting_lines(found: Mapping[str, Any] | None) -> list[str]:
+    """The DELISTINGS lines (ADR 0087 decision 5): the window's delisted names by reason and by
+    the basis of their delisting return, then per screener the picks that were delisted and the
+    headline beside the zero-convention figure (the delisting return taken out; display only)."""
+    if not found:
+        return []
+    out = []
+    w = found.get("window")
+    if w:
+        reasons = ", ".join(f"{k} {n}" for k, n in w["by_reason"].items()) or "none"
+        bases = ", ".join(f"{k} {n}" for k, n in w["by_basis"].items()) or "none"
+        out.append(
+            f"DELISTINGS: {w['delisted']} names delisted in the window ({w['with_bars']} with bars "
+            f"to their last bar, {w['unknown']} with an unknown delisting return); by reason: "
+            f"{reasons}; by basis: {bases}"
+        )
+    for p in found.get("picks", []):
+        by = ", ".join(f"{k} {n}" for k, n in p["delisted_by_basis"].items())
+        if not by:
+            continue
+        hit = p["hits"] / p["picks"] if p["picks"] else None
+        zero = p["zero_hits"] / p["zero_picks"] if p["zero_picks"] else None
+        out.append(
+            f"DELISTINGS: {p['variant']} h={p['horizon']} picked delisted names ({by}): hit rate "
+            f"{'-' if hit is None else f'{hit:.1%}'}, with the delisting return taken out "
+            f"{'-' if zero is None else f'{zero:.1%}'}; mean value {_gap(p['mean_value'])}, "
+            f"taken out {_gap(p['mean_zero_value'])} (display only: no verdict reads it)"
+        )
+    return out
+
+
 def render_edge_report(result: Mapping[str, Any]) -> str:
     """The report of one ``edge-eval`` job result."""
     lines = [f"# Edge {result['edge']} (run {result['run_id']}, {result['trials']} trials)", ""]
@@ -73,6 +104,10 @@ def render_edge_report(result: Mapping[str, Any]) -> str:
             f"flag, {e['proxy']} by the liquidity proxy; screened: {k['today_flag']} and "
             f"{k['proxy']}"
         )
+    if "universe_basis" in result:
+        gaps = ", ".join(result.get("universe_basis_gaps", [])) or "none"
+        lines.append(f"UNIVERSE BASIS: {result['universe_basis']} (gaps: {gaps})")
+    lines.extend(_delisting_lines(result.get("delistings")))
     for horizon, n in result["unclosed_sessions"].items():
         lines.append(f"UNCLOSED: {n} start sessions at h={horizon} have no closed window")
     for lost in result.get("lost_sessions", []):
