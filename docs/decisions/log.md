@@ -418,3 +418,11 @@ follow-up PR).
 - decided by: orchestrator (design call)
 - status: pending owner confirmation
 - Reasoning: the browser derives nothing (ADR 0038, `architecture/web_forbidden_derivations.toml`); one cell shape and one set of factories serve every table of instruments, so a licence or UNKNOWN cell reads the same on Ideas as on a screener's results.
+
+## 2026-11-03 | Setups list: share or option filter | The Ideas words
+- Question: the owner asked to list only the option setups on Setups; what does the filter say, given the Ideas page already splits setups by the same rule (`ideas/setups.py` `tab_of`: any option leg is Premium, shares are Stocks)?
+- Options: "Kind" with Stocks / Premium (the Ideas words) / "Position" with Shares / Options (plainer, a second pair of words for the same split).
+- Decision: filter "Kind", values Stocks / Premium (`stocks` / `premium`), the column served from `tab_of` on the Edges list row (`EdgeRow.tab`); its Guide entry points at `idea_tab`.
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: ADR 0083 amendment (a) already names this split by the position's kind (share legs -> Stocks, any option leg -> Premium, buyers included) and the Guide term `idea_tab` explains it; the Setups filter reuses that one vocabulary and entry rather than adding a second pair of words for the same rule.

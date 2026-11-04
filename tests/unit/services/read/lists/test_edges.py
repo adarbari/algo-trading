@@ -9,6 +9,7 @@ import pytest
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.filtering.definitions import FilterRefusedError
 from algotrade.services.read.filtering.masks import FilterInput
+from algotrade.services.read.ideas.setups import TABS
 from algotrade.services.read.lists.edges import EdgeList, load_edge_list
 from tests.conftest import REPO_ROOT
 from tests.unit.services.read.edge_desk.conftest import backend, context  # noqa: F401  (fixture)
@@ -19,7 +20,19 @@ OTHER = {
     **EDGE, "id": "other", "name": "Quiet Zebra", "status": "rejected",
     "thesis": "Striped names mean revert.", "rejection_reason": "no edge",
 }  # fmt: skip
-EXTRA = {("site", "filters", "edges"): SHIPPED, ("site", "edges", "other"): OTHER}
+TEMPLATES = tomllib.loads((REPO_ROOT / "config/site/positions/templates.toml").read_text())
+STRADDLE = {
+    **EDGE, "id": "straddle", "name": "Short Straddle", "thesis": "Implied overstates realised.",
+    "outcome": {"kind": "option_model_pnl", "horizon_sessions": [21], "benchmark": "none",
+                "start_offset_sessions": 1, "structure": "atm_straddle_short",
+                "iv_field": "feature.iv30"},
+}  # fmt: skip
+EXTRA = {
+    ("site", "filters", "edges"): SHIPPED,
+    ("site", "edges", "other"): OTHER,
+    ("site", "edges", "straddle"): STRADDLE,
+    ("site", "positions", "templates"): TEMPLATES,
+}
 
 
 @pytest.fixture
@@ -33,8 +46,8 @@ def ids(found: EdgeList) -> list[str]:
 
 def test_no_filters_is_every_edge(ctx: ReadContext) -> None:
     found = load_edge_list(ctx)
-    assert ids(found) == ["drift", "other"]
-    assert found.total == found.facets.total == 2
+    assert ids(found) == ["drift", "other", "straddle"]
+    assert found.total == found.facets.total == 3
 
 
 def test_search_matches_name_thesis_and_id(ctx: ReadContext) -> None:
@@ -54,7 +67,7 @@ def test_the_views_are_filters(ctx: ReadContext) -> None:
 
 def test_the_search_narrows_before_the_facets(ctx: ReadContext) -> None:
     found = load_edge_list(ctx, [FilterInput("status", values=["rejected"])], q="names")
-    assert found.facets.total == 2 and ids(found) == ["other"]  # both theses say "names"
+    assert found.facets.total == 2 and ids(found) == ["other"]  # two theses say "names"
 
 
 def test_a_figure_the_verdict_lacks_never_passes(ctx: ReadContext) -> None:
@@ -62,7 +75,7 @@ def test_a_figure_the_verdict_lacks_never_passes(ctx: ReadContext) -> None:
     held = {r.edge.id for r in load_edge_list(ctx).items if r.summary.oos_trades is not None}
     assert set(ids(every)) == held  # a min of 0 admits no null
     sample = next(f for f in every.facets.items if f.id == "sample")
-    assert sample.unknown == 2 - len(held)
+    assert sample.unknown == 3 - len(held)
 
 
 def test_a_live_state_is_picked_by_its_word(ctx: ReadContext) -> None:
@@ -75,3 +88,17 @@ def test_a_filter_that_is_not_offered_is_refused(ctx: ReadContext) -> None:
         load_edge_list(
             ctx, [FilterInput("hit_rate", min=0.5)]
         )  # dropped: not stored in the headline
+
+
+def test_the_kind_is_the_ideas_tab_of_the_position(ctx: ReadContext) -> None:
+    rows = {r.edge.id: r.tab for r in load_edge_list(ctx).items}
+    assert rows == {"drift": "stocks", "other": "stocks", "straddle": "premium"}
+    premium = load_edge_list(ctx, [FilterInput("kind", values=["premium"])])
+    assert ids(premium) == ["straddle"]
+    kind = next(f for f in premium.facets.items if f.id == "kind")
+    assert kind.unknown == 0  # every edge has a kind
+
+
+def test_the_kind_options_are_the_ideas_tabs() -> None:
+    kind = next(f for f in SHIPPED["filter"] if f["id"] == "kind")
+    assert tuple(o["value"] for o in kind["option"]) == TABS
