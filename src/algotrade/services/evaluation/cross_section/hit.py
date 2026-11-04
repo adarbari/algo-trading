@@ -74,7 +74,7 @@ as an ``above`` one's.
 
 import math
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import numpy as np
 import pandas as pd
@@ -135,7 +135,8 @@ SIBLING_REASONS = (
 TRADING_DAYS = 252  # sessions per year: T of an expires_otm strike
 RESULT_COLUMNS = (
     "instrument_id", "value", "oriented", "hit", "excluded", "delisted", "reference", "touch",
-    "short_value", "short_hit",
+    "short_value", "short_hit", "delisting_basis", "zero_value", "zero_hit", "zero_short_value",
+    "zero_short_hit",
 )  # fmt: skip
 
 
@@ -426,6 +427,8 @@ def short_view(res: pd.DataFrame) -> pd.DataFrame:
     out = res.copy()
     out["value"] = out["oriented"] = out["short_value"]
     out["hit"] = out["short_hit"] & (out["excluded"] == "")
+    out["zero_value"] = out["zero_short_value"]
+    out["zero_hit"] = out["zero_short_hit"] & (out["excluded"] == "")
     return out
 
 
@@ -509,6 +512,30 @@ def _return_outcome(edge: Edge, outcomes: pd.DataFrame, excluded: np.ndarray) ->
     return value
 
 
+def zero_view(outcomes: pd.DataFrame) -> pd.DataFrame:
+    """``outcomes`` as they would read with no delisting return applied (ADR 0087 decision 5).
+    ``forward_returns@v3`` stores ``fwd_return = (1 + r_last) * (1 + dr) - 1`` for a DELISTED
+    window with a known ``delisting_return`` ``dr`` (null for ``NO_EVENT``) and the excess return
+    the same less the benchmark's; taking ``dr`` out is exact: ``fwd_return`` becomes
+    ``(1 + f) / (1 + dr) - 1`` and ``fwd_excess_return`` falls by the same step. Max return,
+    drawdown and volatility are to the last bar already. A frame with no ``delisting_return``
+    (v2) is returned as is: its returns carry none."""
+    if "delisting_return" not in outcomes.columns:
+        return outcomes
+    dr = pd.to_numeric(outcomes["delisting_return"], errors="coerce")
+    applied = dr.notna()
+    if not applied.any():
+        return outcomes
+    out = outcomes.copy()
+    gross = pd.to_numeric(out["fwd_return"], errors="coerce")
+    plain = (1.0 + gross) / (1.0 + dr) - 1.0
+    out["fwd_return"] = gross.where(~applied, plain)
+    if "fwd_excess_return" in out.columns:  # a pair spread's rows read ``fwd_return`` alone
+        excess = pd.to_numeric(out["fwd_excess_return"], errors="coerce")
+        out["fwd_excess_return"] = excess.where(~applied, excess - (gross - plain))
+    return out
+
+
 def apply_outcome(
     edge: Edge,
     outcomes: pd.DataFrame,
@@ -521,7 +548,78 @@ def apply_outcome(
     and whether the name was delisted. ``implied``: the IV at S by instrument id (needed when
     ``needs_implied_vol``); ``pairs``: the siblings (needed when ``needs_pairs``);
     ``option_costs``: the commission an ``option_pnl`` value pays (no other kind reads it; none:
-    no commission)."""
+    no commission).
+
+    The ``zero_*`` columns are the same outcome on ``zero_view(outcomes)``, the frame with the
+    delisting returns of ``forward_returns@v3`` taken out (ADR 0087 decision 5): the figure the
+    report shows beside the verdict, never a verdict input. Without a stored delisting return
+    (v2) they equal the value and the hit. ``delisting_basis`` is the row's (null: not delisted,
+    or no basis stored)."""
+    res = _apply(edge, outcomes, implied, pairs, option_costs)
+    own = own_rows(edge, outcomes)
+    zero = _zero_pass(edge, own, res, implied, pairs, option_costs)
+    counted = (res["excluded"] == "") & (zero["excluded"] == "")
+    basis = own["delisting_basis"] if "delisting_basis" in own.columns else None
+    return res.assign(
+        delisting_basis=None if basis is None else basis.astype(object).to_numpy(),
+        zero_value=np.where(counted, zero["oriented"], np.nan),
+        zero_hit=zero["hit"].to_numpy() & counted.to_numpy(),
+        zero_short_value=np.where(counted, zero["short_value"], np.nan),
+        zero_short_hit=zero["short_hit"].to_numpy() & counted.to_numpy(),
+    )[list(RESULT_COLUMNS)]
+
+
+ZERO_COLUMNS = ("oriented", "hit", "excluded", "short_value", "short_hit")
+
+
+def _zero_rows(own: pd.DataFrame, pairs: Pairs | None) -> np.ndarray:
+    """The rows of ``own`` whose zero figure can differ from the value: a stored delisting return
+    on the row, or, for a pair spread, on its sibling's stored row."""
+    drop = "delisting_return"
+    hit = own[drop].notna().to_numpy() if drop in own.columns else np.zeros(len(own), dtype=bool)
+    if pairs is not None and drop in pairs.stored.columns:
+        gone = set(pairs.stored.loc[pairs.stored[drop].notna(), "instrument_id"])
+        if gone:
+            sibling = [pairs.siblings.get(i) in gone for i in own["instrument_id"]]
+            hit = hit | np.array(sibling, dtype=bool)
+    return hit
+
+
+def _zero_pass(
+    edge: Edge,
+    own: pd.DataFrame,
+    res: pd.DataFrame,
+    implied: Mapping[str, float | None] | None,
+    pairs: Pairs | None,
+    option_costs: OptionCosts | None,
+) -> pd.DataFrame:
+    """``res`` re-valued on ``zero_view``: only the rows with a delisting return of their own (or
+    of a pair's sibling, whose stored return is taken out too) go through ``_apply`` again, and
+    their figures are spliced into a copy of ``res``; ``res`` itself when there are none (a v2
+    frame, or a night with no delisted name in the window), so no second full pass is made."""
+    chosen = _zero_rows(own, pairs)
+    if not chosen.any():
+        return res
+    spot = None if pairs is None else replace(pairs, stored=zero_view(pairs.stored))
+    sub = _apply(edge, zero_view(own[chosen]), implied, spot, option_costs)
+    at = np.flatnonzero(chosen)
+    zero = res.copy()
+    for column in ZERO_COLUMNS:
+        values = zero[column].to_numpy(copy=True)
+        values[at] = sub[column].to_numpy()
+        zero[column] = values
+    return zero
+
+
+def _apply(
+    edge: Edge,
+    outcomes: pd.DataFrame,
+    implied: Mapping[str, float | None] | None,
+    pairs: Pairs | None,
+    option_costs: OptionCosts | None,
+) -> pd.DataFrame:
+    """The columns of ``apply_outcome`` before the zero view (``RESULT_COLUMNS`` less ``zero_*``
+    and ``delisting_basis``, which ``apply_outcome`` adds)."""
     o = edge.outcome
     outcomes = own_rows(edge, outcomes)
     _refuse_book(edge)
@@ -579,6 +677,5 @@ def apply_outcome(
             "touch": np.where(counted, touch, np.nan),
             "short_value": short_value,
             "short_hit": np.nan_to_num(short_value, nan=-1.0) > 0,
-        },
-        columns=list(RESULT_COLUMNS),
+        }
     )

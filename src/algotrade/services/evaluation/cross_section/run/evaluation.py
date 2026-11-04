@@ -18,6 +18,7 @@ from algotrade.services.evaluation.cross_section.random_picks import RANDOM
 from algotrade.services.evaluation.cross_section.reporting.report_containment import (
     ReportContainment,
 )
+from algotrade.services.evaluation.cross_section.run.universe_basis import UniverseBasis
 
 
 @dataclass(frozen=True)
@@ -126,3 +127,6 @@ class EdgeEvaluation:
     bootstrap: Mapping[str, Any] = field(default_factory=dict)
     # The main outcome's declared exits (``spec.exits_digest``; None: no position), in the stats.
     exits_digest: str | None = None
+    # The run's ``universe_basis`` stamp and the counts it was decided on (ADR 0087 decision 6);
+    # None: the run did not read the listing history (a time-series run), stamped ``survivors``.
+    universe_basis: UniverseBasis | None = None

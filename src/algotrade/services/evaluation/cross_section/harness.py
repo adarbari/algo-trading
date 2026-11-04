@@ -48,17 +48,20 @@ from algotrade.config.edges.portfolio import PORTFOLIO_KIND
 from algotrade.config.edges.positions.chain import CHAIN_KIND, OPTION_HISTORY
 from algotrade.config.edges.positions.spec import exits_digest
 from algotrade.config.edges.positions.templates import load_templates
+from algotrade.config.edges.universe_basis import UniverseBasisLimits
 from algotrade.config.edges.verdict import OPTION_LEVELS
 from algotrade.config.env import option_history_url
-from algotrade.config.site.settings import load_verdict
+from algotrade.config.site.settings import load_verdict, site_document
 from algotrade.config.strategy.regime import site_regime
 from algotrade.config.strategy.schema import MODEL_IMPL, Selection
 from algotrade.config.user import UserContext
-from algotrade.core.model.errors import ConfigurationError
+from algotrade.core.model.errors import ConfigurationError, MissingDataError
 from algotrade.core.time.calendar import sessions_between
 from algotrade.data import StoreReader
+from algotrade.data.listings.basis import universe_basis_counts
 from algotrade.data.option_history.splice import history_store, read_licence, spliced
 from algotrade.data.outcomes import GrainReads, stored_sessions
+from algotrade.data.outcomes.reading import READ_TABLE
 from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.features.framework.feature import Feature, strictest
 from algotrade.services.evaluation.cross_section.baselines.variant import (
@@ -171,6 +174,11 @@ from algotrade.services.evaluation.cross_section.run.scopes import (
     event_schedules,
     iv_licence,
     refuse_fitted_scores,
+)
+from algotrade.services.evaluation.cross_section.run.universe_basis import (
+    UniverseBasis,
+    grains_without_delisting_return,
+    universe_basis,
 )
 from algotrade.services.evaluation.cross_section.sessions import (
     Leg,
@@ -548,6 +556,29 @@ def evaluate_edge(
             "mean_block": verdict.tails.bootstrap_mean_block,
             "seed_version": BOOTSTRAP_SEED_VERSION,
         },
+        universe_basis=_basis(reader, configs, scopes, start, end, as_of),
+    )
+
+
+def _basis(
+    reader: StoreReader,
+    configs: ConfigStore,
+    scopes: Sequence[_Scope],
+    start: date,
+    end: date,
+    as_of: datetime,
+) -> UniverseBasis:
+    """The run's ``universe_basis`` stamp (ADR 0087 decision 6): the data layer's counts for the
+    window against the site's limits; no listing history stored is a gap, never an error."""
+    try:
+        counts = universe_basis_counts(reader, start, end, as_of)
+    except MissingDataError:
+        counts = None
+    return universe_basis(
+        counts,
+        UniverseBasisLimits.from_document(site_document(configs.load, "verdict")),
+        READ_TABLE,
+        grains_without_delisting_return([s.edge for s in scopes]),
     )
 
 

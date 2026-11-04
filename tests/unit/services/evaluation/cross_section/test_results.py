@@ -2,6 +2,7 @@
 together, one per variant, horizon and slice, keyed so a re-run of the range replaces them), its
 run record keeps the trial log, and the survivorship caveat is countable."""
 
+from dataclasses import replace
 from datetime import date, datetime, timedelta
 from typing import Any
 
@@ -13,6 +14,7 @@ from algotrade.config.user import UserContext
 from algotrade.core.model.errors import DataValidationError
 from algotrade.data import dates_digest
 from algotrade.quant.edges.statistics import break_even_cost
+from algotrade.services.evaluation.cross_section import harness
 from algotrade.services.evaluation.cross_section.harness import evaluate_edge
 from algotrade.services.evaluation.cross_section.legs.rows import (
     _stored,
@@ -27,11 +29,13 @@ from algotrade.services.evaluation.cross_section.results import (
     records,
     sibling_coverage,
     survivorship,
+    universe_basis_of,
     write_edge_eval,
 )
 from algotrade.services.evaluation.cross_section.run.evaluation import EdgeEvaluation
 from algotrade.storage.backends.runs.run_selection import merge_rows
 from algotrade.storage.tables.edge_schemas import EDGE_EVAL
+from algotrade.storage.tables.schemas import FORWARD_RETURNS_V3
 from tests.helpers.stored_frames import stamped
 from tests.unit.services.evaluation.cross_section.conftest import (
     AS_OF,
@@ -547,3 +551,39 @@ def test_a_below_edges_cost_rows_follow_its_orientation_and_break_even_is_one_gr
     assert means == sorted(means)  # sign * (gross - cost): a higher cost raises a below mean
     found = {break_even_cost(m, bp, -1.0) for m, bp in zip(means, (0, 15, 20, 30, 50), strict=True)}
     assert max(found) - min(found) < 1e-6
+
+
+def test_the_run_record_carries_the_stamp_the_gaps_and_the_delistings(world: World) -> None:
+    """ADR 0087 decision 6: ``survivors`` while the read table is v2, the gaps sorted and named;
+    no listing history stored is a gap, never an error."""
+    ev = evaluate(world)
+    record = write_edge_eval(world.results, ev, NOW)
+    stats = record.stats
+    assert stats["universe_basis"] == "survivors"
+    assert stats["universe_basis_gaps"] == ["listing_counts_unread", "outcomes_not_v3"]
+    assert stats["delistings"]["window"] is None
+    assert stats["universe_basis_limits"] == {  # a later owner change shows on old runs
+        "max_no_id_share": 0.01, "min_delisted_bars_share": 0.98,
+        "max_unknown_delisting_share": 0.05, "max_null_type_share": 0.05,
+    }  # fmt: skip
+    (momo,) = stats["delistings"]["picks"]
+    assert momo["picks"] > 0 and momo["zero_picks"] == momo["picks"]  # v2: zero equals headline
+    assert momo["zero_hits"] == momo["hits"] and momo["delisted_by_basis"] == {}
+
+
+def test_a_v2_run_with_the_listing_history_still_says_survivors() -> None:
+    ev = evaluate(with_listing_history(build_world(snapshot=DAYS[3]), DAYS[3]))
+    assert ev.universe_basis is not None and ev.universe_basis.counts is not None
+    assert ev.universe_basis.basis == "survivors"
+    assert "outcomes_not_v3" in ev.universe_basis.gaps
+
+
+def test_a_run_reading_v3_loses_only_the_table_gap(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(harness, "READ_TABLE", FORWARD_RETURNS_V3)  # the stamp's input only
+    ev = evaluate(build_world())
+    assert ev.universe_basis is not None and ev.universe_basis.gaps == ("listing_counts_unread",)
+
+
+def test_a_run_with_no_stamp_is_survivors_with_one_gap(world: World) -> None:
+    found = universe_basis_of(replace(evaluate(world), universe_basis=None))  # a time-series run
+    assert (found.basis, found.gaps) == ("survivors", ("listing_counts_unread",))

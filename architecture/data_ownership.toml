@@ -57,6 +57,7 @@ allowed = [
     "apps/ingestion/algotrade_ingestion/tasks/listings/delistings.py",  # the writer: the table's name, vocabulary and convention
     "apps/ingestion/algotrade_ingestion/tasks/listings/delisting_reason.py",  # the reasons it assigns
     "apps/ingestion/algotrade_ingestion/tasks/derived/outcomes.py",  # the outcome label: the delisting return of forward_returns@v3, the latest snapshot at write time (decision 5)
+    "src/algotrade/data/listings/basis.py",  # the stamp's counts: the window's delistings by reason and basis, as stored by the run's as_of (decision 6)
 ]
 section = "docs/adr/0087-survivorship-free-listing-history.md#decision"
 detect = [{ call = "read_delistings" }, { call = "convention" }]
@@ -317,3 +318,13 @@ allowed = [
 ]
 section = "docs/adr/0077-serving-release.md#decision"
 detect = [{ call = "destructive_epoch" }, { call = "unpin" }]
+
+[[responsibility]]
+id = "universe-basis-counts"
+description = "Count what the run stamp universe_basis is decided on (ADR 0087 decision 6) over a window [start, end]: the in-scope listings alive in it that ADR 0013's rule admits and those with no id, the stock listings with a null security_type, whether the listing snapshot is the merged one, and the delistings with a last trading day in it with an events row (with bars to the last bar), with an unknown delisting return (ZERO_UNKNOWN or no row: a missing event is unknown, never 0) and by reason and basis, from the latest listing snapshot universe_asof reads and the delisting snapshot stored by the run's as_of; the data layer only counts, services/evaluation compares the shares with verdict.toml [universe_basis]"
+owner = ["src/algotrade/data/listings/basis.py"]
+allowed = [
+    "src/algotrade/services/evaluation/cross_section/harness.py",  # the caller: counts the run's window once, into the stamp
+]
+section = "docs/adr/0087-survivorship-free-listing-history.md#decision"
+detect = [{ call = "universe_basis_counts" }]

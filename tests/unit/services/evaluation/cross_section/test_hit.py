@@ -18,14 +18,17 @@ from algotrade.quant.black_scholes import (
     prob_otm,
     strike_from_delta,
 )
+from algotrade.services.evaluation.cross_section import hit
 from algotrade.services.evaluation.cross_section.hit import (
     Pairs,
+    _apply,
     apply_outcome,
     borrow_cost,
     needs_implied_vol,
     needs_pairs,
     own_keys,
     short_view,
+    zero_view,
 )
 from algotrade.storage.tables.schemas import RESIDUAL_RETURNS
 from tests.helpers.stored_frames import stamped
@@ -722,3 +725,147 @@ def test_a_share_path_whose_exit_rule_was_unknown_on_a_close_is_unmeasured() -> 
 def test_a_share_path_row_with_no_benchmark_return_is_excluded_not_a_miss() -> None:
     out = apply_outcome(path_edge(), path_rows(2, fwd_excess_return=[0.05, NAN]))
     assert list(out["excluded"]) == ["", "missing_value"] and not out["hit"].iloc[1]
+
+
+def _excess_edge(**over: object) -> Any:
+    return edge(
+        outcome={
+            "kind": "excess_return", "horizon_sessions": [2], "benchmark": "SPY",
+            "start_offset_sessions": 1, **over,
+        }
+    )  # fmt: skip
+
+
+def test_a_v2_frame_has_the_zero_figure_equal_to_the_value() -> None:
+    out = apply_outcome(_excess_edge(), rows(fwd_excess_return=[0.02, -0.01]))
+    assert list(out["zero_value"]) == list(out["oriented"])
+    assert list(out["zero_hit"]) == list(out["hit"]) == [True, False]
+    assert out["delisting_basis"].isna().all()
+
+
+def test_a_delisting_return_is_in_the_value_and_taken_out_of_the_zero_figure() -> None:
+    last, dr = 0.10, -0.55
+    full = (1 + last) * (1 + dr) - 1  # -0.505
+    frame = rows(
+        fwd_excess_return=[full - 0.01, 0.02],
+        outcome_status=["DELISTED", "COMPLETE"],
+        fwd_return=[full, 0.03],
+        delisting_return=[dr, None],
+        delisting_basis=["REPLACEMENT", None],
+    )
+    out = apply_outcome(_excess_edge(), frame)
+    assert out.at[0, "oriented"] == pytest.approx(full - 0.01) and not out.at[0, "hit"]
+    assert out.at[0, "zero_value"] == pytest.approx(last - 0.01) and out.at[0, "zero_hit"]
+    assert out.at[0, "delisting_basis"] == "REPLACEMENT" and pd.isna(out.at[1, "delisting_basis"])
+    assert (out.at[1, "zero_value"], out.at[1, "zero_hit"]) == (0.02, True)  # not delisted: same
+
+
+def test_the_short_view_carries_the_zero_figure_of_the_short() -> None:
+    frame = rows(
+        fwd_excess_return=[-0.505 - 0.01],
+        outcome_status=["DELISTED"],
+        fwd_return=[-0.505],
+        delisting_return=[-0.55],
+        delisting_basis=["REPLACEMENT"],
+        horizon_sessions=[2],
+    )
+    short = short_view(apply_outcome(_excess_edge(side="short"), frame))
+    assert short.at[0, "hit"]  # the short wins on the -50% return ...
+    assert short.at[0, "zero_value"] == pytest.approx(-(0.10 - 0.01))  # ... and loses without it
+    assert not short.at[0, "zero_hit"]
+
+
+def test_an_excluded_row_has_no_zero_figure() -> None:
+    out = apply_outcome(_excess_edge(), rows(fwd_excess_return=[NAN, 0.02]))
+    assert np.isnan(out.at[0, "zero_value"]) and not out.at[0, "zero_hit"]
+
+
+# ---- zero_view: the delisting return taken back out of a v3 frame (ADR 0087 decision 5)
+
+
+def _v3() -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "instrument_id": ["EQ:A", "EQ:B", "EQ:C"],
+            "fwd_return": [(1.10) * (1 - 0.55) - 1, 0.04, 0.02],
+            "fwd_excess_return": [(1.10) * (1 - 0.55) - 1 - 0.01, 0.03, 0.01],
+            "fwd_max_drawdown": [0.2, 0.1, 0.0],
+            "delisting_return": [-0.55, None, None],
+            "delisting_basis": ["REPLACEMENT", None, "NO_EVENT"],
+        }
+    )
+
+
+def test_the_zero_figure_is_one_plus_f_over_one_plus_dr_minus_one() -> None:
+    out = zero_view(_v3())
+    assert out.at[0, "fwd_return"] == pytest.approx(0.10)  # (1 + f) / (1 + dr) - 1 = r_last
+    assert out.at[0, "fwd_excess_return"] == pytest.approx(0.09)  # the benchmark's 0.01 stays
+    assert out.at[0, "fwd_max_drawdown"] == 0.2  # to the last bar already: untouched
+
+
+def test_rows_with_no_delisting_return_are_unchanged() -> None:
+    frame, out = _v3(), zero_view(_v3())
+    assert list(out["fwd_return"][1:]) == list(frame["fwd_return"][1:])  # incl. NO_EVENT: null
+    assert list(out["fwd_excess_return"][1:]) == list(frame["fwd_excess_return"][1:])
+
+
+def test_the_input_is_not_changed_and_a_v2_frame_is_returned_as_is() -> None:
+    frame = _v3()
+    zero_view(frame)
+    assert frame.at[0, "fwd_return"] == pytest.approx(-0.505)
+    v2 = frame.drop(columns=["delisting_return", "delisting_basis"])
+    assert zero_view(v2) is v2
+    none = frame.assign(delisting_return=None)
+    assert zero_view(none) is none
+
+
+def _mixed() -> pd.DataFrame:
+    return rows(
+        fwd_excess_return=[-0.515, 0.02, -0.01, 0.3],
+        fwd_return=[-0.505, 0.03, 0.0, 0.31],
+        outcome_status=["DELISTED", "COMPLETE", "DELISTED", "COMPLETE"],
+        delisting_return=[-0.55, None, None, None],
+        delisting_basis=["REPLACEMENT", None, "NO_EVENT", None],
+        horizon_sessions=[2] * 4,
+    )
+
+
+@pytest.mark.parametrize("side", ["long", "short"])
+def test_the_spliced_zero_pass_equals_a_full_second_pass(side: str) -> None:
+    """Only the rows with a delisting return are valued twice; the figures are those of valuing
+    the whole zero view."""
+    e, frame = _excess_edge(side=side), _mixed()
+    out = apply_outcome(e, frame)
+    full = _apply(e, zero_view(frame), None, None, None)
+    counted = (out["excluded"] == "") & (full["excluded"] == "")
+    assert list(out["zero_value"].fillna(-9)) == list(full["oriented"].where(counted).fillna(-9))
+    assert list(out["zero_hit"]) == list(full["hit"] & counted)
+    assert list(out["zero_short_hit"]) == list(full["short_hit"] & counted)
+
+
+def test_a_frame_with_no_delisting_return_is_not_valued_twice(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = []
+    real = hit._apply
+    monkeypatch.setattr(hit, "_apply", lambda *a: calls.append(1) or real(*a))
+    apply_outcome(_excess_edge(), rows(fwd_excess_return=[0.02, -0.01]))
+    assert len(calls) == 1  # v2: the zero figure is the value
+    calls.clear()
+    apply_outcome(_excess_edge(), _mixed())
+    assert len(calls) == 2  # v3 with a delisted name: the delisted rows only, a second time
+
+
+def test_a_pair_spread_takes_the_siblings_delisting_return_out_too() -> None:
+    """A (+5%) is held against B, which delisted: -50.5% stored with a -55% delisting return over
+    a +10% last-bar return. A's spread falls by the 60.5 points the convention gave it; the costs
+    are the same in both figures."""
+    stored = pair_rows(
+        {"EQ:A": 0.05, "EQ:B": -0.505},
+        delisting_return=[None, -0.55],
+        outcome_status=["COMPLETE", "DELISTED"],
+    )
+    a_only = stored[stored["instrument_id"] == "EQ:A"]
+    out = apply_outcome(pair_edge(), a_only, pairs=pairs_of(stored, AB)).iloc[0]
+    assert out["excluded"] == ""
+    assert out["oriented"] - out["zero_value"] == pytest.approx(0.605)
