@@ -12,7 +12,7 @@ requires-python = ">=3.12"
 dependencies = [
     "algotrade",
     "fastapi>=0.162.0",
-    "pydantic>=2.14.1",
+    "pydantic>=2.14.2",
     "pyjwt[crypto]>=2.15.1",
     "strawberry-graphql[fastapi]>=0.336.2",
     "uvicorn>=0.30",
