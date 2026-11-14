@@ -15,7 +15,7 @@ requires-python = ">=3.12"
 dependencies = [
     "numpy>=2.5.4",
     "pandas>=2.2",
-    "pyarrow>=26.0.0",
+    "pyarrow>=26.0.1",
 ]
 
 [tool.hatch.build.targets.wheel]
