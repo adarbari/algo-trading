@@ -14,7 +14,7 @@ dependencies = [
     "fastapi>=0.164.0",
     "pydantic>=2.14.2",
     "pyjwt[crypto]>=2.15.1",
-    "strawberry-graphql[fastapi]>=0.336.2",
+    "strawberry-graphql[fastapi]>=0.341.3",
     "uvicorn>=0.30",
 ]
 
